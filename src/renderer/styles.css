@@ -1,7 +1,11 @@
-/* 深色工作台：冷調中性深色面板 + 單一藍色重點色。版面仍依 docs/UI.png：
+/* 三種主題共用同一套元件規則，顏色／圓角／邊框／間距全部走 custom property。
+   :root（= html[data-theme="dark"]）是深色工作台，另外兩個主題只覆寫 token，
+   下面的元件規則一條都不重複。版面仍依 docs/UI.png：
    上方工具列、中間終端機、右側 session 清單、輸入面板停在終端機下方。*/
 
-:root {
+/* ---- 深色 (預設)：冷調中性深色面板 + 單一藍色重點色 ---- */
+:root,
+html[data-theme='dark'] {
   color-scheme: dark;
 
   --window: #111417;
@@ -10,6 +14,7 @@
   --hover: #262a2f;
   --selected: #2c3136;
   --terminal-bg: #0c0f12;
+  --terminal-fg: #cfd3d7;
 
   --text: #dbdee2;
   --text-strong: #f2f4f6;
@@ -25,9 +30,340 @@
   --running: #6fc087;
   --exited: #4b5055;
   --recording: #eb8d86;
+  --recording-soft: rgba(235, 141, 134, 0.16);
+  --recording-soft-hover: rgba(235, 141, 134, 0.24);
+
+  --scrollbar: #3a4046;
+  --term-scrollbar: #3a4046;
+  --backdrop: rgba(9, 11, 13, 0.6);
 
   --radius: 6px;
   --radius-sm: 4px;
+
+  /* 版面 */
+  --toolbar-height: 44px;
+  --panel-width: 240px;
+
+  /* 工具列 */
+  --toolbar-gap: 4px;
+  --toolbar-pad-x: 10px;
+  --btn-height: 30px;
+  --btn-pad-x: 12px;
+  --btn-gap: 7px;
+  --btn-size: 13px;
+  --btn-tracking: normal;
+  --btn-border-width: 0;
+  --btn-border: transparent;
+  --btn-icon-display: block;
+  --btn-on-bg: var(--selected);
+  --btn-on-fg: var(--text);
+  --btn-on-border: transparent;
+  --btn-alt-bg: transparent;
+  --btn-alt-border: transparent;
+  --btn-hover-bg: var(--hover);
+  --btn-active-bg: var(--selected);
+  --sep-width: 1px;
+  --sep-margin: 6px;
+
+  /* 主要動作 (新連接 / 送出 / 建立) */
+  --primary-bg: var(--accent);
+  --primary-fg: var(--on-accent);
+  --primary-hover-bg: var(--accent-hover);
+  --primary-hover-fg: var(--on-accent);
+  --primary-active-bg: var(--accent-active);
+  --primary-weight: 600;
+  --primary-shadow: none;
+  --toolbar-primary-shadow: none;
+
+  /* 終端機區 */
+  --term-area-bg: var(--terminal-bg);
+  --term-area-pad: 0;
+  --term-area-gap: 0;
+  --term-radius: 0;
+  --term-surround: none;
+  --term-pad: 14px 18px;
+
+  /* 輸入面板 */
+  --panel-pad: 10px 14px 12px;
+  --panel-border-width: 0;
+  --panel-radius: 0;
+  --field-bg: var(--terminal-bg);
+  --field-fg: var(--terminal-fg);
+  --field-border: var(--border);
+  --field-height: 78px;
+  --field-focus-underline: 1px;
+  --send-align: flex-end;
+  --send-height: 34px;
+  --send-pad-x: 18px;
+  --send-border-width: 0;
+
+  /* session 清單 */
+  --head-pad-x: 14px;
+  --head-font: inherit;
+  --head-size: 11.5px;
+  --head-weight: 600;
+  --head-color: var(--muted);
+  --head-tracking: 0.08em;
+  --count-size: 11.5px;
+  --list-bg: transparent;
+  --list-pad: 8px;
+  --list-gap: 2px;
+  --item-bg: transparent;
+  --item-grid: 8px 1fr 20px;
+  --item-gap: 10px;
+  --item-pad: 8px 10px;
+  --item-radius: var(--radius);
+  --dot-w: 8px;
+  --dot-h: 8px;
+  --dot-radius: 50%;
+  --dot-clip: none;
+  --dot-inline-size: 8px;
+  --name-size: 13px;
+  --name-active-weight: 400;
+  --meta-font: inherit;
+  --meta-size: 11px;
+  --meta-tracking: normal;
+  --tag-bg: var(--border);
+  --tag-fg: #a4a9af;
+  --tag-border: transparent;
+  --tag-border-width: 0;
+  --tag-pad: 1px 6px;
+  --tag-radius: var(--radius-sm);
+  --tag-size: 10.5px;
+  --tag-tracking: 0.03em;
+  --tag-transform: none;
+  --tag-exited-bg: #23272c;
+  --tag-exited-fg: #7b8187;
+  --state-running: var(--muted);
+  --close-size: 20px;
+  --close-radius: var(--radius-sm);
+  --close-hover-bg: rgba(219, 222, 226, 0.1);
+  --close-active-fg: #a4a9af;
+
+  /* 對話框與下拉選單 */
+  --dialog-hover-bg: #343940;
+  --select-bg: var(--chrome);
+  --select-border: var(--border);
+}
+
+/* ---- 淺色：Fluent 風格淺灰視窗 + 內嵌深色終端機 ---- */
+html[data-theme='light'] {
+  color-scheme: light;
+
+  --window: #f3f3f3;
+  --chrome: #fdfdfd;
+  --border: #e0e0e0;
+  --hover: #f5f5f5;
+  --selected: #ededed;
+  --terminal-bg: #181b1f;
+  --terminal-fg: #d1d5d9;
+
+  --text: #2c2e31;
+  --text-strong: #1b1d1f;
+  --text-button: #2c2e31;
+  --muted: #717579;
+  --dim: #8a8e92;
+
+  --accent: #0067c0;
+  --accent-hover: #005ba7;
+  --accent-active: #004f95;
+  --on-accent: #fbfcfc;
+
+  --running: #267f47;
+  --exited: #b8bbbe;
+  --recording: #b13a36;
+  --recording-soft: rgba(177, 58, 54, 0.1);
+  --recording-soft-hover: rgba(177, 58, 54, 0.16);
+
+  --scrollbar: #c6c9cc;
+  --backdrop: rgba(0, 0, 0, 0.35);
+
+  --radius: 4px;
+  --radius-sm: 4px;
+
+  --toolbar-height: 48px;
+  --panel-width: 260px;
+
+  --toolbar-gap: 6px;
+  --toolbar-pad-x: 12px;
+  --btn-height: 32px;
+  --btn-gap: 8px;
+  --btn-size: 14px;
+  --btn-border-width: 1px;
+  --btn-on-bg: #eff6fc;
+  --btn-on-fg: var(--accent);
+  --btn-on-border: #cde0f2;
+  --btn-alt-bg: #fbfbfb;
+  --btn-alt-border: var(--border);
+  --sep-margin: 4px;
+
+  --primary-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.16);
+  --toolbar-primary-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.16);
+
+  /* 終端機縮成有外框的深色卡片，浮在淺灰視窗上 */
+  --term-area-bg: var(--window);
+  --term-area-pad: 12px;
+  --term-area-gap: 10px;
+  --term-radius: 8px;
+  --term-surround:
+    0 0 0 1px #d6d6d6,
+    0 1px 4px rgba(0, 0, 0, 0.1);
+
+  --panel-pad: 12px;
+  --panel-border-width: 1px;
+  --panel-radius: var(--radius);
+  --field-bg: #ffffff;
+  --field-fg: var(--text);
+  --field-border: #d1d1d1;
+  --field-height: 76px;
+  --field-focus-underline: 2px;
+  --send-height: 32px;
+  --send-pad-x: 20px;
+  --send-border-width: 1px;
+
+  --head-size: 14px;
+  --head-color: var(--text);
+  --head-tracking: normal;
+  --count-size: 12px;
+  --item-grid: 3px 1fr 24px;
+  --item-gap: 9px;
+  --item-pad: 7px 8px 7px 5px;
+  --dot-w: 3px;
+  --dot-h: 16px;
+  --dot-radius: 2px;
+  --dot-inline-size: 7px;
+  --name-size: 14px;
+  --name-active-weight: 600;
+  --meta-size: 12px;
+  --tag-bg: #f0f0f0;
+  --tag-fg: #4a4d51;
+  --tag-border: #e5e5e5;
+  --tag-border-width: 1px;
+  --tag-size: 11px;
+  --tag-exited-bg: #f6f6f6;
+  --tag-exited-fg: var(--muted);
+  --close-size: 24px;
+  --close-hover-bg: rgba(0, 0, 0, 0.06);
+  --close-active-fg: #4a4d51;
+
+  --dialog-hover-bg: #f0f0f0;
+  --select-bg: #fbfbfb;
+}
+
+/* ---- 暖色：暖炭底 + 琥珀色，零圓角、只有髮絲線，工具列純文字 ----
+   刻意不載入 Google Fonts (renderer 的 CSP 是 default-src 'self'，
+   而且離線也要能用)，改用系統字型，暖味靠顏色、字距與髮絲線撐住。*/
+html[data-theme='warm'] {
+  color-scheme: dark;
+
+  --window: #1a1510;
+  --chrome: #1a1510;
+  --border: #322d27;
+  --hover: #211c16;
+  --selected: #241f19;
+  --terminal-bg: #14100b;
+  --terminal-fg: #d8d3ca;
+
+  --text: #e5e1d9;
+  --text-strong: #f2efe9;
+  --text-button: #9d978f;
+  --muted: #9d978f;
+  --dim: #6e6860;
+
+  --accent: #e5ab60;
+  --accent-hover: #f0c68f;
+  --accent-active: #d0954a;
+  --on-accent: #1a1510;
+
+  --running: #7fcc90;
+  --exited: #6e6860;
+  --recording: #f89996;
+  --recording-soft: transparent;
+  --recording-soft-hover: rgba(248, 153, 150, 0.1);
+
+  --scrollbar: #3a342c;
+  --term-scrollbar: #3a342c;
+  --backdrop: rgba(10, 8, 5, 0.6);
+
+  --radius: 0;
+  --radius-sm: 0;
+
+  --toolbar-height: 52px;
+  --panel-width: 248px;
+
+  /* 純文字工具列：沒有圖示、沒有底色，字距拉開 */
+  --toolbar-gap: 28px;
+  --toolbar-pad-x: 24px;
+  --btn-height: 28px;
+  --btn-pad-x: 0;
+  --btn-gap: 0;
+  --btn-size: 13.5px;
+  --btn-tracking: 0.12em;
+  --btn-icon-display: none;
+  --btn-on-bg: transparent;
+  --btn-on-fg: var(--text);
+  --btn-hover-bg: transparent;
+  --btn-active-bg: transparent;
+  --sep-width: 0;
+  --sep-margin: 0;
+
+  /* 主要動作只用琥珀色的字與線 */
+  --primary-bg: transparent;
+  --primary-fg: var(--accent);
+  --primary-hover-bg: transparent;
+  --primary-hover-fg: var(--accent-hover);
+  --primary-active-bg: transparent;
+  --primary-weight: 400;
+  --toolbar-primary-shadow: inset 0 -2px 0 var(--accent);
+
+  --term-pad: 22px 26px;
+
+  --panel-pad: 16px 26px 18px;
+  --field-height: 74px;
+  --send-align: stretch;
+  --send-height: auto;
+  --send-pad-x: 24px;
+  --send-border-width: 1px;
+
+  --head-pad-x: 18px;
+  --head-font: 'Cascadia Mono', Consolas, monospace;
+  --head-size: 10.5px;
+  --head-weight: 400;
+  --head-tracking: 0.18em;
+  --count-size: 10.5px;
+  /* 清單底色從 1px 縫隙透出來，就是列與列之間的髮絲線 */
+  --list-bg: var(--border);
+  --list-pad: 0;
+  --list-gap: 1px;
+  --item-bg: var(--chrome);
+  --item-grid: 9px 1fr 18px;
+  --item-gap: 12px;
+  --item-pad: 13px 18px;
+  /* 作用中那列的指示是一個琥珀色箭頭 */
+  --dot-w: 7px;
+  --dot-h: 9px;
+  --dot-radius: 0;
+  --dot-clip: polygon(0 0, 100% 50%, 0 100%);
+  --dot-inline-size: 7px;
+  --name-size: 14.5px;
+  --meta-font: 'Cascadia Mono', Consolas, monospace;
+  --meta-size: 10.5px;
+  --meta-tracking: 0.1em;
+  --tag-bg: transparent;
+  --tag-fg: var(--dim);
+  --tag-pad: 0;
+  --tag-size: 10.5px;
+  --tag-tracking: 0.1em;
+  --tag-transform: uppercase;
+  --tag-exited-bg: transparent;
+  --tag-exited-fg: var(--dim);
+  --state-running: var(--running);
+  --close-size: 18px;
+  --close-hover-bg: rgba(229, 225, 217, 0.08);
+  --close-active-fg: var(--muted);
+
+  --dialog-hover-bg: var(--selected);
+  --select-bg: transparent;
 }
 
 * {
@@ -46,8 +382,8 @@ body {
 
 #app {
   display: grid;
-  grid-template-columns: 1fr 240px;
-  grid-template-rows: 44px 1fr;
+  grid-template-columns: 1fr var(--panel-width);
+  grid-template-rows: var(--toolbar-height) 1fr;
   height: 100%;
 }
 
@@ -72,8 +408,8 @@ body {
   grid-row: 1;
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 0 10px;
+  gap: var(--toolbar-gap);
+  padding: 0 var(--toolbar-pad-x);
   background: var(--chrome);
   border-bottom: 1px solid var(--border);
 }
@@ -81,32 +417,34 @@ body {
 #toolbar button {
   display: flex;
   align-items: center;
-  gap: 7px;
-  height: 30px;
-  padding: 0 12px;
-  border: none;
+  gap: var(--btn-gap);
+  height: var(--btn-height);
+  padding: 0 var(--btn-pad-x);
+  border: var(--btn-border-width) solid var(--btn-border);
   border-radius: var(--radius);
   background: transparent;
   color: var(--text-button);
   font-family: inherit;
-  font-size: 13px;
+  font-size: var(--btn-size);
+  letter-spacing: var(--btn-tracking);
   line-height: 1;
   white-space: nowrap;
   cursor: pointer;
 }
 
 #toolbar button svg {
+  display: var(--btn-icon-display);
   width: 16px;
   height: 16px;
 }
 
 #toolbar button:hover {
-  background: var(--hover);
+  background: var(--btn-hover-bg);
   color: var(--text);
 }
 
 #toolbar button:active {
-  background: var(--selected);
+  background: var(--btn-active-bg);
 }
 
 #toolbar button:focus-visible {
@@ -124,50 +462,83 @@ body {
   color: var(--text-button);
 }
 
+/* 清除畫面：淺色主題裡是有外框的次要按鈕，其他主題維持純文字。
+   選擇器要帶上 #toolbar，否則權重輸給上面的 #toolbar button。*/
+#toolbar #btn-clear {
+  background: var(--btn-alt-bg);
+  border-color: var(--btn-alt-border);
+}
+
 /* 主要動作：新連接、送出、對話框的建立。
    選擇器要帶上各自的 id，否則會輸給 #toolbar button 那條的權重。*/
 #toolbar button.primary,
 #new-connection menu button.primary,
 #btn-send {
-  background: var(--accent);
-  color: var(--on-accent);
-  font-weight: 600;
+  background: var(--primary-bg);
+  color: var(--primary-fg);
+  border-color: var(--accent);
+  font-weight: var(--primary-weight);
+}
+
+/* 暖色的「新連接」是琥珀色底線而不是色塊，淺色則是 Fluent 的內陰影。*/
+#toolbar button.primary {
+  box-shadow: var(--toolbar-primary-shadow);
 }
 
 #toolbar button.primary:hover,
 #new-connection menu button.primary:hover,
 #btn-send:hover {
-  background: var(--accent-hover);
-  color: var(--on-accent);
+  background: var(--primary-hover-bg);
+  color: var(--primary-hover-fg);
 }
 
 #toolbar button.primary:active,
 #new-connection menu button.primary:active,
 #btn-send:active {
-  background: var(--accent-active);
+  background: var(--primary-active-bg);
 }
 
 /* 「輸入字」按著的狀態 = 面板開著。*/
 #btn-input.on {
-  background: var(--selected);
-  color: var(--text);
+  background: var(--btn-on-bg);
+  border-color: var(--btn-on-border);
+  color: var(--btn-on-fg);
 }
 
 /* 「紀錄」啟用中：紅色染色而不是整塊紅底。*/
 #btn-log.on {
-  background: rgba(235, 141, 134, 0.16);
+  background: var(--recording-soft);
   color: var(--recording);
 }
 
 #btn-log.on:hover {
-  background: rgba(235, 141, 134, 0.24);
+  background: var(--recording-soft-hover);
   color: var(--recording);
 }
 
+/* 主題下拉選單，跟工具列按鈕同高。*/
+#theme-select {
+  height: var(--btn-height);
+  padding: 0 6px;
+  border: 1px solid var(--select-border);
+  border-radius: var(--radius);
+  background: var(--select-bg);
+  color: var(--text-button);
+  font-family: inherit;
+  font-size: var(--btn-size);
+  letter-spacing: var(--btn-tracking);
+  cursor: pointer;
+}
+
+#theme-select:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 1px;
+}
+
 .toolbar-sep {
-  width: 1px;
+  width: var(--sep-width);
   height: 18px;
-  margin: 0 6px;
+  margin: 0 var(--sep-margin);
   background: var(--border);
 }
 
@@ -182,29 +553,41 @@ body {
   position: relative;
   display: flex;
   flex-direction: column;
+  gap: var(--term-area-gap);
   min-height: 0;
-  background: var(--terminal-bg);
+  padding: var(--term-area-pad);
+  background: var(--term-area-bg);
 }
 
+/* 淺色主題把終端機縮成一張有外框的深色卡片，所以背景與圓角在這一層。*/
 #terminals {
   position: relative;
   flex: 1;
   min-height: 0;
+  overflow: hidden;
+  border-radius: var(--term-radius);
+  background: var(--terminal-bg);
+  box-shadow: var(--term-surround);
 }
 
 /* 捲軸：Windows 預設的淺色粗捲軸在深色面板上太搶眼。
-   xterm.css 先載入，所以這裡蓋得過去。*/
-.xterm-viewport,
+   xterm.css 先載入，所以這裡蓋得過去。
+   終端機自己一個 token —— 淺色主題的終端機還是深色的。*/
+.xterm-viewport {
+  scrollbar-width: thin;
+  scrollbar-color: var(--term-scrollbar) transparent;
+}
+
 #session-list {
   scrollbar-width: thin;
-  scrollbar-color: #3a4046 transparent;
+  scrollbar-color: var(--scrollbar) transparent;
 }
 
 /* 每個工作階段一個容器，只有作用中的那個顯示 */
 .term-host {
   position: absolute;
   inset: 0;
-  padding: 14px 18px;
+  padding: var(--term-pad);
 }
 
 .term-host[hidden] {
@@ -231,9 +614,11 @@ body {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 10px 14px 12px;
+  padding: var(--panel-pad);
   background: var(--chrome);
+  border: var(--panel-border-width) solid var(--border);
   border-top: 1px solid var(--border);
+  border-radius: var(--panel-radius);
 }
 
 #input-panel[hidden] {
@@ -245,12 +630,22 @@ body {
   align-items: center;
   gap: 6px;
   margin: 0;
+  font-family: var(--meta-font);
   font-size: 11.5px;
+  letter-spacing: var(--meta-tracking);
   color: var(--muted);
 }
 
 #input-target-name {
   color: var(--text);
+}
+
+/* 送到哪個工作階段的小圓點：清單那邊的指示器換形狀時這裡不跟著換。*/
+#input-target-dot {
+  width: var(--dot-inline-size);
+  height: var(--dot-inline-size);
+  border-radius: 50%;
+  clip-path: none;
 }
 
 #input-target-dot[hidden] {
@@ -266,13 +661,13 @@ body {
 #input-text {
   flex: 1;
   min-width: 0;
-  height: 78px;
+  height: var(--field-height);
   resize: none;
   padding: 9px 11px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--field-border);
   border-radius: var(--radius);
-  background: var(--terminal-bg);
-  color: #cfd3d7;
+  background: var(--field-bg);
+  color: var(--field-fg);
   font: 13px/1.55 'Cascadia Mono', Consolas, 'Microsoft JhengHei', monospace;
 }
 
@@ -280,28 +675,33 @@ body {
   color: var(--dim);
 }
 
+/* 淺色是 Fluent 的重點色底線，其餘主題就是整圈換色。*/
 #input-text:focus {
   outline: none;
   border-color: var(--accent);
+  border-bottom-width: var(--field-focus-underline);
 }
 
 #btn-send {
   display: flex;
-  align-self: flex-end;
+  align-self: var(--send-align);
   align-items: center;
-  gap: 7px;
-  height: 34px;
-  padding: 0 18px;
-  border: none;
+  gap: var(--btn-gap);
+  height: var(--send-height);
+  padding: 0 var(--send-pad-x);
+  border: var(--send-border-width) solid var(--accent);
   border-radius: var(--radius);
+  box-shadow: var(--primary-shadow);
   font-family: inherit;
   font-size: 13px;
+  letter-spacing: var(--btn-tracking);
   line-height: 1;
   white-space: nowrap;
   cursor: pointer;
 }
 
 #btn-send svg {
+  display: var(--btn-icon-display);
   width: 16px;
   height: 16px;
   stroke: currentColor;
@@ -328,41 +728,45 @@ body {
   flex: none;
   align-items: center;
   justify-content: space-between;
-  height: 44px;
-  padding: 0 14px;
+  height: var(--toolbar-height);
+  padding: 0 var(--head-pad-x);
   border-bottom: 1px solid var(--border);
 }
 
 #session-panel-head h2 {
   margin: 0;
-  font-size: 11.5px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  color: var(--muted);
+  font-family: var(--head-font);
+  font-size: var(--head-size);
+  font-weight: var(--head-weight);
+  letter-spacing: var(--head-tracking);
+  color: var(--head-color);
 }
 
 #session-count {
-  font-size: 11.5px;
+  font-family: var(--head-font);
+  font-size: var(--count-size);
   color: var(--dim);
 }
 
 #session-list {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--list-gap);
   margin: 0;
-  padding: 8px;
+  padding: var(--list-pad);
+  background: var(--list-bg);
   list-style: none;
   overflow-y: auto;
 }
 
 .session-item {
   display: grid;
-  grid-template-columns: 8px 1fr 20px;
-  column-gap: 10px;
+  grid-template-columns: var(--item-grid);
+  column-gap: var(--item-gap);
   align-items: center;
-  padding: 8px 10px;
-  border-radius: var(--radius);
+  padding: var(--item-pad);
+  border-radius: var(--item-radius);
+  background: var(--item-bg);
   cursor: pointer;
 }
 
@@ -376,6 +780,7 @@ body {
 
 .session-item.active .session-name {
   color: var(--text-strong);
+  font-weight: var(--name-active-weight);
 }
 
 .session-item.exited .session-name {
@@ -383,14 +788,15 @@ body {
 }
 
 .session-item.exited .session-tag {
-  background: #23272c;
-  color: #7b8187;
+  background: var(--tag-exited-bg);
+  color: var(--tag-exited-fg);
 }
 
 .session-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
+  width: var(--dot-w);
+  height: var(--dot-h);
+  border-radius: var(--dot-radius);
+  clip-path: var(--dot-clip);
   background: var(--exited);
 }
 
@@ -402,10 +808,24 @@ body {
   background: var(--exited);
 }
 
-/* 紀錄中的小紅點，跟在狀態文字前面。*/
+/* 淺色是重點色指示條、暖色是琥珀色箭頭，兩者都只出現在作用中的那一列；
+   執行中／已結束改由右邊的狀態文字顏色表達。*/
+html[data-theme='light'] .session-item .session-dot,
+html[data-theme='warm'] .session-item .session-dot {
+  background: transparent;
+}
+
+html[data-theme='light'] .session-item.active .session-dot,
+html[data-theme='warm'] .session-item.active .session-dot {
+  background: var(--accent);
+}
+
+/* 紀錄中的小紅點，跟在狀態文字前面；任何主題都是圓的。*/
 .session-dot.logging {
   width: 6px;
   height: 6px;
+  border-radius: 50%;
+  clip-path: none;
   background: var(--recording);
 }
 
@@ -414,7 +834,7 @@ body {
 }
 
 .session-name {
-  font-size: 13px;
+  font-size: var(--name-size);
   color: var(--text);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -426,23 +846,31 @@ body {
   align-items: center;
   gap: 6px;
   margin-top: 3px;
-  font-size: 11px;
+  font-family: var(--meta-font);
+  font-size: var(--meta-size);
+  letter-spacing: var(--meta-tracking);
   color: var(--muted);
 }
 
 .session-tag {
-  padding: 1px 6px;
-  border-radius: var(--radius-sm);
-  background: var(--border);
-  color: #a4a9af;
-  font-size: 10.5px;
-  letter-spacing: 0.03em;
+  padding: var(--tag-pad);
+  border: var(--tag-border-width) solid var(--tag-border);
+  border-radius: var(--tag-radius);
+  background: var(--tag-bg);
+  color: var(--tag-fg);
+  font-size: var(--tag-size);
+  letter-spacing: var(--tag-tracking);
+  text-transform: var(--tag-transform);
 }
 
 .session-state {
   display: flex;
   align-items: center;
   gap: 4px;
+}
+
+.session-state.running {
+  color: var(--state-running);
 }
 
 .session-state.exited {
@@ -457,11 +885,11 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: var(--close-size);
+  height: var(--close-size);
   padding: 0;
   border: none;
-  border-radius: var(--radius-sm);
+  border-radius: var(--close-radius);
   background: transparent;
   color: var(--dim);
   cursor: pointer;
@@ -473,12 +901,12 @@ body {
 }
 
 .session-close:hover {
-  background: rgba(219, 222, 226, 0.1);
+  background: var(--close-hover-bg);
   color: var(--text);
 }
 
 .session-item.active .session-close {
-  color: #a4a9af;
+  color: var(--close-active-fg);
 }
 
 /* ---- 新連接對話框 ---- */
@@ -492,7 +920,7 @@ body {
 }
 
 #new-connection::backdrop {
-  background: rgba(9, 11, 13, 0.6);
+  background: var(--backdrop);
 }
 
 #new-connection form {
@@ -521,10 +949,10 @@ body {
   flex: 1;
   max-width: 260px;
   padding: 5px 8px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--field-border);
   border-radius: var(--radius-sm);
-  background: var(--terminal-bg);
-  color: var(--text);
+  background: var(--field-bg);
+  color: var(--field-fg);
   font: inherit;
   font-size: 13px;
 }
@@ -580,11 +1008,7 @@ body {
 }
 
 #new-connection menu button:hover {
-  background: #343940;
-}
-
-#new-connection menu button.primary {
-  border-color: var(--accent);
+  background: var(--dialog-hover-bg);
 }
 
 #new-connection menu button.primary:hover {

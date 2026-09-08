@@ -15,6 +15,7 @@ export interface ToolbarCommands {
   toggleLog: ICommand;
   clear: ICommand;
   send: ICommand;
+  switchTheme: ICommand;
 }
 
 /**
@@ -47,6 +48,11 @@ export class Toolbar {
       bind('btn-log', commands.toggleLog),
       bind('btn-clear', commands.clear),
     ];
+
+    // 主題下拉選單也是工具列的一部分，只是事件是 change 不是 click。
+    $<HTMLSelectElement>('theme-select').addEventListener('change', () => {
+      void commands.switchTheme.execute();
+    });
 
     this.state.subscribe(() => this.render());
     this.render();

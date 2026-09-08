@@ -15,7 +15,9 @@ import {
   ToggleLogCommand,
   ClearScreenCommand,
   SendInputCommand,
+  SwitchThemeCommand,
 } from './commands';
+import { ThemeStore } from './theme';
 import type { ClipboardPort } from './ports';
 import type { ConnectionProfile } from '../shared/profile';
 
@@ -24,6 +26,9 @@ const $ = <T extends HTMLElement>(id: string): T => {
   if (!el) throw new Error(`找不到元素 #${id}`);
   return el as T;
 };
+
+// 主題要在畫面畫出來之前就套上去，所以是第一件事。
+const themeStore = new ThemeStore();
 
 const api = window.myterminal;
 const state = new AppState();
@@ -44,14 +49,18 @@ const clipboard: ClipboardPort = {
 /** 建立工作階段：先開終端機量出 cols/rows，再請 main spawn。*/
 async function createSession(profile: ConnectionProfile): Promise<void> {
   let id: string | null = null;
-  const view = new TerminalView(terminalsEl, {
-    onInput: (data) => {
-      if (id) void api.write(id, data);
+  const view = new TerminalView(
+    terminalsEl,
+    {
+      onInput: (data) => {
+        if (id) void api.write(id, data);
+      },
+      onResize: (cols, rows) => {
+        if (id) void api.resize(id, cols, rows);
+      },
     },
-    onResize: (cols, rows) => {
-      if (id) void api.resize(id, cols, rows);
-    },
-  });
+    themeStore,
+  );
 
   activeTerminal()?.hide();
   view.show();
@@ -98,6 +107,9 @@ const inputPanel = new InputPanel(
   () => activeTerminal()?.resize(),
 );
 
+const themeSelect = $<HTMLSelectElement>('theme-select');
+themeSelect.value = themeStore.get();
+
 new Toolbar(state, {
   newConnection: new NewConnectionCommand(dialog),
   toggleInput: new ToggleInputPanelCommand(state),
@@ -106,6 +118,7 @@ new Toolbar(state, {
   toggleLog: new ToggleLogCommand(state, api),
   clear: new ClearScreenCommand(activeTerminal),
   send: new SendInputCommand(state, api, inputPanel),
+  switchTheme: new SwitchThemeCommand(themeStore, () => themeSelect.value),
 });
 
 new SessionListView(

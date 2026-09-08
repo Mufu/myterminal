@@ -1,6 +1,8 @@
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import type { TerminalPort } from './ports';
+import { THEMES } from './theme';
+import type { ThemeStore } from './theme';
 
 export interface TerminalHandlers {
   onInput(data: string): void;
@@ -19,8 +21,9 @@ export class TerminalView implements TerminalPort {
   private readonly host: HTMLDivElement;
   private readonly term: Terminal;
   private readonly fit = new FitAddon();
+  private readonly unsubscribeTheme: () => void;
 
-  constructor(parent: HTMLElement, handlers: TerminalHandlers) {
+  constructor(parent: HTMLElement, handlers: TerminalHandlers, theme: ThemeStore) {
     this.host = document.createElement('div');
     this.host.className = 'term-host';
     parent.appendChild(this.host);
@@ -30,13 +33,8 @@ export class TerminalView implements TerminalPort {
       fontSize: 13.5,
       cursorBlink: true,
       scrollback: 5000,
-      theme: {
-        background: '#0c0f12',
-        foreground: '#cfd3d7',
-        cursor: '#cfd3d7',
-        cursorAccent: '#0c0f12',
-        selectionBackground: 'rgba(107, 177, 239, 0.28)',
-      },
+      // xterm 畫的是 canvas，吃不到 CSS 變數，顏色只能用 JS 給。
+      theme: THEMES[theme.get()].terminal,
     });
     this.term.loadAddon(this.fit);
     this.term.open(this.host);
@@ -44,6 +42,10 @@ export class TerminalView implements TerminalPort {
 
     this.term.onData(handlers.onInput);
     this.term.onResize(({ cols, rows }) => handlers.onResize(cols, rows));
+
+    this.unsubscribeTheme = theme.subscribe(() => {
+      this.term.options.theme = THEMES[theme.get()].terminal;
+    });
   }
 
   write(data: string): void {
@@ -84,6 +86,7 @@ export class TerminalView implements TerminalPort {
   }
 
   dispose(): void {
+    this.unsubscribeTheme();
     this.term.dispose();
     this.host.remove();
   }
