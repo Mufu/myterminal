@@ -1,4 +1,6 @@
 import type { AppState } from './app-state';
+import type { ThemeStore } from './theme';
+import { parseTheme } from './theme';
 import type { MyTerminalApi } from '../shared/api';
 import type {
   ICommand,
@@ -94,5 +96,16 @@ export class SendInputCommand implements ICommand {
     if (!text.trim()) return;
     await this.api.write(id, `${text}\r`);
     this.panel.clear();
+  }
+}
+
+/** 主題下拉選單：把選到的值交給 ThemeStore。*/
+export class SwitchThemeCommand implements ICommand {
+  constructor(
+    private readonly theme: ThemeStore,
+    private readonly selected: () => string,
+  ) {}
+  execute(): void {
+    this.theme.set(parseTheme(this.selected()));
   }
 }

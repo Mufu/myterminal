@@ -8,7 +8,9 @@ import {
   ToggleLogCommand,
   ClearScreenCommand,
   SendInputCommand,
+  SwitchThemeCommand,
 } from '../src/renderer/commands';
+import { ThemeStore } from '../src/renderer/theme';
 import type { TerminalPort, ClipboardPort, InputPanelPort, DialogPort } from '../src/renderer/ports';
 import type { MyTerminalApi } from '../src/shared/api';
 import type { SessionInfo } from '../src/shared/session';
@@ -187,5 +189,22 @@ describe('送出 (輸入面板)', () => {
     await new SendInputCommand(state, api, panel).execute();
     expect(api.write).not.toHaveBeenCalled();
     expect(panel.cleared).toBe(0);
+  });
+});
+
+describe('切換主題', () => {
+  const store = () => new ThemeStore({ getItem: () => null, setItem: () => {} }, () => {});
+
+  it('把下拉選單選到的主題交給 ThemeStore', () => {
+    const theme = store();
+    new SwitchThemeCommand(theme, () => 'warm').execute();
+    expect(theme.get()).toBe('warm');
+  });
+
+  it('選到不認得的值時退回深色', () => {
+    const theme = store();
+    theme.set('light');
+    new SwitchThemeCommand(theme, () => '???').execute();
+    expect(theme.get()).toBe('dark');
   });
 });
