@@ -1,0 +1,35 @@
+import type { AppState } from './app-state';
+import type { InputPanelPort } from './ports';
+
+/**
+ * InputPanel：「輸入字」開關控制的多行輸入區。
+ * 實作 InputPanelPort，讓 SendInputCommand 不必知道 DOM。
+ */
+export class InputPanel implements InputPanelPort {
+  constructor(
+    private readonly panel: HTMLElement,
+    private readonly textarea: HTMLTextAreaElement,
+    state: AppState,
+    private readonly onVisibilityChange: () => void,
+  ) {
+    state.subscribe(() => this.sync(state.inputPanelVisible));
+    this.sync(state.inputPanelVisible);
+  }
+
+  getText(): string {
+    return this.textarea.value;
+  }
+
+  clear(): void {
+    this.textarea.value = '';
+    this.textarea.focus();
+  }
+
+  private sync(visible: boolean): void {
+    if (this.panel.hidden === !visible) return;
+    this.panel.hidden = !visible;
+    // 面板佔掉高度，終端機要重新量測。
+    this.onVisibilityChange();
+    if (visible) this.textarea.focus();
+  }
+}

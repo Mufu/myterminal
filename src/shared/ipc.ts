@@ -1,5 +1,4 @@
 import type { ConnectionProfile } from './profile';
-import type { SessionInfo } from './session';
 
 /**
  * IPC 契約：頻道名稱 + payload 型別集中在 shared，

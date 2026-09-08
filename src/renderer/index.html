@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:"
+    />
+    <title>myterminal</title>
+  </head>
+  <body>
+    <div id="app">
+      <header id="toolbar">
+        <button id="btn-new" type="button">新連接</button>
+        <button id="btn-input" type="button">輸入字</button>
+        <button id="btn-copy" type="button">複製文字</button>
+        <button id="btn-paste" type="button">貼上</button>
+        <button id="btn-log" type="button">紀錄</button>
+        <span class="toolbar-spacer"></span>
+        <button id="btn-clear" type="button">清除畫面</button>
+      </header>
+
+      <main id="terminal-area">
+        <div id="terminals"></div>
+        <div id="empty-hint">還沒有工作階段，請按左上角的「新連接」。</div>
+        <section id="input-panel" hidden>
+          <textarea
+            id="input-text"
+            rows="4"
+            placeholder="在這裡編輯要送給 Claude / Codex 的長訊息，按「送出」一次送出。"
+          ></textarea>
+          <button id="btn-send" type="button">送出</button>
+        </section>
+      </main>
+
+      <aside id="session-panel">
+        <h2>session</h2>
+        <ul id="session-list"></ul>
+      </aside>
+    </div>
+
+    <dialog id="new-connection">
+      <form method="dialog">
+        <h2>新連接</h2>
+
+        <label>
+          類型
+          <select id="f-type">
+            <option value="powershell">PowerShell</option>
+            <option value="wsl">WSL</option>
+            <option value="ssh">SSH (plink)</option>
+            <option value="claude">Claude</option>
+            <option value="codex">Codex</option>
+            <option value="custom">自訂命令</option>
+          </select>
+        </label>
+
+        <label>
+          名稱 <input id="f-name" type="text" placeholder="留空自動命名" />
+        </label>
+
+        <label>
+          工作目錄 <input id="f-cwd" type="text" placeholder="留空使用預設目錄" />
+        </label>
+
+        <div class="field-group" data-for="wsl">
+          <label>發行版 <input id="f-distro" type="text" placeholder="留空使用預設，例如 Ubuntu" /></label>
+        </div>
+
+        <div class="field-group" data-for="ssh">
+          <label>主機 <input id="f-host" type="text" /></label>
+          <label>連接埠 <input id="f-port" type="number" value="22" min="1" max="65535" /></label>
+          <label>使用者 <input id="f-user" type="text" /></label>
+        </div>
+
+        <div class="field-group" data-for="agent">
+          <label>
+            基礎 shell
+            <select id="f-base-shell">
+              <option value="powershell">PowerShell</option>
+              <option value="wsl">WSL</option>
+            </select>
+          </label>
+          <label>啟動指令 <input id="f-startup" type="text" /></label>
+        </div>
+
+        <div class="field-group" data-for="custom">
+          <label>執行檔 <input id="f-file" type="text" placeholder="例如 cmd.exe" /></label>
+          <label>參數 <input id="f-args" type="text" placeholder="以空白分隔" /></label>
+        </div>
+
+        <p id="f-errors" class="errors"></p>
+
+        <menu>
+          <button id="f-cancel" value="cancel" type="submit">取消</button>
+          <button id="f-ok" value="ok" type="submit" class="primary">建立</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>
