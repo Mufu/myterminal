@@ -133,3 +133,9 @@ main → renderer（`webContents.send`）：
   `SessionManager.resize()` 會擋掉。
 - **關窗之後 pty 的 exit 事件才會送達**，那時 `webContents` 已經銷毀，
   所以 `main/index.ts` 在 `closed` 時把 `win` 設回 `null` 並檢查 `isDestroyed()`。
+- **關閉工作階段時 stderr 可能出現 `AttachConsole failed`**：這是 node-pty 自己
+  fork 出來的 `conpty_console_list_agent.js` 在 shell 已經結束時印的，
+  屬於 node-pty 內部的清理步驟，不是本專案的例外。
+  `WindowsPtyAgent.kill()` 是**同步**呼叫 `_ptyNative.kill()` 的，
+  不依賴那個 agent，所以 shell 仍會被正常終止（已實測沒有殘留行程）。
+  純粹是雜訊，不影響功能。
