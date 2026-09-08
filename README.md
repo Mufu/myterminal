@@ -3,8 +3,8 @@
 一個 Windows 桌面終端機管理員：在同一個視窗裡管理多個工作階段
 （PowerShell、WSL、SSH、以及跑 `claude` / `codex` CLI 的 shell）。
 
-介面草圖見 [`docs/UI.png`](docs/UI.png)：
-上方藍色工具列、中間終端機、右側綠色 session 清單，一次只顯示一個終端機（沒有分割視窗）。
+介面見 [`docs/UI.png`](docs/UI.png)：
+深色工作台風格，上方工具列、中間終端機、右側工作階段清單，一次只顯示一個終端機（沒有分割視窗）。
 
 ![介面](docs/UI.png)
 
