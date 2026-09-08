@@ -80,6 +80,7 @@ body {
 #terminal-area {
   grid-column: 1;
   grid-row: 2;
+  position: relative;
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -220,6 +221,8 @@ body {
 }
 
 .session-close {
+  /* 欄位要寫死：只給 grid-row 的話會被自動排版搶到第一欄。*/
+  grid-column: 2;
   grid-row: 1 / span 2;
   align-self: center;
   width: 22px;

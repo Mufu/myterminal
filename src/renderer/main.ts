@@ -62,6 +62,9 @@ async function createSession(profile: ConnectionProfile): Promise<void> {
     id = info.id;
     terminals.set(info.id, view);
     state.setActive(info.id);
+    // main 的 created 事件通常比 invoke 的回覆更早到，那時 terminals 還沒有這個 view，
+    // 所以這裡要再同步一次畫面。
+    syncTerminals();
   } catch (error) {
     view.dispose();
     syncTerminals();
@@ -81,7 +84,7 @@ function syncTerminals(): void {
     if (id === state.activeSessionId) view.show();
     else view.hide();
   }
-  emptyHint.hidden = terminals.size > 0;
+  emptyHint.hidden = state.sessions.length > 0;
 }
 
 const dialog = new NewConnectionDialog((profile) => void createSession(profile));
@@ -113,8 +116,3 @@ api.onExit(({ id }) => terminals.get(id)?.write('\r\n\x1b[33m[工作階段已結
 window.addEventListener('resize', () => activeTerminal()?.resize());
 
 void api.list().then((sessions) => state.setSessions(sessions));
-
-// 冒煙測試模式：自動開一個 PowerShell，讓 main 截得到有提示字元的畫面。
-if (new URLSearchParams(location.search).has('smoke')) {
-  void createSession({ type: 'powershell' });
-}
