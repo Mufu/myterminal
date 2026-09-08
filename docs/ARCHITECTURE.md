@@ -1,6 +1,6 @@
 # 架構
 
-介面草圖：[`UI.png`](UI.png)
+介面：[`UI.png`](UI.png)
 
 ## 分層
 
