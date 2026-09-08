@@ -79,11 +79,19 @@ export class SessionManager extends EventEmitter<SessionEvents> {
   }
 
   write(id: string, data: string): void {
-    this.sessions.get(id)?.pty.write(data);
+    this.running(id)?.pty.write(data);
   }
 
   resize(id: string, cols: number, rows: number): void {
-    this.sessions.get(id)?.pty.resize(cols, rows);
+    // FitAddon 在容器被隱藏時會量出 0 或 NaN，送進 conpty 會丟例外。
+    if (!Number.isInteger(cols) || !Number.isInteger(rows) || cols < 1 || rows < 1) return;
+    this.running(id)?.pty.resize(cols, rows);
+  }
+
+  /** 只有還在跑的工作階段能被寫入或改尺寸；已結束的 pty 再碰會丟例外。*/
+  private running(id: string): Session | undefined {
+    const session = this.sessions.get(id);
+    return session?.info.state === 'running' ? session : undefined;
   }
 
   close(id: string): void {

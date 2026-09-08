@@ -1,16 +1,15 @@
 import { app, BrowserWindow } from 'electron';
 import { join } from 'node:path';
-import { mkdirSync, writeFileSync } from 'node:fs';
 import { SessionManager } from './session-manager';
 import { SessionLogger, defaultLogDir, ensureLogDir } from './session-logger';
 import { NodePtySpawner } from './node-pty-spawner';
 import { ShellFactory } from './shell-factory';
 import { registerIpc } from './ipc';
 
-/** MYTERMINAL_SMOKE=1 時走冒煙測試流程：自動開一個 PowerShell、截圖、離開。*/
-const SMOKE = process.env.MYTERMINAL_SMOKE === '1';
-
 let win: BrowserWindow | null = null;
+
+// 最後一道防線：主行程的未捕捉例外預設會跳出錯誤對話框，改成寫進 stderr。
+process.on('uncaughtException', (error) => console.error('[main] 未捕捉的例外', error));
 
 const logDir = defaultLogDir();
 ensureLogDir(logDir);
@@ -19,7 +18,8 @@ ensureLogDir(logDir);
 const manager = new SessionManager(new NodePtySpawner(), new ShellFactory());
 const logger = new SessionLogger(logDir);
 
-registerIpc(manager, logger, () => win?.webContents ?? null);
+// 關窗之後 pty 的 exit 事件才可能送達，那時 webContents 已經被銷毀。
+registerIpc(manager, logger, () => (win && !win.isDestroyed() ? win.webContents : null));
 
 function createWindow(): void {
   win = new BrowserWindow({
@@ -36,37 +36,11 @@ function createWindow(): void {
   });
 
   win.once('ready-to-show', () => win?.show());
+  win.on('closed', () => (win = null));
 
-  const search = SMOKE ? 'smoke=1' : '';
   const devUrl = process.env.ELECTRON_RENDERER_URL;
-  if (devUrl) {
-    void win.loadURL(search ? `${devUrl}?${search}` : devUrl);
-  } else {
-    void win.loadFile(join(__dirname, '../renderer/index.html'), { search });
-  }
-
-  if (SMOKE) runSmoke(win);
-}
-
-/** 冒煙測試：等 renderer 自動開好 PowerShell，截圖後結束。*/
-function runSmoke(target: BrowserWindow): void {
-  target.webContents.once('did-finish-load', () => {
-    setTimeout(() => {
-      void target.webContents
-        .capturePage()
-        .then((image) => {
-          const out = join(app.getAppPath(), 'test-results');
-          mkdirSync(out, { recursive: true });
-          writeFileSync(join(out, 'smoke.png'), image.toPNG());
-          console.log('[smoke] 已寫出', join(out, 'smoke.png'));
-        })
-        .catch((err: unknown) => console.error('[smoke] 截圖失敗', err))
-        .finally(() => {
-          manager.closeAll();
-          app.exit(0);
-        });
-    }, 5000);
-  });
+  if (devUrl) void win.loadURL(devUrl);
+  else void win.loadFile(join(__dirname, '../renderer/index.html'));
 }
 
 void app.whenReady().then(() => {

@@ -120,6 +120,27 @@ describe('SessionManager 生命週期', () => {
     expect(manager.list()).toEqual([]);
   });
 
+  it('已結束的工作階段不再轉送 write / resize (pty 已關閉，再碰會丟例外)', () => {
+    const info = manager.create({ type: 'powershell' }, 80, 24);
+    const pty = spawner.last();
+    pty.emitExit(0);
+
+    manager.write(info.id, 'dir\r');
+    manager.resize(info.id, 120, 40);
+
+    expect(pty.writes).toEqual([]);
+    expect(pty.resizes).toEqual([]);
+  });
+
+  it('不合法的尺寸不會送進 pty (FitAddon 在容器隱藏時會算出 0/NaN)', () => {
+    const info = manager.create({ type: 'powershell' }, 80, 24);
+    manager.resize(info.id, 0, 24);
+    manager.resize(info.id, 80, -1);
+    manager.resize(info.id, Number.NaN, 24);
+
+    expect(spawner.last().resizes).toEqual([]);
+  });
+
   it('list 依建立順序回傳所有工作階段', () => {
     const a = manager.create({ type: 'powershell' }, 80, 24);
     const b = manager.create({ type: 'wsl' }, 80, 24);
