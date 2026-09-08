@@ -25,7 +25,7 @@ function createWindow(): void {
   win = new BrowserWindow({
     width: 1280,
     height: 800,
-    backgroundColor: '#1e1e1e',
+    backgroundColor: '#111417',
     title: 'myterminal',
     show: false,
     webPreferences: {

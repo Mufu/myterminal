@@ -26,11 +26,17 @@ export class TerminalView implements TerminalPort {
     parent.appendChild(this.host);
 
     this.term = new Terminal({
-      fontFamily: 'Consolas, "Microsoft JhengHei", monospace',
-      fontSize: 14,
+      fontFamily: '"Cascadia Mono", Consolas, "Microsoft JhengHei", monospace',
+      fontSize: 13.5,
       cursorBlink: true,
       scrollback: 5000,
-      theme: { background: '#1e1e1e', foreground: '#d4d4d4' },
+      theme: {
+        background: '#0c0f12',
+        foreground: '#cfd3d7',
+        cursor: '#cfd3d7',
+        cursorAccent: '#0c0f12',
+        selectionBackground: 'rgba(107, 177, 239, 0.28)',
+      },
     });
     this.term.loadAddon(this.fit);
     this.term.open(this.host);

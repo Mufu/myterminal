@@ -11,30 +11,87 @@
   <body>
     <div id="app">
       <header id="toolbar">
-        <button id="btn-new" type="button">新連接</button>
-        <button id="btn-input" type="button">輸入字</button>
-        <button id="btn-copy" type="button">複製文字</button>
-        <button id="btn-paste" type="button">貼上</button>
-        <button id="btn-log" type="button">紀錄</button>
+        <button id="btn-new" type="button" class="primary">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10"></path></svg>
+          <span class="btn-label">新連接</span>
+        </button>
+
+        <span class="toolbar-sep"></span>
+
+        <button id="btn-input" type="button">
+          <svg viewBox="0 0 16 16" aria-hidden="true">
+            <rect x="2" y="3.5" width="12" height="9" rx="1.5"></rect>
+            <path d="M4.5 7h5M4.5 9.5h3"></path>
+          </svg>
+          <span class="btn-label">輸入字</span>
+        </button>
+
+        <button id="btn-copy" type="button">
+          <svg viewBox="0 0 16 16" aria-hidden="true">
+            <rect x="5.5" y="5.5" width="8" height="8" rx="1.5"></rect>
+            <path d="M3 10.5V3.5A1 1 0 0 1 4 2.5h7"></path>
+          </svg>
+          <span class="btn-label">複製文字</span>
+        </button>
+
+        <button id="btn-paste" type="button">
+          <svg viewBox="0 0 16 16" aria-hidden="true">
+            <rect x="3.5" y="3.5" width="9" height="10.5" rx="1.5"></rect>
+            <path d="M6 3.5V2.5h4v1"></path>
+            <path d="M6 8h4M6 10.5h4"></path>
+          </svg>
+          <span class="btn-label">貼上</span>
+        </button>
+
+        <button id="btn-log" type="button">
+          <svg viewBox="0 0 16 16" aria-hidden="true">
+            <circle cx="8" cy="8" r="5.5"></circle>
+            <circle class="icon-fill" cx="8" cy="8" r="2.2"></circle>
+          </svg>
+          <span class="btn-label">紀錄</span>
+        </button>
+
         <span class="toolbar-spacer"></span>
-        <button id="btn-clear" type="button">清除畫面</button>
+
+        <button id="btn-clear" type="button">
+          <svg viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M4.5 12.5l6-6a1.5 1.5 0 0 1 2.1 0l.4.4a1.5 1.5 0 0 1 0 2.1l-3.5 3.5H4.5z"></path>
+            <path d="M3 13.5h10"></path>
+          </svg>
+          <span class="btn-label">清除畫面</span>
+        </button>
       </header>
 
       <main id="terminal-area">
         <div id="terminals"></div>
         <div id="empty-hint">還沒有工作階段，請按左上角的「新連接」。</div>
         <section id="input-panel" hidden>
-          <textarea
-            id="input-text"
-            rows="4"
-            placeholder="在這裡編輯要送給 Claude / Codex 的長訊息，按「送出」一次送出。"
-          ></textarea>
-          <button id="btn-send" type="button">送出</button>
+          <p id="input-target">
+            送到 <span id="input-target-name">—</span>
+            <span id="input-target-dot" class="session-dot"></span>
+          </p>
+          <div class="input-row">
+            <textarea
+              id="input-text"
+              rows="4"
+              placeholder="在這裡編輯要送給 Claude / Codex 的長訊息，按「送出」一次送出。"
+            ></textarea>
+            <button id="btn-send" type="button" class="primary">
+              <svg viewBox="0 0 16 16" aria-hidden="true">
+                <path d="M14 2L7.4 8.6"></path>
+                <path d="M14 2l-4.2 12-2.4-5.4L2 6.2z"></path>
+              </svg>
+              <span class="btn-label">送出</span>
+            </button>
+          </div>
         </section>
       </main>
 
       <aside id="session-panel">
-        <h2>session</h2>
+        <header id="session-panel-head">
+          <h2>工作階段</h2>
+          <span id="session-count">0</span>
+        </header>
         <ul id="session-list"></ul>
       </aside>
     </div>

@@ -1,14 +1,33 @@
-/* 版面依照 docs/UI.png：上方藍色工具列、中間終端機、右側綠色 session 清單。*/
+/* 深色工作台：冷調中性深色面板 + 單一藍色重點色。版面仍依 docs/UI.png：
+   上方工具列、中間終端機、右側 session 清單、輸入面板停在終端機下方。*/
 
 :root {
-  --toolbar: #4472c4;
-  --toolbar-hover: #5b86d6;
-  --toolbar-active: #2f5597;
-  --panel: #a9d08e;
-  --panel-item: #93bd78;
-  --terminal-bg: #1e1e1e;
-  --text-light: #ffffff;
-  --border: #2f5597;
+  color-scheme: dark;
+
+  --window: #111417;
+  --chrome: #1d2125;
+  --border: #2a2e34;
+  --hover: #262a2f;
+  --selected: #2c3136;
+  --terminal-bg: #0c0f12;
+
+  --text: #dbdee2;
+  --text-strong: #f2f4f6;
+  --text-button: #b6bbc1;
+  --muted: #8e9398;
+  --dim: #6e7277;
+
+  --accent: #6bb1ef;
+  --accent-hover: #8cc3f3;
+  --accent-active: #4f9cdd;
+  --on-accent: #10171f;
+
+  --running: #6fc087;
+  --exited: #4b5055;
+  --recording: #eb8d86;
+
+  --radius: 6px;
+  --radius-sm: 4px;
 }
 
 * {
@@ -20,16 +39,31 @@ body {
   margin: 0;
   height: 100%;
   overflow: hidden;
-  font-family: 'Microsoft JhengHei', 'Segoe UI', system-ui, sans-serif;
-  background: var(--terminal-bg);
-  color: var(--text-light);
+  font-family: 'Segoe UI Variable Text', 'Segoe UI', 'Microsoft JhengHei', system-ui, sans-serif;
+  background: var(--window);
+  color: var(--text);
 }
 
 #app {
   display: grid;
-  grid-template-columns: 1fr 180px;
-  grid-template-rows: 56px 1fr;
+  grid-template-columns: 1fr 240px;
+  grid-template-rows: 44px 1fr;
   height: 100%;
+}
+
+/* 圖示統一是 16px 網格上的線稿。*/
+#toolbar button svg,
+.session-close svg {
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex: none;
+}
+
+.icon-fill {
+  fill: currentColor;
 }
 
 /* ---- 工具列 ---- */
@@ -37,43 +71,108 @@ body {
   grid-column: 1;
   grid-row: 1;
   display: flex;
-  background: var(--toolbar);
-  border-bottom: 2px solid var(--border);
+  align-items: center;
+  gap: 4px;
+  padding: 0 10px;
+  background: var(--chrome);
+  border-bottom: 1px solid var(--border);
 }
 
 #toolbar button {
-  min-width: 96px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 30px;
   padding: 0 12px;
   border: none;
-  border-right: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: var(--radius);
   background: transparent;
-  color: var(--text-light);
-  font: inherit;
-  font-size: 15px;
+  color: var(--text-button);
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1;
+  white-space: nowrap;
   cursor: pointer;
 }
 
+#toolbar button svg {
+  width: 16px;
+  height: 16px;
+}
+
 #toolbar button:hover {
-  background: var(--toolbar-hover);
+  background: var(--hover);
+  color: var(--text);
+}
+
+#toolbar button:active {
+  background: var(--selected);
+}
+
+#toolbar button:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 1px;
 }
 
 #toolbar button:disabled {
-  opacity: 0.45;
+  opacity: 0.4;
   cursor: default;
 }
 
 #toolbar button:disabled:hover {
   background: transparent;
+  color: var(--text-button);
 }
 
-/* 「紀錄」啟用中的狀態 */
-#toolbar button.on {
-  background: #c00000;
+/* 主要動作：新連接、送出、對話框的建立。
+   選擇器要帶上各自的 id，否則會輸給 #toolbar button 那條的權重。*/
+#toolbar button.primary,
+#new-connection menu button.primary,
+#btn-send {
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+
+#toolbar button.primary:hover,
+#new-connection menu button.primary:hover,
+#btn-send:hover {
+  background: var(--accent-hover);
+  color: var(--on-accent);
+}
+
+#toolbar button.primary:active,
+#new-connection menu button.primary:active,
+#btn-send:active {
+  background: var(--accent-active);
+}
+
+/* 「輸入字」按著的狀態 = 面板開著。*/
+#btn-input.on {
+  background: var(--selected);
+  color: var(--text);
+}
+
+/* 「紀錄」啟用中：紅色染色而不是整塊紅底。*/
+#btn-log.on {
+  background: rgba(235, 141, 134, 0.16);
+  color: var(--recording);
+}
+
+#btn-log.on:hover {
+  background: rgba(235, 141, 134, 0.24);
+  color: var(--recording);
+}
+
+.toolbar-sep {
+  width: 1px;
+  height: 18px;
+  margin: 0 6px;
+  background: var(--border);
 }
 
 .toolbar-spacer {
   flex: 1;
-  border-right: 1px solid rgba(255, 255, 255, 0.5);
 }
 
 /* ---- 終端機區 ---- */
@@ -93,11 +192,19 @@ body {
   min-height: 0;
 }
 
+/* 捲軸：Windows 預設的淺色粗捲軸在深色面板上太搶眼。
+   xterm.css 先載入，所以這裡蓋得過去。*/
+.xterm-viewport,
+#session-list {
+  scrollbar-width: thin;
+  scrollbar-color: #3a4046 transparent;
+}
+
 /* 每個工作階段一個容器，只有作用中的那個顯示 */
 .term-host {
   position: absolute;
   inset: 0;
-  padding: 4px;
+  padding: 14px 18px;
 }
 
 .term-host[hidden] {
@@ -110,7 +217,8 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #888;
+  color: var(--muted);
+  font-size: 13px;
   pointer-events: none;
 }
 
@@ -121,122 +229,256 @@ body {
 /* ---- 輸入面板 ---- */
 #input-panel {
   display: flex;
-  gap: 8px;
-  padding: 8px;
-  border-top: 2px solid var(--border);
-  background: #252526;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 14px 12px;
+  background: var(--chrome);
+  border-top: 1px solid var(--border);
 }
 
 #input-panel[hidden] {
   display: none;
 }
 
+#input-target {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+#input-target-name {
+  color: var(--text);
+}
+
+#input-target-dot[hidden] {
+  display: none;
+}
+
+.input-row {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+}
+
 #input-text {
   flex: 1;
+  min-width: 0;
+  height: 78px;
   resize: none;
-  padding: 6px;
-  border: 1px solid #444;
-  background: #1e1e1e;
-  color: #eee;
-  font: 14px/1.5 Consolas, 'Microsoft JhengHei', monospace;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--terminal-bg);
+  color: #cfd3d7;
+  font: 13px/1.55 'Cascadia Mono', Consolas, 'Microsoft JhengHei', monospace;
+}
+
+#input-text::placeholder {
+  color: var(--dim);
+}
+
+#input-text:focus {
+  outline: none;
+  border-color: var(--accent);
 }
 
 #btn-send {
-  align-self: stretch;
-  width: 88px;
+  display: flex;
+  align-self: flex-end;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  padding: 0 18px;
   border: none;
-  background: var(--toolbar);
-  color: var(--text-light);
-  font: inherit;
+  border-radius: var(--radius);
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1;
+  white-space: nowrap;
   cursor: pointer;
 }
 
-#btn-send:hover {
-  background: var(--toolbar-hover);
+#btn-send svg {
+  width: 16px;
+  height: 16px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex: none;
 }
 
 /* ---- session 清單 ---- */
 #session-panel {
   grid-column: 2;
   grid-row: 1 / span 2;
-  background: var(--panel);
-  color: #1b2f10;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--chrome);
+  border-left: 1px solid var(--border);
 }
 
-#session-panel h2 {
+#session-panel-head {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  height: 44px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+#session-panel-head h2 {
   margin: 0;
-  padding: 16px 12px;
-  font-size: 15px;
+  font-size: 11.5px;
   font-weight: 600;
-  text-align: center;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+#session-count {
+  font-size: 11.5px;
+  color: var(--dim);
 }
 
 #session-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   margin: 0;
-  padding: 0;
+  padding: 8px;
   list-style: none;
+  overflow-y: auto;
 }
 
 .session-item {
   display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 2px 6px;
+  grid-template-columns: 8px 1fr 20px;
+  column-gap: 10px;
+  align-items: center;
   padding: 8px 10px;
-  border-top: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: var(--radius);
   cursor: pointer;
 }
 
 .session-item:hover {
-  background: var(--panel-item);
+  background: var(--hover);
 }
 
 .session-item.active {
-  background: var(--panel-item);
-  box-shadow: inset 4px 0 0 var(--toolbar-active);
+  background: var(--selected);
+}
+
+.session-item.active .session-name {
+  color: var(--text-strong);
+}
+
+.session-item.exited .session-name {
+  color: var(--muted);
+}
+
+.session-item.exited .session-tag {
+  background: #23272c;
+  color: #7b8187;
+}
+
+.session-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--exited);
+}
+
+.session-dot.running {
+  background: var(--running);
+}
+
+.session-dot.exited {
+  background: var(--exited);
+}
+
+/* 紀錄中的小紅點，跟在狀態文字前面。*/
+.session-dot.logging {
+  width: 6px;
+  height: 6px;
+  background: var(--recording);
+}
+
+.session-body {
+  min-width: 0;
 }
 
 .session-name {
-  font-size: 14px;
+  font-size: 13px;
+  color: var(--text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .session-meta {
-  grid-column: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 3px;
   font-size: 11px;
-  opacity: 0.8;
+  color: var(--muted);
 }
 
 .session-tag {
-  padding: 0 4px;
-  border-radius: 3px;
-  background: rgba(0, 0, 0, 0.18);
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  background: var(--border);
+  color: #a4a9af;
+  font-size: 10.5px;
+  letter-spacing: 0.03em;
+}
+
+.session-state {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .session-state.exited {
-  color: #7a1010;
-  font-weight: 600;
+  color: var(--dim);
+}
+
+.session-state.logging {
+  color: var(--recording);
 }
 
 .session-close {
-  /* 欄位要寫死：只給 grid-row 的話會被自動排版搶到第一欄。*/
-  grid-column: 2;
-  grid-row: 1 / span 2;
-  align-self: center;
-  width: 22px;
-  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
   border: none;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   background: transparent;
-  color: inherit;
-  font-size: 14px;
+  color: var(--dim);
   cursor: pointer;
 }
 
+.session-close svg {
+  width: 12px;
+  height: 12px;
+}
+
 .session-close:hover {
-  background: rgba(0, 0, 0, 0.2);
+  background: rgba(219, 222, 226, 0.1);
+  color: var(--text);
+}
+
+.session-item.active .session-close {
+  color: #a4a9af;
 }
 
 /* ---- 新連接對話框 ---- */
@@ -244,13 +486,13 @@ body {
   min-width: 420px;
   padding: 0;
   border: 1px solid var(--border);
-  border-radius: 4px;
-  background: #2d2d30;
-  color: #eee;
+  border-radius: var(--radius);
+  background: var(--chrome);
+  color: var(--text);
 }
 
 #new-connection::backdrop {
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(9, 11, 13, 0.6);
 }
 
 #new-connection form {
@@ -262,7 +504,8 @@ body {
 
 #new-connection h2 {
   margin: 0;
-  font-size: 16px;
+  font-size: 15px;
+  font-weight: 600;
 }
 
 #new-connection label {
@@ -270,18 +513,30 @@ body {
   gap: 8px;
   align-items: center;
   justify-content: space-between;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 #new-connection input,
 #new-connection select {
   flex: 1;
   max-width: 260px;
-  padding: 4px 6px;
-  border: 1px solid #555;
-  background: #1e1e1e;
-  color: #eee;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--terminal-bg);
+  color: var(--text);
   font: inherit;
+  font-size: 13px;
+}
+
+#new-connection input:focus,
+#new-connection select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+#new-connection input::placeholder {
+  color: var(--dim);
 }
 
 .field-group {
@@ -289,7 +544,7 @@ body {
   flex-direction: column;
   gap: 10px;
   padding-left: 12px;
-  border-left: 2px solid var(--toolbar);
+  border-left: 1px solid var(--border);
 }
 
 .field-group[hidden] {
@@ -299,8 +554,8 @@ body {
 .errors {
   margin: 0;
   min-height: 1em;
-  color: #ff8a80;
-  font-size: 13px;
+  color: var(--recording);
+  font-size: 12.5px;
   white-space: pre-line;
 }
 
@@ -313,15 +568,26 @@ body {
 }
 
 #new-connection menu button {
-  padding: 5px 16px;
-  border: 1px solid #555;
-  background: #3c3c3c;
-  color: #eee;
-  font: inherit;
+  height: 30px;
+  padding: 0 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--selected);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 13px;
   cursor: pointer;
 }
 
+#new-connection menu button:hover {
+  background: #343940;
+}
+
 #new-connection menu button.primary {
-  border-color: var(--toolbar);
-  background: var(--toolbar);
+  border-color: var(--accent);
+}
+
+#new-connection menu button.primary:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
 }
