@@ -10,7 +10,8 @@
     "start": "electron-vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "e2e": "npm run build && playwright test"
+    "e2e": "npm run build && playwright test",
+    "dist": "electron-vite build && electron-builder --win"
   },
   "dependencies": {
     "@xterm/addon-fit": "0.10.0",
@@ -21,6 +22,7 @@
     "@playwright/test": "1.56.1",
     "@types/node": "24.10.1",
     "electron": "44.2.0",
+    "electron-builder": "26.15.3",
     "electron-vite": "4.0.1",
     "typescript": "5.9.3",
     "vite": "7.3.6",

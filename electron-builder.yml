@@ -1,0 +1,22 @@
+appId: com.mufu.myterminal
+productName: myterminal
+directories:
+  output: dist
+# node-pty 1.1.0 內附 win32-x64 預先建置檔，ABI 與 electron@44.2.0 相容，
+# 不需要（本機也沒有 Visual Studio 可以）從原始碼重建。
+npmRebuild: false
+files:
+  - out/**/*
+  - package.json
+# node-pty 的 .node、conpty.dll、OpenConsole.exe 以及 fork 出來的
+# conpty_console_list_agent.js 都必須是真實檔案，不能留在 asar 裡。
+asarUnpack:
+  - node_modules/node-pty/**
+win:
+  target:
+    - portable
+    - nsis
+portable:
+  artifactName: ${name}-${version}-portable.${ext}
+nsis:
+  artifactName: ${name}-${version}-setup.${ext}
