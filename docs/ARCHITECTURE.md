@@ -61,8 +61,25 @@ renderer 拿不到 `ipcRenderer` 也拿不到 Node，只看得到 `preload` 白�
 | **Decorator / Observer** | `main/session-logger.ts` | 紀錄功能掛在 `SessionManager` 的 `data` 事件上，不改變資料流本身，也不需要 `SessionManager` 知道紀錄這回事。 |
 | **Command** | `renderer/commands.ts` | 工具列七個按鈕各是一個 `ICommand`。按鈕只負責「按下去就 `execute()`」，行為本身不碰 DOM，可以單獨測試。 |
 
-刻意**沒有**引入的東西：設定系統、主題、外掛架構、狀態管理框架、UI 框架。
+刻意**沒有**引入的東西：設定系統、外掛架構、狀態管理框架、UI 框架。
 renderer 是純 TypeScript + DOM。
+
+## 主題
+
+`styles.css` 只有一份元件規則，顏色／圓角／邊框／版面尺寸全部是 CSS custom
+property：`:root`（等同 `html[data-theme="dark"]`）是深色，
+`html[data-theme="light"]` 與 `["warm"]` 只覆寫 token，沒有任何元件規則被複製第二遍。
+極少數 token 表達不了的差異（淺色與暖色只在作用中那列顯示指示器）才用
+`data-theme` 選擇器寫成兩行。
+
+`renderer/theme.ts` 是另一半：`THEMES` 放三個主題的中文名稱與 xterm 的
+`ITheme`（xterm 畫在 canvas 上，吃不到 CSS 變數，只能用 JS 給顏色），
+`ThemeStore` 則是跟 `AppState` 同一個 Observer 寫法，多了持久化 ——
+`Storage` 與「套用主題」的動作都從建構子注入，正式環境是 `window.localStorage`
+與 `document.documentElement.dataset.theme`，測試傳假的，所以 vitest 的 node
+環境不需要 DOM 就測得到（`test/theme.spec.ts`）。讀不到或讀壞的值一律退回深色。
+`main.ts` 第一件事就是建立 `ThemeStore`，主題因此在第一次繪製前就套上；
+每個 `TerminalView` 都訂閱它，換主題時更新自己的 `terminal.options.theme`。
 
 ## IPC 契約
 
@@ -108,6 +125,7 @@ main → renderer（`webContents.send`）：
 | `SessionManager` | `FakePtySpawner` / `FakePty`，以及同步版的 `Scheduler` | `test/fakes/fake-pty.ts` |
 | `SessionLogger` | 假的 `LogSinkFactory` 與固定時鐘 | `test/session-logger.spec.ts` |
 | `AppState` | 不需要（純資料） | `test/app-state.spec.ts` |
+| `ThemeStore` | 假的 `Storage`（兩個方法）與假的 `apply` | `test/theme.spec.ts` |
 | 各 `Command` | `FakeTerminal` / `FakeClipboard` / `FakeInputPanel` + `vi.fn()` 的 api | `test/commands.spec.ts` |
 | `validateProfile` | 不需要（純函式） | `test/validate-profile.spec.ts` |
 
