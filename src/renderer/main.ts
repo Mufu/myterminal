@@ -92,6 +92,8 @@ const dialog = new NewConnectionDialog((profile) => void createSession(profile))
 const inputPanel = new InputPanel(
   $<HTMLElement>('input-panel'),
   $<HTMLTextAreaElement>('input-text'),
+  $<HTMLElement>('input-target-name'),
+  $<HTMLElement>('input-target-dot'),
   state,
   () => activeTerminal()?.resize(),
 );
@@ -106,7 +108,12 @@ new Toolbar(state, {
   send: new SendInputCommand(state, api, inputPanel),
 });
 
-new SessionListView($<HTMLUListElement>('session-list'), state, (id) => void api.close(id));
+new SessionListView(
+  $<HTMLUListElement>('session-list'),
+  $<HTMLElement>('session-count'),
+  state,
+  (id) => void api.close(id),
+);
 
 state.subscribe(syncTerminals);
 api.onSessionsChanged((sessions) => state.setSessions(sessions));

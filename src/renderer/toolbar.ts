@@ -23,6 +23,8 @@ export interface ToolbarCommands {
  */
 export class Toolbar {
   private readonly logButton = $<HTMLButtonElement>('btn-log');
+  /** 按鈕裡除了文字還有圖示，所以只換 .btn-label，不要動整顆按鈕的內容。*/
+  private readonly logLabel = this.logButton.querySelector<HTMLElement>('.btn-label');
   private readonly needSession: HTMLButtonElement[];
 
   constructor(
@@ -54,7 +56,7 @@ export class Toolbar {
     const session = this.state.activeSession();
     for (const button of this.needSession) button.disabled = session === null;
     this.logButton.classList.toggle('on', session?.logging === true);
-    this.logButton.textContent = session?.logging ? '紀錄中' : '紀錄';
+    if (this.logLabel) this.logLabel.textContent = session?.logging ? '紀錄中' : '紀錄';
     $<HTMLButtonElement>('btn-input').classList.toggle('on', this.state.inputPanelVisible);
   }
 }

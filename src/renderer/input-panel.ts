@@ -9,11 +9,17 @@ export class InputPanel implements InputPanelPort {
   constructor(
     private readonly panel: HTMLElement,
     private readonly textarea: HTMLTextAreaElement,
-    state: AppState,
+    private readonly targetName: HTMLElement,
+    private readonly targetDot: HTMLElement,
+    private readonly state: AppState,
     private readonly onVisibilityChange: () => void,
   ) {
-    state.subscribe(() => this.sync(state.inputPanelVisible));
+    state.subscribe(() => {
+      this.sync(state.inputPanelVisible);
+      this.renderTarget();
+    });
     this.sync(state.inputPanelVisible);
+    this.renderTarget();
   }
 
   getText(): string {
@@ -23,6 +29,14 @@ export class InputPanel implements InputPanelPort {
   clear(): void {
     this.textarea.value = '';
     this.textarea.focus();
+  }
+
+  /** 標題列顯示這段文字會送到哪個工作階段。*/
+  private renderTarget(): void {
+    const session = this.state.activeSession();
+    this.targetName.textContent = session?.name ?? '—';
+    this.targetDot.hidden = session === null;
+    this.targetDot.className = session ? `session-dot ${session.state}` : 'session-dot';
   }
 
   private sync(visible: boolean): void {
