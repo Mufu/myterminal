@@ -54,6 +54,9 @@ export type ConnectionProfile =
   | AgentProfile
   | CustomProfile;
 
+/** 已儲存的連線設定：名稱是必填的，因為清單與刪除都以名稱為鍵。*/
+export type SavedProfile = ConnectionProfile & { name: string };
+
 /** 每個型別的預設顯示前綴，供 SessionManager 產生名稱時使用。*/
 export const TYPE_LABELS: Record<SessionType, string> = {
   powershell: 'PowerShell',

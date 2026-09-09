@@ -5,8 +5,10 @@ import type {
   WriteRequest,
   ResizeRequest,
 } from '../shared/ipc';
+import type { SavedProfile } from '../shared/profile';
 import type { SessionManager } from './session-manager';
 import type { SessionLogger } from './session-logger';
+import type { ProfileStore } from './profile-store';
 
 /**
  * IPC 橋接層：刻意保持很薄。
@@ -16,12 +18,14 @@ import type { SessionLogger } from './session-logger';
 export function registerIpc(
   manager: SessionManager,
   logger: SessionLogger,
+  profiles: ProfileStore,
   getWebContents: () => WebContents | null,
 ): void {
   const send = (channel: string, payload: unknown): void => {
     getWebContents()?.send(channel, payload);
   };
   const pushSessions = (): void => send(IPC.sessionsChanged, manager.list());
+  const pushProfiles = (): void => send(IPC.profilesChanged, profiles.list());
 
   // main -> renderer
   manager.on('data', (event) => {
@@ -62,5 +66,17 @@ export function registerIpc(
     logger.stop(id);
     manager.setLogging(id, false);
     pushSessions();
+  });
+
+  ipcMain.handle(IPC.listProfiles, () => profiles.list());
+
+  ipcMain.handle(IPC.saveProfile, (_e, profile: SavedProfile) => {
+    profiles.save(profile);
+    pushProfiles();
+  });
+
+  ipcMain.handle(IPC.removeProfile, (_e, name: string) => {
+    profiles.remove(name);
+    pushProfiles();
   });
 }

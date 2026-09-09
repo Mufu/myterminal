@@ -13,11 +13,15 @@ export const IPC = {
   list: 'session:list',
   startLog: 'session:start-log',
   stopLog: 'session:stop-log',
+  listProfiles: 'profiles:list',
+  saveProfile: 'profiles:save',
+  removeProfile: 'profiles:remove',
 
   /** main -> renderer (send) */
   data: 'session:data',
   exit: 'session:exit',
   sessionsChanged: 'session:changed',
+  profilesChanged: 'profiles:changed',
 } as const;
 
 export interface CreateSessionRequest {

@@ -1,4 +1,4 @@
-import type { ConnectionProfile } from './profile';
+import type { ConnectionProfile, SavedProfile } from './profile';
 import type { SessionInfo } from './session';
 import type { DataEvent, ExitEvent } from './ipc';
 
@@ -15,9 +15,14 @@ export interface MyTerminalApi {
   startLog(id: string): Promise<string>;
   stopLog(id: string): Promise<void>;
 
+  listProfiles(): Promise<SavedProfile[]>;
+  saveProfile(profile: SavedProfile): Promise<void>;
+  removeProfile(name: string): Promise<void>;
+
   onData(listener: (event: DataEvent) => void): void;
   onExit(listener: (event: ExitEvent) => void): void;
   onSessionsChanged(listener: (sessions: SessionInfo[]) => void): void;
+  onProfilesChanged(listener: (profiles: SavedProfile[]) => void): void;
 }
 
 declare global {

@@ -4,6 +4,7 @@ import { SessionManager } from './session-manager';
 import { SessionLogger, defaultLogDir, ensureLogDir } from './session-logger';
 import { NodePtySpawner } from './node-pty-spawner';
 import { ShellFactory } from './shell-factory';
+import { fileProfileStore } from './profile-store';
 import { registerIpc } from './ipc';
 
 let win: BrowserWindow | null = null;
@@ -17,9 +18,12 @@ ensureLogDir(logDir);
 // 組裝：正式環境注入真的 node-pty spawner 與真的檔案 sink。
 const manager = new SessionManager(new NodePtySpawner(), new ShellFactory());
 const logger = new SessionLogger(logDir);
+const profiles = fileProfileStore(join(app.getPath('userData'), 'profiles.json'));
 
 // 關窗之後 pty 的 exit 事件才可能送達，那時 webContents 已經被銷毀。
-registerIpc(manager, logger, () => (win && !win.isDestroyed() ? win.webContents : null));
+registerIpc(manager, logger, profiles, () =>
+  win && !win.isDestroyed() ? win.webContents : null,
+);
 
 function createWindow(): void {
   win = new BrowserWindow({

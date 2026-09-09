@@ -16,10 +16,16 @@ const api: MyTerminalApi = {
   startLog: (id) => ipcRenderer.invoke(IPC.startLog, id),
   stopLog: (id) => ipcRenderer.invoke(IPC.stopLog, id),
 
+  listProfiles: () => ipcRenderer.invoke(IPC.listProfiles),
+  saveProfile: (profile) => ipcRenderer.invoke(IPC.saveProfile, profile),
+  removeProfile: (name) => ipcRenderer.invoke(IPC.removeProfile, name),
+
   onData: (listener) => void ipcRenderer.on(IPC.data, (_e, payload) => listener(payload)),
   onExit: (listener) => void ipcRenderer.on(IPC.exit, (_e, payload) => listener(payload)),
   onSessionsChanged: (listener) =>
     void ipcRenderer.on(IPC.sessionsChanged, (_e, payload) => listener(payload)),
+  onProfilesChanged: (listener) =>
+    void ipcRenderer.on(IPC.profilesChanged, (_e, payload) => listener(payload)),
 };
 
 contextBridge.exposeInMainWorld('myterminal', api);
