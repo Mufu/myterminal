@@ -19,6 +19,7 @@ import {
   SwitchThemeCommand,
   ConnectFromProfileCommand,
   RemoveProfileCommand,
+  TakeOverCommand,
 } from './commands';
 import { ThemeStore } from './theme';
 import type { ClipboardPort, ConfirmPort } from './ports';
@@ -135,6 +136,7 @@ new SessionListView(
   $<HTMLElement>('session-count'),
   state,
   (id) => void api.close(id),
+  (session) => new TakeOverCommand((p) => void createSession(p), session).execute(),
 );
 
 new ProfileListView(

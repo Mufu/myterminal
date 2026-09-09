@@ -3,6 +3,8 @@ import type { ThemeStore } from './theme';
 import { parseTheme } from './theme';
 import type { MyTerminalApi } from '../shared/api';
 import type { ConnectionProfile, SavedProfile } from '../shared/profile';
+import type { AgentKind } from '../shared/agent';
+import type { SessionInfo } from '../shared/session';
 import type {
   ICommand,
   ActiveTerminal,
@@ -120,6 +122,35 @@ export class ConnectFromProfileCommand implements ICommand {
   ) {}
   execute(): void {
     this.connect(this.profile);
+  }
+}
+
+/** 在真的終端機裡接續同一段對話的指令。*/
+export function resumeCommand(kind: AgentKind, sessionId: string): string {
+  return kind === 'claude' ? `claude --resume ${sessionId}` : `codex resume ${sessionId}`;
+}
+
+/**
+ * 「接手」：把跑完的 agent 任務接到一個真的互動式工作階段裡。
+ * 走的是既有的 Claude / Codex 型別 (PowerShell 起 shell 再送啟動指令)，
+ * 所以接手之後跟平常自己開 claude 沒有兩樣。
+ */
+export class TakeOverCommand implements ICommand {
+  constructor(
+    private readonly connect: (profile: ConnectionProfile) => void,
+    private readonly session: SessionInfo,
+  ) {}
+
+  execute(): void {
+    const { agentKind, agentSessionId } = this.session;
+    if (!agentKind || !agentSessionId) return;
+    this.connect({
+      type: agentKind,
+      name: `接手 ${this.session.name}`,
+      cwd: this.session.cwd,
+      baseShell: 'powershell',
+      startupCommand: resumeCommand(agentKind, agentSessionId),
+    });
   }
 }
 

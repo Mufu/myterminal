@@ -920,6 +920,44 @@ html[data-theme='warm'] .session-item.active .session-dot {
   color: var(--close-active-fg);
 }
 
+/* 接手：只有 agent 任務報回 session id 之後才會出現，跟 ✕ 一樣滑過那一列才顯形。*/
+.session-takeover {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0 4px;
+  border: none;
+  border-radius: var(--close-radius);
+  background: transparent;
+  color: var(--dim);
+  font: inherit;
+  font-size: var(--meta-size);
+  letter-spacing: var(--meta-tracking);
+  cursor: pointer;
+  opacity: 0;
+}
+
+.session-takeover svg {
+  width: 11px;
+  height: 11px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex: none;
+}
+
+.session-item:hover .session-takeover,
+.session-takeover:focus-visible {
+  opacity: 1;
+}
+
+.session-takeover:hover {
+  background: var(--close-hover-bg);
+  color: var(--text);
+}
+
 /* ---- 已儲存連線：跟 session 清單同一套 token，只差沒有狀態指示器 ---- */
 #profile-panel-head {
   border-top: 1px solid var(--border);
@@ -1006,7 +1044,8 @@ html[data-theme='warm'] .session-item.active .session-dot {
 }
 
 #new-connection input,
-#new-connection select {
+#new-connection select,
+#new-connection textarea {
   flex: 1;
   max-width: 260px;
   padding: 5px 8px;
@@ -1019,18 +1058,25 @@ html[data-theme='warm'] .session-item.active .session-dot {
 }
 
 #new-connection input:focus,
-#new-connection select:focus {
+#new-connection select:focus,
+#new-connection textarea:focus {
   outline: none;
   border-color: var(--accent);
 }
 
-#new-connection input::placeholder {
+#new-connection input::placeholder,
+#new-connection textarea::placeholder {
   color: var(--dim);
+}
+
+#new-connection textarea {
+  resize: vertical;
 }
 
 /* 勾選框那一列：左對齊，方框不要跟著文字輸入框被拉寬。
    選擇器要帶上 #new-connection，否則權重輸給上面的 #new-connection label。*/
-#new-connection #f-save-row {
+#new-connection #f-save-row,
+#new-connection #f-agent-edits-row {
   justify-content: flex-start;
   gap: 8px;
 }

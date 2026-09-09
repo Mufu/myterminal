@@ -1,7 +1,25 @@
 import type { AppState } from './app-state';
+import type { SessionInfo } from '../shared/session';
 import { TYPE_LABELS } from '../shared/profile';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
+
+/** 清單上那一列的類型標籤；agent 任務要看得出是哪個 CLI 在跑。*/
+export function sessionTag(session: SessionInfo): string {
+  if (session.type !== 'agent') return TYPE_LABELS[session.type];
+  return session.agentKind === 'codex' ? 'Codex 任務' : 'Claude 任務';
+}
+
+/** 接手：把這次 agent 執行接到真的終端機裡繼續。*/
+function takeOverIcon(): SVGSVGElement {
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('viewBox', '0 0 12 12');
+  svg.setAttribute('aria-hidden', 'true');
+  const path = document.createElementNS(SVG_NS, 'path');
+  path.setAttribute('d', 'M1 6h6M5 3.5L7.5 6 5 8.5M9.5 1.5v9');
+  svg.appendChild(path);
+  return svg;
+}
 
 /** 線稿圖示：關閉工作階段與刪除設定檔共用。*/
 export function closeIcon(): SVGSVGElement {
@@ -24,6 +42,7 @@ export class SessionListView {
     private readonly count: HTMLElement,
     private readonly state: AppState,
     private readonly onClose: (id: string) => void,
+    private readonly onTakeOver: (session: SessionInfo) => void,
   ) {
     this.state.subscribe(() => this.render());
     this.render();
@@ -59,7 +78,7 @@ export class SessionListView {
 
       const tag = document.createElement('span');
       tag.className = 'session-tag';
-      tag.textContent = TYPE_LABELS[session.type];
+      tag.textContent = sessionTag(session);
 
       const stateLabel = document.createElement('span');
       stateLabel.className = `session-state ${session.state}`;
@@ -74,6 +93,23 @@ export class SessionListView {
       }
 
       meta.append(tag, stateLabel);
+
+      // 有 session id 才接得回去，所以 CLI 回報之前不顯示。
+      if (session.agentSessionId) {
+        const takeOver = document.createElement('button');
+        takeOver.type = 'button';
+        takeOver.className = 'session-takeover';
+        takeOver.title = '在真的終端機裡接續這段對話';
+        takeOver.setAttribute('aria-label', `接手 ${session.name}`);
+        const label = document.createElement('span');
+        label.textContent = '接手';
+        takeOver.append(takeOverIcon(), label);
+        takeOver.addEventListener('click', (event) => {
+          event.stopPropagation();
+          this.onTakeOver(session);
+        });
+        meta.appendChild(takeOver);
+      }
       body.append(name, meta);
 
       const close = document.createElement('button');

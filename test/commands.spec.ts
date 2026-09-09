@@ -11,6 +11,8 @@ import {
   SwitchThemeCommand,
   ConnectFromProfileCommand,
   RemoveProfileCommand,
+  TakeOverCommand,
+  resumeCommand,
 } from '../src/renderer/commands';
 import { ThemeStore } from '../src/renderer/theme';
 import type { TerminalPort, ClipboardPort, InputPanelPort, DialogPort } from '../src/renderer/ports';
@@ -242,5 +244,51 @@ describe('刪除已儲存連線', () => {
   it('取消時不刪除', async () => {
     await new RemoveProfileCommand(api, () => false, '我的 PS').execute();
     expect(api.removeProfile).not.toHaveBeenCalled();
+  });
+});
+
+describe('TakeOverCommand', () => {
+  const finished = (over: Partial<SessionInfo> = {}): SessionInfo =>
+    session('s1', {
+      name: 'Agent 1',
+      type: 'agent',
+      state: 'exited',
+      cwd: 'C:/work',
+      agentKind: 'claude',
+      agentSessionId: 'a7c9c5c6-ae75-4090-9d47-13fc2c0f23b7',
+      ...over,
+    });
+
+  it('用既有的 Claude 型別開一個互動式工作階段，啟動指令是 --resume', () => {
+    const connect = vi.fn();
+    new TakeOverCommand(connect, finished()).execute();
+
+    expect(connect).toHaveBeenCalledWith({
+      type: 'claude',
+      name: '接手 Agent 1',
+      cwd: 'C:/work',
+      baseShell: 'powershell',
+      startupCommand: 'claude --resume a7c9c5c6-ae75-4090-9d47-13fc2c0f23b7',
+    });
+  });
+
+  it('Codex 用 codex resume', () => {
+    const connect = vi.fn();
+    new TakeOverCommand(connect, finished({ agentKind: 'codex', agentSessionId: 't-1' })).execute();
+
+    expect(connect).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'codex', startupCommand: 'codex resume t-1' }),
+    );
+  });
+
+  it('還沒有 session id 就什麼都不做', () => {
+    const connect = vi.fn();
+    new TakeOverCommand(connect, finished({ agentSessionId: undefined })).execute();
+    expect(connect).not.toHaveBeenCalled();
+  });
+
+  it('resumeCommand 兩種 CLI 的形式', () => {
+    expect(resumeCommand('claude', 'x')).toBe('claude --resume x');
+    expect(resumeCommand('codex', 'x')).toBe('codex resume x');
   });
 });
