@@ -12,10 +12,12 @@ flowchart TB
   subgraph renderer["renderer (瀏覽器環境，無 Node)"]
     Toolbar --> Commands
     SessionListView --> AppState
+    ProfileListView --> Commands
     Commands --> AppState
     Commands --> TerminalView
     AppState -. 訂閱通知 .-> Toolbar
     AppState -. 訂閱通知 .-> SessionListView
+    AppState -. 訂閱通知 .-> ProfileListView
     NewConnectionDialog --> Commands
     InputPanel --> Commands
   end
@@ -27,13 +29,14 @@ flowchart TB
   subgraph main["main (Node)"]
     IPCLayer["ipc.ts"] --> SessionManager
     IPCLayer --> SessionLogger
+    IPCLayer --> ProfileStore
     SessionManager --> ShellFactory
     SessionManager --> IPtySpawner
     IPtySpawner --> NodePty["node-pty (conpty)"]
   end
 
   subgraph shared["shared (三方共用型別)"]
-    Profile["ConnectionProfile<br/>SessionInfo<br/>IPC 契約<br/>validateProfile"]
+    Profile["ConnectionProfile / SavedProfile<br/>SessionInfo<br/>IPC 契約<br/>validateProfile"]
   end
 
   Commands --> Bridge
@@ -59,6 +62,7 @@ renderer 拿不到 `ipcRenderer` 也拿不到 Node，只看得到 `preload` 白�
 | **Dependency Injection** | `SessionManager`、`SessionLogger`、每個 `Command` 的建構子 | 所有跟外界（行程、檔案系統、剪貼簿、DOM）接觸的東西都從建構子傳進來，預設值是正式實作，測試傳假的。 |
 | **Observer** | `SessionManager`（typed `EventEmitter`）、`AppState`（`subscribe`） | main 端 pty 的輸出是推送式的；renderer 端多個 View 要對同一份狀態反應。兩邊都用訂閱而不是互相持有參考。 |
 | **Decorator / Observer** | `main/session-logger.ts` | 紀錄功能掛在 `SessionManager` 的 `data` 事件上，不改變資料流本身，也不需要 `SessionManager` 知道紀錄這回事。 |
+| **Repository** | `main/profile-store.ts` | 已儲存的連線設定就是一份 JSON，`list` / `save` / `remove` 三個方法把「存在哪、怎麼序列化、檔案壞了怎麼辦」包在裡面。IPC 與 renderer 只看得到 `SavedProfile[]`，換成別的儲存方式不會影響到它們。 |
 | **Command** | `renderer/commands.ts` | 工具列七個按鈕各是一個 `ICommand`。按鈕只負責「按下去就 `execute()`」，行為本身不碰 DOM，可以單獨測試。 |
 
 刻意**沒有**引入的東西：設定系統、外掛架構、狀態管理框架、UI 框架。
@@ -81,6 +85,28 @@ property：`:root`（等同 `html[data-theme="dark"]`）是深色，
 `main.ts` 第一件事就是建立 `ThemeStore`，主題因此在第一次繪製前就套上；
 每個 `TerminalView` 都訂閱它，換主題時更新自己的 `terminal.options.theme`。
 
+## 已儲存連線 (ProfileStore)
+
+`ProfileStore` 是 Repository，資料是 `join(app.getPath('userData'), 'profiles.json')`
+這一個檔案，每次寫入都把整個陣列覆寫回去（設定檔數量是個位數，
+不值得為了省 I/O 做增量寫入或快取）。
+
+讀與寫是建構子注入的兩個函式 —— 正式環境由 `fileProfileStore(path)` 包上
+`readFileSync` / `writeFileSync`，測試傳一個記憶體字串進去，所以
+`test/profile-store.spec.ts` 不需要暫存目錄也不會有殘留檔案，
+跟 `SessionLogger` 注入 `LogSinkFactory` 是同一個手法。
+
+名稱是主鍵：前後空白去掉、區分大小寫、`save` 是 upsert（覆寫時保留原順序）。
+`list()` 每次都重新讀檔，而且對壞資料很寬容 —— 檔案不存在、內容不是 JSON、
+不是陣列、或某一筆缺名稱／類型，分別回傳空清單或跳過那一筆。
+使用者是可以直接編輯這個檔案的，一個逗號打錯不該讓 app 開不起來。
+
+renderer 端沒有第二份狀態：`AppState` 多存一份 `profiles`，
+`profiles:changed` 一到就 `setProfiles()`，`ProfileListView` 跟
+`SessionListView` 一樣訂閱同一個 `AppState` 重畫。
+點一列時走的是 `main.ts` 裡同一個 `createSession()`，
+所以「先量 cols/rows 再 spawn」的順序對兩個入口都成立。
+
 ## IPC 契約
 
 頻道名稱與 payload 型別都定義在 `src/shared/ipc.ts`，三邊共用同一份。
@@ -96,6 +122,9 @@ renderer → main（`ipcMain.handle`，全部回傳 Promise）：
 | `session:list` | — | `SessionInfo[]` |
 | `session:start-log` | `id` | 紀錄檔路徑 |
 | `session:stop-log` | `id` | — |
+| `profiles:list` | — | `SavedProfile[]` |
+| `profiles:save` | `SavedProfile` | — |
+| `profiles:remove` | `name` | — |
 
 main → renderer（`webContents.send`）：
 
@@ -104,6 +133,7 @@ main → renderer（`webContents.send`）：
 | `session:data` | `{ id, data }` | pty 有輸出 |
 | `session:exit` | `{ id, exitCode }` | pty 結束 |
 | `session:changed` | `SessionInfo[]` | 建立、關閉、結束、紀錄狀態改變 |
+| `profiles:changed` | `SavedProfile[]` | 儲存或刪除設定檔之後 |
 
 `ipc.ts` 只做轉接，沒有商業邏輯；所以「IPC 沒被測試」不代表邏輯沒被測試。
 
@@ -124,6 +154,7 @@ main → renderer（`webContents.send`）：
 | `ShellFactory` | 假的 `ExecutableResolver`（回傳 `RESOLVED(name)`） | `test/shell-factory.spec.ts` |
 | `SessionManager` | `FakePtySpawner` / `FakePty`，以及同步版的 `Scheduler` | `test/fakes/fake-pty.ts` |
 | `SessionLogger` | 假的 `LogSinkFactory` 與固定時鐘 | `test/session-logger.spec.ts` |
+| `ProfileStore` | 假的讀／寫函式（記憶體裡的一個字串） | `test/profile-store.spec.ts` |
 | `AppState` | 不需要（純資料） | `test/app-state.spec.ts` |
 | `ThemeStore` | 假的 `Storage`（兩個方法）與假的 `apply` | `test/theme.spec.ts` |
 | 各 `Command` | `FakeTerminal` / `FakeClipboard` / `FakeInputPanel` + `vi.fn()` 的 api | `test/commands.spec.ts` |
