@@ -852,7 +852,9 @@ html[data-theme='warm'] .session-item.active .session-dot {
 .profile-meta {
   display: flex;
   align-items: center;
-  gap: 6px;
+  /* 多了「接手」之後一行放不下，讓它換行而不是把標籤壓成兩行。*/
+  flex-wrap: wrap;
+  gap: 6px 6px;
   margin-top: 3px;
   font-family: var(--meta-font);
   font-size: var(--meta-size);
@@ -861,6 +863,7 @@ html[data-theme='warm'] .session-item.active .session-dot {
 }
 
 .session-tag {
+  white-space: nowrap;
   padding: var(--tag-pad);
   border: var(--tag-border-width) solid var(--tag-border);
   border-radius: var(--tag-radius);
@@ -874,6 +877,7 @@ html[data-theme='warm'] .session-item.active .session-dot {
 .session-state {
   display: flex;
   align-items: center;
+  white-space: nowrap;
   gap: 4px;
 }
 
@@ -924,6 +928,7 @@ html[data-theme='warm'] .session-item.active .session-dot {
 .session-takeover {
   display: flex;
   align-items: center;
+  white-space: nowrap;
   gap: 3px;
   padding: 0 4px;
   border: none;
