@@ -1,0 +1,2 @@
+# core.autocrlf=true 會把 checkout 出來的 .sh 變成 CRLF，WSL 的 bash 會因為 \r 失敗。
+*.sh text eol=lf

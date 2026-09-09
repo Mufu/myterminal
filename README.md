@@ -79,12 +79,78 @@
 | --- | --- |
 | PowerShell | `powershell.exe -NoLogo` |
 | WSL | `wsl.exe`（可指定發行版與 `--cd` 目錄） |
-| SSH (plink) | `plink.exe -ssh -P <port> <user>@<host>` |
+| SSH (plink) | `plink.exe -ssh -no-antispoof -P <port> <user>@<host>`，見下面的「SSH 連線」 |
 | Claude | 基礎 shell（PowerShell 或 WSL）開起來後送出 `claude` |
 | Codex | 基礎 shell 開起來後送出 `codex` |
 | 自訂命令 | 自行指定執行檔與參數 |
 
 Claude / Codex 的啟動指令可以在對話框裡改（例如加參數）。
+
+## SSH 連線
+
+「新連接」選 SSH，填主機、連接埠、使用者，實際 spawn 出來的是：
+
+```
+plink.exe -ssh -no-antispoof -P <port> <user>@<host>
+```
+
+- **刻意不加 `-batch`**：主機金鑰確認、密碼這些提示要能顯示在終端機裡讓你回答。
+- **`-no-antispoof`**：在 ConPTY 底下 plink 會認為終端機不可信，密碼過了之後多印一行
+  `Access granted. Press Return to begin session.`，並把你打的**第一行整個吃掉**
+  當成那個 Return（打 `ls` 會什麼都不做，也不會有回應）。加上這個參數就沒有那一步，
+  代價是關掉 PuTTY 的防偽提示保護。
+- 密碼不由本程式處理：plink 自己問，你直接打進終端機。
+  （plink 預設會先試 Pageant 與金鑰，都不成才問密碼。）
+
+第一次連某台主機時 plink 會先問金鑰：
+
+```
+The host key is not cached for this server:
+  localhost (port 2222)
+...
+Store key in cache? (y/n, Return cancels connection, i for more info)
+```
+
+打 `y` + Enter，金鑰會存進 `HKCU\Software\SimonTatham\PuTTY\SshHostKeys`，
+之後連同一台就直接跳到 `<user>@<host>'s password:`。
+
+### 本機 SSH 測試環境
+
+`e2e/ssh.spec.ts` 要有一台真的 sshd 才跑得動。`scripts/wsl-sshd-setup.sh` 會在 WSL 裡開一台
+（可重複執行）：
+
+```bash
+wsl.exe -u root -e bash scripts/wsl-sshd-setup.sh
+```
+
+用 `wsl.exe -u root` 是因為它不需要密碼，所以腳本裡不用 `sudo`。它會動到 WSL 的這些東西：
+
+| 動作 | 內容 |
+| --- | --- |
+| 安裝套件 | `openssh-server` |
+| 停用 systemd 單元 | `ssh.socket`、`ssh.service`、`sshd.service`。Ubuntu 24.04 之後預設 socket activation，`ssh.socket` 把 22 寫死在 unit 裡，`sshd_config` 的 `Port` 會被無視，所以改用獨立的 sshd 行程 |
+| 新增設定檔 | `/etc/ssh/sshd_config.d/myterminal-e2e.conf`：`Port 2222`、`ListenAddress 127.0.0.1`、`PasswordAuthentication yes`、`PermitRootLogin no` |
+| 新增帳號 | 本機帳號 `mtssh`，密碼 `mtssh-e2e`。**這是拋棄式的測試帳號**，只存在於這台 WSL，測完就該刪掉 |
+| 啟動 | `/usr/sbin/sshd`（獨立行程，不經 systemd） |
+
+綁 `127.0.0.1` 就夠：WSL2 NAT 模式的 localhost forwarding 會把 Windows 的
+`localhost:2222` 轉進 WSL（已實測），不必為了測試對 LAN 開放。
+
+跑測試：
+
+```bash
+npm run e2e:ssh
+```
+
+用完還原：
+
+```bash
+wsl.exe -u root -e bash scripts/wsl-sshd-teardown.sh            # 停 sshd、刪設定檔與 mtssh
+wsl.exe -u root -e bash scripts/wsl-sshd-teardown.sh --purge    # 連 openssh-server 一起移除
+```
+
+不加 `--purge` 的話 `openssh-server` 會留著，systemd 的 ssh 單元維持在停用狀態
+（這台機器本來就沒在跑 sshd，所以腳本不會自作主張把它們打開）。
 
 ## 前置需求
 
@@ -107,6 +173,7 @@ npm run dev      # 開發模式（electron-vite，支援熱更新）
 npm test         # 單元測試（Vitest）
 npm run build    # 建置到 out/
 npm run e2e      # 先 build 再跑 Playwright 冒煙測試，截圖寫到 test-results/smoke.png
+npm run e2e:ssh  # SSH 端到端測試，要先開好本機 sshd，見「本機 SSH 測試環境」
 npm run dist     # 打包成 Windows 執行檔（electron-builder）
 ```
 

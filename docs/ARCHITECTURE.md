@@ -173,6 +173,9 @@ main → renderer（`webContents.send`）：
 - **WSL 的工作目錄走 `--cd` 而不是 spawn 的 `cwd`**：使用者填的通常是
   Linux 路徑，拿去當 Windows 行程的 cwd 會失敗。
 - **SSH 刻意不加 `-batch`**：主機金鑰確認之類的提示要能顯示在終端機裡讓使用者回答。
+- **SSH 要加 `-no-antispoof`**：ConPTY 下 plink 會多一道
+  `Access granted. Press Return to begin session.`，並把使用者輸入的第一行整個
+  吃掉當成那個 Return。細節見 README 的「SSH 連線」。
 - **已結束的 pty 不能碰**：node-pty 的 Windows 後端在行程結束後呼叫
   `resize()` 會丟 `Cannot resize a pty that has already exited`，
   而且是從非同步回呼裡丟的，`ipcMain.handle` 攔不到，會變成主行程的錯誤對話框。
