@@ -12,6 +12,7 @@
     "test:watch": "vitest",
     "e2e": "npm run build && playwright test",
     "e2e:ssh": "npm run build && node scripts/e2e-ssh.mjs",
+    "e2e:agent": "npm run build && node scripts/e2e-agent.mjs",
     "dist": "electron-vite build && electron-builder --win"
   },
   "dependencies": {
