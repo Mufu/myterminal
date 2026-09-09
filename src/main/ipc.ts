@@ -37,6 +37,7 @@ export function registerIpc(
     pushSessions();
   });
   manager.on('created', pushSessions);
+  manager.on('updated', pushSessions);
   manager.on('closed', pushSessions);
 
   // renderer -> main

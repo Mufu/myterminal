@@ -1,10 +1,14 @@
 import { EventEmitter } from 'node:events';
-import type { ConnectionProfile } from '../shared/profile';
+import { homedir } from 'node:os';
+import type { AgentTaskProfile, ConnectionProfile } from '../shared/profile';
 import { TYPE_LABELS } from '../shared/profile';
 import type { SessionInfo } from '../shared/session';
 import type { DataEvent, ExitEvent } from '../shared/ipc';
 import type { IPtyProcess, IPtySpawner } from './pty';
 import { ShellFactory } from './shell-factory';
+import type { IAgentRunnerFactory } from './agent-runner';
+import { defaultAgentRunners } from './agent-runner';
+import { AgentRunPty } from './agent-run-pty';
 
 interface Session {
   info: SessionInfo;
@@ -16,6 +20,8 @@ type SessionEvents = {
   data: [DataEvent];
   exit: [ExitEvent];
   created: [SessionInfo];
+  /** 已經存在的工作階段內容改變 (目前只有 agent 回報了 session id)。*/
+  updated: [SessionInfo];
   closed: [string];
 };
 
@@ -39,14 +45,12 @@ export class SessionManager extends EventEmitter<SessionEvents> {
     private readonly schedule: Scheduler = (fn, ms) => {
       setTimeout(fn, ms);
     },
+    private readonly agents: IAgentRunnerFactory = defaultAgentRunners,
   ) {
     super();
   }
 
   create(profile: ConnectionProfile, cols: number, rows: number): SessionInfo {
-    const spec = this.factory.create(profile);
-    const pty = this.spawner.spawn(spec, cols, rows);
-
     this.counter += 1;
     const id = `s${this.counter}`;
     const info: SessionInfo = {
@@ -55,7 +59,9 @@ export class SessionManager extends EventEmitter<SessionEvents> {
       type: profile.type,
       state: 'running',
       logging: false,
+      cwd: profile.cwd,
     };
+    const { pty, startupCommand } = this.open(profile, info, cols, rows);
 
     this.sessions.set(id, { info, pty });
 
@@ -69,13 +75,54 @@ export class SessionManager extends EventEmitter<SessionEvents> {
       this.emit('exit', { id, exitCode });
     });
 
-    if (spec.startupCommand) {
+    if (startupCommand) {
       // 稍等 shell 起來再送，避免指令被還沒開始讀 stdin 的 shell 吃掉。
-      this.schedule(() => pty.write(`${spec.startupCommand}\r`), STARTUP_DELAY_MS);
+      this.schedule(() => pty.write(`${startupCommand}\r`), STARTUP_DELAY_MS);
     }
 
     this.emit('created', info);
     return info;
+  }
+
+  /**
+   * 開出這個工作階段的「pty」。
+   * 一般型別走 ShellFactory + node-pty；agent 任務走 IAgentRunner，
+   * 再用 AgentRunPty 包成 IPtyProcess，後面的流程就完全一樣了。
+   */
+  private open(
+    profile: ConnectionProfile,
+    info: SessionInfo,
+    cols: number,
+    rows: number,
+  ): { pty: IPtyProcess; startupCommand?: string } {
+    if (profile.type !== 'agent') {
+      const spec = this.factory.create(profile);
+      return { pty: this.spawner.spawn(spec, cols, rows), startupCommand: spec.startupCommand };
+    }
+    return { pty: this.startAgent(profile, info) };
+  }
+
+  /** agent 任務：開一次 CLI 執行，包成 pty 的樣子。*/
+  private startAgent(profile: AgentTaskProfile, info: SessionInfo): IPtyProcess {
+    const cwd = profile.cwd?.trim() || homedir();
+    info.cwd = cwd;
+    info.agentKind = profile.kind;
+
+    const run = this.agents(profile.kind).start({
+      kind: profile.kind,
+      prompt: profile.prompt,
+      cwd,
+      allowEdits: profile.allowEdits,
+    });
+    // CLI 一開始就會報 session id，記下來右側清單才能顯示「接手」。
+    run.onEvent((event) => {
+      const sessionId =
+        event.type === 'init' || event.type === 'result' ? event.sessionId : undefined;
+      if (!sessionId || info.agentSessionId === sessionId) return;
+      info.agentSessionId = sessionId;
+      this.emit('updated', { ...info });
+    });
+    return new AgentRunPty(run, profile.kind, profile.prompt);
   }
 
   write(id: string, data: string): void {

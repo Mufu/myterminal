@@ -120,6 +120,7 @@
             <option value="ssh">SSH (plink)</option>
             <option value="claude">Claude</option>
             <option value="codex">Codex</option>
+            <option value="agent">Agent 任務</option>
             <option value="custom">自訂命令</option>
           </select>
         </label>
@@ -151,6 +152,24 @@
             </select>
           </label>
           <label>啟動指令 <input id="f-startup" type="text" /></label>
+        </div>
+
+        <div class="field-group" data-for="agent-task">
+          <label>
+            執行者
+            <select id="f-agent-kind">
+              <option value="claude">Claude</option>
+              <option value="codex">Codex</option>
+            </select>
+          </label>
+          <label>
+            任務
+            <textarea id="f-agent-prompt" rows="4" placeholder="要 agent 做什麼"></textarea>
+          </label>
+          <label id="f-agent-edits-row">
+            <input id="f-agent-edits" type="checkbox" />
+            允許修改檔案
+          </label>
         </div>
 
         <div class="field-group" data-for="custom">

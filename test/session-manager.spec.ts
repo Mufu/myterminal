@@ -2,16 +2,25 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { SessionManager } from '../src/main/session-manager';
 import { ShellFactory } from '../src/main/shell-factory';
 import { FakePtySpawner } from './fakes/fake-pty';
+import { FakeAgentRunner } from './fakes/fake-agent';
 import type { DataEvent, ExitEvent } from '../src/shared/ipc';
 import type { SessionInfo } from '../src/shared/session';
+import { homedir } from 'node:os';
 
 let spawner: FakePtySpawner;
+let agents: FakeAgentRunner;
 let manager: SessionManager;
 
 beforeEach(() => {
   spawner = new FakePtySpawner();
+  agents = new FakeAgentRunner();
   // schedule 注入成同步執行，讓「spawn 後送出啟動指令」在測試裡是決定性的。
-  manager = new SessionManager(spawner, new ShellFactory((name) => name), (fn) => fn());
+  manager = new SessionManager(
+    spawner,
+    new ShellFactory((name) => name),
+    (fn) => fn(),
+    () => agents,
+  );
 });
 
 describe('SessionManager 建立工作階段', () => {
@@ -161,5 +170,59 @@ describe('SessionManager 生命週期', () => {
 
     expect(spawner.spawned.every((p) => p.killed)).toBe(true);
     expect(manager.list()).toEqual([]);
+  });
+});
+
+describe('SessionManager 的 agent 任務', () => {
+  const task = { type: 'agent', kind: 'claude', prompt: '只回覆 OK', allowEdits: false } as const;
+
+  it('不經過 node-pty，改交給 IAgentRunner', () => {
+    const info = manager.create({ ...task, cwd: 'C:/work' }, 80, 24);
+
+    expect(spawner.spawned).toEqual([]);
+    expect(agents.tasks).toEqual([
+      { kind: 'claude', prompt: '只回覆 OK', cwd: 'C:/work', allowEdits: false },
+    ]);
+    expect(info.type).toBe('agent');
+    expect(info.name).toBe('Agent 1');
+    expect(info.agentKind).toBe('claude');
+    expect(info.cwd).toBe('C:/work');
+  });
+
+  it('沒填工作目錄時用家目錄', () => {
+    const info = manager.create(task, 80, 24);
+    expect(agents.tasks[0].cwd).toBe(homedir());
+    expect(info.cwd).toBe(homedir());
+  });
+
+  it('CLI 回報 session id 之後填進 SessionInfo 並發出 updated', () => {
+    const updated: SessionInfo[] = [];
+    manager.on('updated', (info) => updated.push(info));
+    manager.create(task, 80, 24);
+
+    agents.last().emit({ type: 'init', sessionId: 'sess-1' });
+
+    expect(manager.list()[0].agentSessionId).toBe('sess-1');
+    expect(updated.map((i) => i.agentSessionId)).toEqual(['sess-1']);
+  });
+
+  it('agent 的輸出一樣走 data 事件，結束一樣走 exit', () => {
+    const data: DataEvent[] = [];
+    const exits: ExitEvent[] = [];
+    manager.on('data', (e) => data.push(e));
+    manager.on('exit', (e) => exits.push(e));
+    const info = manager.create(task, 80, 24);
+
+    agents.last().emit({ type: 'text', text: 'OK' });
+    agents.last().emit({ type: 'result', ok: true, text: 'OK', exitCode: 0 });
+
+    expect(data.map((e) => e.data)).toContain('OK\r\n');
+    expect(exits).toEqual([{ id: info.id, exitCode: 0 }]);
+  });
+
+  it('關閉 agent 工作階段會取消執行', () => {
+    const info = manager.create(task, 80, 24);
+    manager.close(info.id);
+    expect(agents.last().cancelled).toBe(true);
   });
 });

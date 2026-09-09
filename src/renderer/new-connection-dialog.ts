@@ -1,4 +1,5 @@
 import type { ConnectionProfile, SessionType, BaseShell } from '../shared/profile';
+import type { AgentKind } from '../shared/agent';
 import { defaultStartupCommand } from '../shared/profile';
 import { validateProfile } from '../shared/validate-profile';
 import type { DialogPort } from './ports';
@@ -17,6 +18,7 @@ const GROUP_FOR: Record<SessionType, string | null> = {
   claude: 'agent',
   codex: 'agent',
   custom: 'custom',
+  agent: 'agent-task',
 };
 
 /**
@@ -98,6 +100,16 @@ export class NewConnectionDialog implements DialogPort {
           cwd,
           baseShell: $<HTMLSelectElement>('f-base-shell').value as BaseShell,
           startupCommand: value('f-startup') || undefined,
+        };
+
+      case 'agent':
+        return {
+          type: 'agent',
+          name,
+          cwd,
+          kind: $<HTMLSelectElement>('f-agent-kind').value as AgentKind,
+          prompt: $<HTMLTextAreaElement>('f-agent-prompt').value.trim(),
+          allowEdits: $<HTMLInputElement>('f-agent-edits').checked,
         };
 
       case 'custom':

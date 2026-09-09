@@ -66,3 +66,15 @@ describe('validateProfile 要儲存設定檔時', () => {
     ]);
   });
 });
+
+describe('Agent 任務', () => {
+  const task = { type: 'agent', kind: 'claude', allowEdits: false } as const;
+
+  it('沒有任務內容就不合法', () => {
+    expect(validateProfile({ ...task, prompt: '   ' })).toEqual(['請輸入任務內容']);
+  });
+
+  it('工作目錄可以留空 (由 SessionManager 補家目錄)', () => {
+    expect(validateProfile({ ...task, prompt: '只回覆 OK' })).toEqual([]);
+  });
+});

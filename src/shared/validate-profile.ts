@@ -31,6 +31,11 @@ export function validateProfile(profile: ConnectionProfile, requireName = false)
       }
       break;
 
+    case 'agent':
+      // 工作目錄可以留空 (SessionManager 會用家目錄)，但沒有任務就沒事可做。
+      if (!profile.prompt.trim()) errors.push('請輸入任務內容');
+      break;
+
     case 'powershell':
     case 'wsl':
       break;

@@ -1,10 +1,19 @@
+import type { AgentKind } from './agent';
+
 /**
  * 連線設定檔 (ConnectionProfile)：純資料，沒有任何行為。
  * 以 `type` 作為判別聯集 (discriminated union) 的判別欄位，
  * 讓 ShellFactory 可以用 exhaustive switch 產生 spawn 規格。
  */
 
-export type SessionType = 'powershell' | 'wsl' | 'ssh' | 'claude' | 'codex' | 'custom';
+export type SessionType =
+  | 'powershell'
+  | 'wsl'
+  | 'ssh'
+  | 'claude'
+  | 'codex'
+  | 'custom'
+  | 'agent';
 
 /** Claude / Codex 這類 agent 工作階段所依附的基礎 shell。*/
 export type BaseShell = 'powershell' | 'wsl';
@@ -41,6 +50,18 @@ export interface AgentProfile extends ProfileBase {
   startupCommand?: string;
 }
 
+/**
+ * Agent 任務 (spike)：不是開一個 shell，而是把 claude / codex 的無介面模式
+ * 跑一次。不經過 ShellFactory，由 SessionManager 交給 IAgentRunner。
+ */
+export interface AgentTaskProfile extends ProfileBase {
+  type: 'agent';
+  kind: AgentKind;
+  prompt: string;
+  /** 預設 false：不讓 agent 改檔案。*/
+  allowEdits: boolean;
+}
+
 export interface CustomProfile extends ProfileBase {
   type: 'custom';
   file: string;
@@ -52,6 +73,7 @@ export type ConnectionProfile =
   | WslProfile
   | SshProfile
   | AgentProfile
+  | AgentTaskProfile
   | CustomProfile;
 
 /** 已儲存的連線設定：名稱是必填的，因為清單與刪除都以名稱為鍵。*/
@@ -65,6 +87,7 @@ export const TYPE_LABELS: Record<SessionType, string> = {
   claude: 'Claude',
   codex: 'Codex',
   custom: '自訂',
+  agent: 'Agent',
 };
 
 export const DEFAULT_SSH_PORT = 22;

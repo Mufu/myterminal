@@ -13,6 +13,8 @@ export function profileMeta(profile: SavedProfile): string {
     case 'claude':
     case 'codex':
       return profile.startupCommand ?? defaultStartupCommand(profile.type);
+    case 'agent':
+      return profile.prompt;
     case 'custom':
       return profile.file;
     case 'powershell':

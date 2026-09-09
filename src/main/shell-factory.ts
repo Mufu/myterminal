@@ -72,6 +72,10 @@ export class ShellFactory {
         };
       }
 
+      // agent 任務不開 shell，由 SessionManager 直接交給 IAgentRunner。
+      case 'agent':
+        throw new Error('agent 任務不經過 ShellFactory');
+
       case 'custom':
         return {
           file: this.resolve(profile.file),

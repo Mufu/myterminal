@@ -139,7 +139,8 @@ function toolSummary(input: unknown): string {
   return '';
 }
 
-function oneLine(text: string): string {
+/** 壓成一行並截短，讓終端機一行放得下。*/
+export function oneLine(text: string): string {
   const flat = text.replace(/\s+/g, ' ').trim();
   return flat.length > 60 ? `${flat.slice(0, 59)}…` : flat;
 }
