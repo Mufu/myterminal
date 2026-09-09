@@ -1,4 +1,5 @@
 import type { SessionInfo } from '../shared/session';
+import type { SavedProfile } from '../shared/profile';
 
 type Listener = () => void;
 
@@ -11,6 +12,7 @@ export class AppState {
   private _sessions: SessionInfo[] = [];
   private _activeSessionId: string | null = null;
   private _inputPanelVisible = false;
+  private _profiles: SavedProfile[] = [];
 
   get sessions(): SessionInfo[] {
     return this._sessions;
@@ -22,6 +24,10 @@ export class AppState {
 
   get inputPanelVisible(): boolean {
     return this._inputPanelVisible;
+  }
+
+  get profiles(): SavedProfile[] {
+    return this._profiles;
   }
 
   subscribe(listener: Listener): () => void {
@@ -47,6 +53,11 @@ export class AppState {
 
   activeSession(): SessionInfo | null {
     return this._sessions.find((s) => s.id === this._activeSessionId) ?? null;
+  }
+
+  setProfiles(profiles: SavedProfile[]): void {
+    this._profiles = profiles;
+    this.notify();
   }
 
   toggleInputPanel(): void {

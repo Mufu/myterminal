@@ -4,6 +4,7 @@ import './styles.css';
 import { AppState } from './app-state';
 import { TerminalView } from './terminal-view';
 import { SessionListView } from './session-list-view';
+import { ProfileListView } from './profile-list-view';
 import { NewConnectionDialog } from './new-connection-dialog';
 import { InputPanel } from './input-panel';
 import { Toolbar } from './toolbar';
@@ -16,10 +17,12 @@ import {
   ClearScreenCommand,
   SendInputCommand,
   SwitchThemeCommand,
+  ConnectFromProfileCommand,
+  RemoveProfileCommand,
 } from './commands';
 import { ThemeStore } from './theme';
-import type { ClipboardPort } from './ports';
-import type { ConnectionProfile } from '../shared/profile';
+import type { ClipboardPort, ConfirmPort } from './ports';
+import type { ConnectionProfile, SavedProfile } from '../shared/profile';
 
 const $ = <T extends HTMLElement>(id: string): T => {
   const el = document.getElementById(id);
@@ -96,7 +99,13 @@ function syncTerminals(): void {
   emptyHint.hidden = state.sessions.length > 0;
 }
 
-const dialog = new NewConnectionDialog((profile) => void createSession(profile));
+const confirmRemove: ConfirmPort = (message) => window.confirm(message);
+
+const dialog = new NewConnectionDialog((profile, save) => {
+  // 勾了儲存時 validateProfile 已經確保名稱不是空的，所以這裡的轉型是安全的。
+  if (save) void api.saveProfile(profile as SavedProfile);
+  void createSession(profile);
+});
 
 const inputPanel = new InputPanel(
   $<HTMLElement>('input-panel'),
@@ -128,11 +137,21 @@ new SessionListView(
   (id) => void api.close(id),
 );
 
+new ProfileListView(
+  $<HTMLUListElement>('profile-list'),
+  $<HTMLElement>('profile-count'),
+  state,
+  (profile) => new ConnectFromProfileCommand((p) => void createSession(p), profile).execute(),
+  (name) => void new RemoveProfileCommand(api, confirmRemove, name).execute(),
+);
+
 state.subscribe(syncTerminals);
 api.onSessionsChanged((sessions) => state.setSessions(sessions));
+api.onProfilesChanged((profiles) => state.setProfiles(profiles));
 api.onData(({ id, data }) => terminals.get(id)?.write(data));
 api.onExit(({ id }) => terminals.get(id)?.write('\r\n\x1b[33m[工作階段已結束]\x1b[0m\r\n'));
 
 window.addEventListener('resize', () => activeTerminal()?.resize());
 
 void api.list().then((sessions) => state.setSessions(sessions));
+void api.listProfiles().then((profiles) => state.setProfiles(profiles));

@@ -3,8 +3,8 @@ import { TYPE_LABELS } from '../shared/profile';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
-/** 線稿圖示：只有關閉用得到，所以直接寫死路徑。*/
-function closeIcon(): SVGSVGElement {
+/** 線稿圖示：關閉工作階段與刪除設定檔共用。*/
+export function closeIcon(): SVGSVGElement {
   const svg = document.createElementNS(SVG_NS, 'svg');
   svg.setAttribute('viewBox', '0 0 12 12');
   svg.setAttribute('aria-hidden', 'true');

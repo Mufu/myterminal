@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { AppState } from '../src/renderer/app-state';
 import type { SessionInfo } from '../src/shared/session';
+import type { SavedProfile } from '../src/shared/profile';
 
 const session = (id: string, over: Partial<SessionInfo> = {}): SessionInfo => ({
   id,
@@ -96,5 +97,28 @@ describe('AppState 輸入面板', () => {
     state.toggleInputPanel();
     expect(state.inputPanelVisible).toBe(false);
     expect(notified).toBe(2);
+  });
+});
+
+describe('AppState 已儲存連線', () => {
+  const profile: SavedProfile = { type: 'powershell', name: '我的 PS' };
+
+  it('初始是空清單', () => {
+    expect(state.profiles).toEqual([]);
+  });
+
+  it('setProfiles 換掉清單並通知訂閱者 (Observer)', () => {
+    let notified = 0;
+    state.subscribe(() => (notified += 1));
+    state.setProfiles([profile]);
+    expect(state.profiles).toEqual([profile]);
+    expect(notified).toBe(1);
+  });
+
+  it('已儲存連線與工作階段互不影響', () => {
+    state.setProfiles([profile]);
+    state.setSessions([session('a')]);
+    expect(state.profiles).toEqual([profile]);
+    expect(state.activeSessionId).toBe('a');
   });
 });

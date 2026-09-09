@@ -2,12 +2,14 @@ import type { AppState } from './app-state';
 import type { ThemeStore } from './theme';
 import { parseTheme } from './theme';
 import type { MyTerminalApi } from '../shared/api';
+import type { ConnectionProfile, SavedProfile } from '../shared/profile';
 import type {
   ICommand,
   ActiveTerminal,
   ClipboardPort,
   InputPanelPort,
   DialogPort,
+  ConfirmPort,
 } from './ports';
 
 /**
@@ -107,5 +109,29 @@ export class SwitchThemeCommand implements ICommand {
   ) {}
   execute(): void {
     this.theme.set(parseTheme(this.selected()));
+  }
+}
+
+/** 點一下已儲存的連線：用同一條建立工作階段的流程連上去。*/
+export class ConnectFromProfileCommand implements ICommand {
+  constructor(
+    private readonly connect: (profile: ConnectionProfile) => void,
+    private readonly profile: SavedProfile,
+  ) {}
+  execute(): void {
+    this.connect(this.profile);
+  }
+}
+
+/** 已儲存連線的 ✕：確認之後才刪除。*/
+export class RemoveProfileCommand implements ICommand {
+  constructor(
+    private readonly api: MyTerminalApi,
+    private readonly confirm: ConfirmPort,
+    private readonly name: string,
+  ) {}
+  async execute(): Promise<void> {
+    if (!this.confirm(`刪除連線設定「${this.name}」？`)) return;
+    await this.api.removeProfile(this.name);
   }
 }

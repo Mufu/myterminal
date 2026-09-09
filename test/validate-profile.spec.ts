@@ -39,3 +39,30 @@ describe('validateProfile', () => {
     expect(validateProfile({ type: 'claude', baseShell: 'powershell' })).toEqual([]);
   });
 });
+
+describe('validateProfile 要儲存設定檔時', () => {
+  it('沒有名稱就報錯', () => {
+    expect(validateProfile({ type: 'powershell' }, true)).toEqual(['儲存設定時必須填名稱']);
+  });
+
+  it('名稱只有空白也報錯', () => {
+    expect(validateProfile({ type: 'powershell', name: '  ' }, true)).toEqual([
+      '儲存設定時必須填名稱',
+    ]);
+  });
+
+  it('有名稱就通過', () => {
+    expect(validateProfile({ type: 'powershell', name: '我的 PS' }, true)).toEqual([]);
+  });
+
+  it('不儲存時名稱仍然可以留空', () => {
+    expect(validateProfile({ type: 'powershell' })).toEqual([]);
+  });
+
+  it('名稱的錯誤與類型本身的錯誤會一起回報', () => {
+    expect(validateProfile({ type: 'ssh', host: '', user: 'u' }, true)).toEqual([
+      '儲存設定時必須填名稱',
+      '請輸入主機位址',
+    ]);
+  });
+});

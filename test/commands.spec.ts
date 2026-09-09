@@ -9,11 +9,14 @@ import {
   ClearScreenCommand,
   SendInputCommand,
   SwitchThemeCommand,
+  ConnectFromProfileCommand,
+  RemoveProfileCommand,
 } from '../src/renderer/commands';
 import { ThemeStore } from '../src/renderer/theme';
 import type { TerminalPort, ClipboardPort, InputPanelPort, DialogPort } from '../src/renderer/ports';
 import type { MyTerminalApi } from '../src/shared/api';
 import type { SessionInfo } from '../src/shared/session';
+import type { ConnectionProfile, SavedProfile } from '../src/shared/profile';
 
 const session = (id: string, over: Partial<SessionInfo> = {}): SessionInfo => ({
   id,
@@ -66,10 +69,12 @@ const fakeApi = () =>
     write: vi.fn().mockResolvedValue(undefined),
     startLog: vi.fn().mockResolvedValue('D:/logs/a.log'),
     stopLog: vi.fn().mockResolvedValue(undefined),
+    removeProfile: vi.fn().mockResolvedValue(undefined),
   }) as unknown as MyTerminalApi & {
     write: ReturnType<typeof vi.fn>;
     startLog: ReturnType<typeof vi.fn>;
     stopLog: ReturnType<typeof vi.fn>;
+    removeProfile: ReturnType<typeof vi.fn>;
   };
 
 let state: AppState;
@@ -206,5 +211,36 @@ describe('切換主題', () => {
     theme.set('light');
     new SwitchThemeCommand(theme, () => '???').execute();
     expect(theme.get()).toBe('dark');
+  });
+});
+
+describe('從已儲存連線建立工作階段', () => {
+  const profile: SavedProfile = { type: 'ssh', name: '部署機', host: 'build-server', user: 'deploy' };
+
+  it('把整個設定檔交給建立工作階段的流程', () => {
+    const connected: ConnectionProfile[] = [];
+    new ConnectFromProfileCommand((p) => connected.push(p), profile).execute();
+    expect(connected).toEqual([profile]);
+  });
+});
+
+describe('刪除已儲存連線', () => {
+  it('確認之後才刪除', async () => {
+    const asked: string[] = [];
+    await new RemoveProfileCommand(
+      api,
+      (message) => {
+        asked.push(message);
+        return true;
+      },
+      '我的 PS',
+    ).execute();
+    expect(asked).toEqual(['刪除連線設定「我的 PS」？']);
+    expect(api.removeProfile).toHaveBeenCalledWith('我的 PS');
+  });
+
+  it('取消時不刪除', async () => {
+    await new RemoveProfileCommand(api, () => false, '我的 PS').execute();
+    expect(api.removeProfile).not.toHaveBeenCalled();
   });
 });

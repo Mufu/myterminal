@@ -27,8 +27,9 @@ export class NewConnectionDialog implements DialogPort {
   private readonly dialog = $<HTMLDialogElement>('new-connection');
   private readonly typeSelect = $<HTMLSelectElement>('f-type');
   private readonly errors = $<HTMLParagraphElement>('f-errors');
+  private readonly saveProfile = $<HTMLInputElement>('f-save');
 
-  constructor(private readonly onCreate: (profile: ConnectionProfile) => void) {
+  constructor(private readonly onCreate: (profile: ConnectionProfile, save: boolean) => void) {
     this.typeSelect.addEventListener('change', () => this.syncFields());
     $('f-ok').addEventListener('click', (event) => this.submit(event));
     this.syncFields();
@@ -57,7 +58,9 @@ export class NewConnectionDialog implements DialogPort {
 
   private submit(event: Event): void {
     const profile = this.collect();
-    const errors = validateProfile(profile);
+    // 勾了「儲存此連線設定」名稱才是必填的 —— 設定檔以名稱為鍵。
+    const save = this.saveProfile.checked;
+    const errors = validateProfile(profile, save);
     if (errors.length > 0) {
       // 阻止 <form method="dialog"> 關閉對話框，讓使用者修正。
       event.preventDefault();
@@ -65,7 +68,7 @@ export class NewConnectionDialog implements DialogPort {
       return;
     }
     this.errors.textContent = '';
-    this.onCreate(profile);
+    this.onCreate(profile, save);
   }
 
   private collect(): ConnectionProfile {

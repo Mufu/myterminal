@@ -3,9 +3,12 @@ import type { ConnectionProfile } from './profile';
 /**
  * 設定檔驗證：回傳錯誤訊息陣列，空陣列代表合法。
  * 放在 shared 讓對話框 (renderer) 與 main 用同一套規則。
+ * requireName：要把這筆連線存成設定檔時，名稱才是必填的 (設定檔以名稱為鍵)。
  */
-export function validateProfile(profile: ConnectionProfile): string[] {
+export function validateProfile(profile: ConnectionProfile, requireName = false): string[] {
   const errors: string[] = [];
+
+  if (requireName && !profile.name?.trim()) errors.push('儲存設定時必須填名稱');
 
   switch (profile.type) {
     case 'ssh':

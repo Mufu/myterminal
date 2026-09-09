@@ -28,5 +28,8 @@ export interface DialogPort {
   open(): void;
 }
 
+/** 刪除前的確認；正式環境是 window.confirm，測試直接回傳 true / false。*/
+export type ConfirmPort = (message: string) => boolean;
+
 /** 取得目前作用中的終端機；沒有工作階段時是 null。*/
 export type ActiveTerminal = () => TerminalPort | null;

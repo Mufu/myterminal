@@ -99,6 +99,12 @@
           <span id="session-count">0</span>
         </header>
         <ul id="session-list"></ul>
+
+        <header id="profile-panel-head">
+          <h2>已儲存連線</h2>
+          <span id="profile-count">0</span>
+        </header>
+        <ul id="profile-list"></ul>
       </aside>
     </div>
 
@@ -151,6 +157,11 @@
           <label>執行檔 <input id="f-file" type="text" placeholder="例如 cmd.exe" /></label>
           <label>參數 <input id="f-args" type="text" placeholder="以空白分隔" /></label>
         </div>
+
+        <label id="f-save-row">
+          <input id="f-save" type="checkbox" />
+          儲存此連線設定
+        </label>
 
         <p id="f-errors" class="errors"></p>
 

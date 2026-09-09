@@ -389,7 +389,8 @@ body {
 
 /* 圖示統一是 16px 網格上的線稿。*/
 #toolbar button svg,
-.session-close svg {
+.session-close svg,
+.profile-remove svg {
   stroke: currentColor;
   fill: none;
   stroke-width: 1.6;
@@ -578,7 +579,8 @@ body {
   scrollbar-color: var(--term-scrollbar) transparent;
 }
 
-#session-list {
+#session-list,
+#profile-list {
   scrollbar-width: thin;
   scrollbar-color: var(--scrollbar) transparent;
 }
@@ -723,7 +725,8 @@ body {
   border-left: 1px solid var(--border);
 }
 
-#session-panel-head {
+#session-panel-head,
+#profile-panel-head {
   display: flex;
   flex: none;
   align-items: center;
@@ -733,7 +736,8 @@ body {
   border-bottom: 1px solid var(--border);
 }
 
-#session-panel-head h2 {
+#session-panel-head h2,
+#profile-panel-head h2 {
   margin: 0;
   font-family: var(--head-font);
   font-size: var(--head-size);
@@ -742,13 +746,15 @@ body {
   color: var(--head-color);
 }
 
-#session-count {
+#session-count,
+#profile-count {
   font-family: var(--head-font);
   font-size: var(--count-size);
   color: var(--dim);
 }
 
-#session-list {
+#session-list,
+#profile-list {
   display: flex;
   flex-direction: column;
   gap: var(--list-gap);
@@ -833,7 +839,8 @@ html[data-theme='warm'] .session-item.active .session-dot {
   min-width: 0;
 }
 
-.session-name {
+.session-name,
+.profile-name {
   font-size: var(--name-size);
   color: var(--text);
   overflow: hidden;
@@ -841,7 +848,8 @@ html[data-theme='warm'] .session-item.active .session-dot {
   white-space: nowrap;
 }
 
-.session-meta {
+.session-meta,
+.profile-meta {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -881,7 +889,8 @@ html[data-theme='warm'] .session-item.active .session-dot {
   color: var(--recording);
 }
 
-.session-close {
+.session-close,
+.profile-remove {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -895,18 +904,70 @@ html[data-theme='warm'] .session-item.active .session-dot {
   cursor: pointer;
 }
 
-.session-close svg {
+.session-close svg,
+.profile-remove svg {
   width: 12px;
   height: 12px;
 }
 
-.session-close:hover {
+.session-close:hover,
+.profile-remove:hover {
   background: var(--close-hover-bg);
   color: var(--text);
 }
 
 .session-item.active .session-close {
   color: var(--close-active-fg);
+}
+
+/* ---- 已儲存連線：跟 session 清單同一套 token，只差沒有狀態指示器 ---- */
+#profile-panel-head {
+  border-top: 1px solid var(--border);
+}
+
+.profile-item {
+  display: grid;
+  grid-template-columns: 1fr var(--close-size);
+  column-gap: var(--item-gap);
+  align-items: center;
+  padding: var(--item-pad);
+  border-radius: var(--item-radius);
+  background: var(--item-bg);
+  cursor: pointer;
+}
+
+.profile-item:hover {
+  background: var(--hover);
+}
+
+.profile-body {
+  min-width: 0;
+}
+
+.profile-detail {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ✕ 平常不出現，滑過那一列 (或鍵盤 focus) 才顯示。*/
+.profile-remove {
+  opacity: 0;
+}
+
+.profile-item:hover .profile-remove,
+.profile-remove:focus-visible {
+  opacity: 1;
+}
+
+.profile-empty {
+  padding: var(--item-pad);
+  background: var(--item-bg);
+  color: var(--dim);
+  font-family: var(--meta-font);
+  font-size: var(--meta-size);
+  letter-spacing: var(--meta-tracking);
 }
 
 /* ---- 新連接對話框 ---- */
@@ -965,6 +1026,22 @@ html[data-theme='warm'] .session-item.active .session-dot {
 
 #new-connection input::placeholder {
   color: var(--dim);
+}
+
+/* 勾選框那一列：左對齊，方框不要跟著文字輸入框被拉寬。
+   選擇器要帶上 #new-connection，否則權重輸給上面的 #new-connection label。*/
+#new-connection #f-save-row {
+  justify-content: flex-start;
+  gap: 8px;
+}
+
+#new-connection input[type='checkbox'] {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--accent);
 }
 
 .field-group {
