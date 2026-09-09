@@ -31,6 +31,20 @@ describe('profileMeta', () => {
   });
 });
 
+describe('profileMeta 的 agent 任務', () => {
+  it('顯示任務內容', () => {
+    expect(
+      profileMeta({
+        type: 'agent',
+        name: 'a',
+        kind: 'claude',
+        prompt: '每天早上整理 TODO',
+        allowEdits: false,
+      }),
+    ).toBe('每天早上整理 TODO');
+  });
+});
+
 describe('sessionTag', () => {
   const info = (over: Partial<SessionInfo>): SessionInfo => ({
     id: 's1',

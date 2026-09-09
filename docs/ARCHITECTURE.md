@@ -32,7 +32,9 @@ flowchart TB
     IPCLayer --> ProfileStore
     SessionManager --> ShellFactory
     SessionManager --> IPtySpawner
+    SessionManager --> IAgentRunner
     IPtySpawner --> NodePty["node-pty (conpty)"]
+    IAgentRunner --> AgentCli["claude -p / codex exec"]
   end
 
   subgraph shared["shared (三方共用型別)"]
@@ -58,7 +60,7 @@ renderer 拿不到 `ipcRenderer` 也拿不到 Node，只看得到 `preload` 白�
 | 模式 | 位置 | 為什麼 |
 | --- | --- | --- |
 | **Factory Method** | `main/shell-factory.ts` | 「哪一種連線要 spawn 什麼」是唯一會隨類型增長的知識，集中在一個 `switch`。判別聯集讓 TypeScript 在漏掉新類型時直接編譯失敗。 |
-| **Adapter** | `main/pty.ts`（介面）、`main/node-pty-spawner.ts`（實作） | node-pty 是原生模組、要真的開行程，直接依賴它整個 main 就沒辦法測。抽成 `IPtySpawner` / `IPtyProcess` 之後，測試注入 `FakePtySpawner` 就行。這也是唯一吞掉 node-pty Windows 後端例外的地方。 |
+| **Adapter** | `main/pty.ts`（介面）、`main/node-pty-spawner.ts`（實作）、`main/agent-runner.ts` + `main/agent-run-pty.ts`（見下面的「Agent 任務」） | node-pty 是原生模組、要真的開行程，直接依賴它整個 main 就沒辦法測。抽成 `IPtySpawner` / `IPtyProcess` 之後，測試注入 `FakePtySpawner` 就行。這也是唯一吞掉 node-pty Windows 後端例外的地方。 |
 | **Dependency Injection** | `SessionManager`、`SessionLogger`、每個 `Command` 的建構子 | 所有跟外界（行程、檔案系統、剪貼簿、DOM）接觸的東西都從建構子傳進來，預設值是正式實作，測試傳假的。 |
 | **Observer** | `SessionManager`（typed `EventEmitter`）、`AppState`（`subscribe`） | main 端 pty 的輸出是推送式的；renderer 端多個 View 要對同一份狀態反應。兩邊都用訂閱而不是互相持有參考。 |
 | **Decorator / Observer** | `main/session-logger.ts` | 紀錄功能掛在 `SessionManager` 的 `data` 事件上，不改變資料流本身，也不需要 `SessionManager` 知道紀錄這回事。 |
@@ -107,6 +109,42 @@ renderer 端沒有第二份狀態：`AppState` 多存一份 `profiles`，
 點一列時走的是 `main.ts` 裡同一個 `createSession()`，
 所以「先量 cols/rows 再 spawn」的順序對兩個入口都成立。
 
+## Agent 任務 (spike)
+
+`ConnectionProfile` 的 `'agent'` 變體不是「開一個 shell」，而是「跑一次 CLI」：
+`claude -p --output-format stream-json --verbose` 或 `codex exec --json`。
+它是唯一**不經過 `ShellFactory`** 的型別。
+
+```mermaid
+flowchart LR
+  SM[SessionManager] -->|AgentTask| R[IAgentRunner]
+  R --> P[IProcessSpawner]
+  P --> CLI["claude.exe / cmd.exe /c codex"]
+  R -->|AgentEvent| APty[AgentRunPty]
+  APty -->|IPtyProcess| SM
+```
+
+兩層 Adapter，各自解決一件事：
+
+| 介面 | 為什麼存在 |
+| --- | --- |
+| **`IAgentRunner` / `IAgentRun`** (`main/agent-runner.ts`) | 把「CLI 的旗標、JSONL、Windows 的 `.cmd` shim」關在一個地方，對外只有 `start(task)` 與 `init / text / tool / result / error` 五種事件。行程本身再透過 `IProcessSpawner` 注入，所以解析器可以用 `FakeProcessSpawner` 加上 `test/fixtures/` 裡真的抓下來的 JSONL 測，一毛錢都不用花。 |
+| **`AgentRunPty`** (`main/agent-run-pty.ts`) | 把事件流裝成 `IPtyProcess` 的樣子（`onData` 給格式化過的文字、`onExit` 給離開碼、`kill` 等於取消）。 |
+
+**為什麼要繞回 `SessionManager`**：因為這樣「一次 agent 執行」在系統裡就是一個普通的
+工作階段 —— 右側清單、切換、關閉、輸出紀錄、`session:data` / `session:exit`
+全部不必為它改一行。`SessionManager` 只多知道一件事：agent 的 pty 不是 spawn 出來的。
+代價是 `write()` / `resize()` 變成 no-op（spike 沒有追問的介面），
+人要追問就按「接手」，用既有的 Claude / Codex 型別開一個真的互動式工作階段
+（`claude --resume <session_id>`），那條路完全沒有動到。
+
+`SessionInfo` 為此多了三個可選欄位：`cwd`（接手要用同一個目錄）、
+`agentKind`（清單標籤要分 Claude / Codex）、`agentSessionId`（CLI 回報之後才會有，
+有了「接手」按鈕才出現）。`agentSessionId` 是在執行中途才知道的，
+所以 `SessionManager` 多了一個 `updated` 事件推給 renderer。
+
+實測記錄與決策見 [`AGENT-SPIKE.md`](AGENT-SPIKE.md)。
+
 ## IPC 契約
 
 頻道名稱與 payload 型別都定義在 `src/shared/ipc.ts`，三邊共用同一份。
@@ -132,7 +170,7 @@ main → renderer（`webContents.send`）：
 | --- | --- | --- |
 | `session:data` | `{ id, data }` | pty 有輸出 |
 | `session:exit` | `{ id, exitCode }` | pty 結束 |
-| `session:changed` | `SessionInfo[]` | 建立、關閉、結束、紀錄狀態改變 |
+| `session:changed` | `SessionInfo[]` | 建立、關閉、結束、紀錄狀態改變、agent 回報 session id |
 | `profiles:changed` | `SavedProfile[]` | 儲存或刪除設定檔之後 |
 
 `ipc.ts` 只做轉接，沒有商業邏輯；所以「IPC 沒被測試」不代表邏輯沒被測試。
@@ -143,9 +181,17 @@ main → renderer（`webContents.send`）：
 所以流程是：renderer 先建立 `TerminalView`（此時還沒有 id，輸入透過閉包回呼），
 量出尺寸後才 `createSession`，拿到 id 再綁定。
 
-另外 `session:changed` 通常比 `session:create` 的回覆更早到 renderer
-（`manager.create()` 是同步發出 `created` 事件的），
-所以 `renderer/main.ts` 在拿到 id 之後會再同步一次畫面。
+另外 `session:changed`（`webContents.send`）與 `session:create` 的回覆
+（`ipcMain.handle` 的 Promise）走的是不同的佇列，**兩邊都可能先到**：
+
+- `session:changed` 先到：`terminals` 還沒有這個 view，所以 renderer 拿到 id 之後
+  要再 `syncTerminals()` 一次。
+- 回覆先到：`state.sessions` 還沒有這個 id，`syncTerminals()` 會把剛建好的 view
+  當成殘留清掉。所以 renderer 拿到 `SessionInfo` 之後會先把它塞進 `AppState`
+  （下一個 `session:changed` 會覆寫，內容一樣）。
+- 同理，`session:data` 也可能比回覆先到（agent 任務的第一行標題就是同步發出的），
+  所以 renderer 有一個 `pendingData`：認領不到 id 的輸出先存著，
+  `TerminalView` 一登記就補寫進去。
 
 ## TDD 縫線（fakes）
 
@@ -159,6 +205,8 @@ main → renderer（`webContents.send`）：
 | `ThemeStore` | 假的 `Storage`（兩個方法）與假的 `apply` | `test/theme.spec.ts` |
 | 各 `Command` | `FakeTerminal` / `FakeClipboard` / `FakeInputPanel` + `vi.fn()` 的 api | `test/commands.spec.ts` |
 | `validateProfile` | 不需要（純函式） | `test/validate-profile.spec.ts` |
+| `ClaudeCodeRunner` / `CodexRunner` | `FakeProcessSpawner` + `test/fixtures/*.jsonl`（真的跑出來的輸出） | `test/agent-runner.spec.ts` |
+| `AgentRunPty` | `FakeAgentRun` | `test/agent-run-pty.spec.ts` |
 
 原則：**不測 node-pty 和 xterm.js 本身**，只測自己包在它們外面的邏輯。
 真正會碰到它們的地方（`NodePtySpawner`、`TerminalView`）刻意寫得很薄，

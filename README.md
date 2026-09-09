@@ -73,6 +73,44 @@
 萬一改壞了（不是合法 JSON、或某一筆少了名稱），那一筆會被忽略，
 最壞的情況是清單變空的，app 不會因此開不起來。
 
+## Agent 任務（spike）
+
+「新連接」選 **Agent 任務**，填一段任務給 `claude` 或 `codex`，
+它會用**無介面模式**跑一次，跑完就結束 —— 不是開一個可以打字的 CLI，
+而是「送出一個任務，看它做完」。畫面上它就是一個普通的工作階段：
+
+```
+[claude] 任務：只回覆 AGENT_E2E_OK，不要做別的事
+AGENT_E2E_OK
+✔ 完成 · 2.4 s · $0.091 · session fe91027d…
+```
+
+助理的文字照原樣印，用到工具會多一行 `⚙ Read src/x.ts`，
+最後一行是結果、花的時間、花的錢與 CLI 那邊的 session id。
+
+| 欄位 | 說明 |
+| --- | --- |
+| 執行者 | Claude 或 Codex |
+| 任務 | 要它做什麼（多行沒問題，是用 stdin 送進去的） |
+| 工作目錄 | 留空的話用家目錄 |
+| 允許修改檔案 | **預設關閉**。關著是 Claude 的 `plan` 模式／Codex 的 `read-only` 沙箱（會讀、會回答，但不能寫）；打開才是 `acceptEdits`／`workspace-write` |
+
+注意事項：
+
+- **會花錢**，而且跟任務大小幾乎無關 —— 一句「只回覆 OK」實測就要 $0.07～0.09
+  （大部分是冷啟動建立快取的費用）。
+- **要先登入**：`claude` 用 `claude` 自己的登入，`codex` 用 `codex login`。
+  沒登入就會在終端機裡看到 `✘ 失敗：…`。
+- **接手**：任務跑起來之後，右側那一列滑過去會出現「接手」。
+  按下去會開一個**真的互動式**工作階段（PowerShell 裡跑 `claude --resume <id>`，
+  Codex 是 `codex resume <id>`），接著同一段對話繼續問下去。
+  app 裡的 agent 任務本身不能追問，追問就是用接手。
+- 這一頁的任務也可以像其他類型一樣勾「儲存此連線設定」存起來重複用。
+
+實測到的東西（命令、事件格式、延遲、Windows 的坑、還沒解決的風險）寫在
+[`docs/AGENT-SPIKE.md`](docs/AGENT-SPIKE.md)。**這是一個 spike**：
+沒有排程、沒有多步驟編排、沒有費用儀表板。
+
 ## 支援的工作階段類型
 
 | 類型 | 實際執行 |
@@ -83,6 +121,7 @@
 | Claude | 基礎 shell（PowerShell 或 WSL）開起來後送出 `claude` |
 | Codex | 基礎 shell 開起來後送出 `codex` |
 | 自訂命令 | 自行指定執行檔與參數 |
+| Agent 任務 | `claude -p --output-format stream-json` 或 `codex exec --json` 跑一次，見上面的「Agent 任務」 |
 
 Claude / Codex 的啟動指令可以在對話框裡改（例如加參數）。
 
@@ -174,6 +213,7 @@ npm test         # 單元測試（Vitest）
 npm run build    # 建置到 out/
 npm run e2e      # 先 build 再跑 Playwright 冒煙測試，截圖寫到 test-results/smoke.png
 npm run e2e:ssh  # SSH 端到端測試，要先開好本機 sshd，見「本機 SSH 測試環境」
+npm run e2e:agent # Agent 任務端到端測試，會真的呼叫 claude / codex（要登入、會花錢）
 npm run dist     # 打包成 Windows 執行檔（electron-builder）
 ```
 
@@ -226,5 +266,9 @@ npm run dist
    決定「已儲存連線」那一列要顯示什麼。TypeScript 一樣會強迫你補齊。
 
 `SessionManager`、IPC、renderer 的其他部分都不必改。
+
+唯一的例外是 **Agent 任務**：它不開 shell，所以不走 `ShellFactory`，
+而是由 `SessionManager` 交給 `IAgentRunner`，見
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) 的「Agent 任務」。
 
 架構細節見 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)。
