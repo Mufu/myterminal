@@ -49,8 +49,12 @@ export class ShellFactory {
         return {
           file: this.resolve('plink.exe'),
           // 刻意不加 -batch：主機金鑰確認等提示要能顯示在終端機裡讓使用者回答。
+          // -no-antispoof：在 ConPTY 下 plink 會多印一行
+          // "Access granted. Press Return to begin session."，並把使用者輸入的
+          // 第一行整個吃掉當成那個 Return，關掉才能一登入就直接打字。
           args: [
             '-ssh',
+            '-no-antispoof',
             '-P',
             String(profile.port ?? DEFAULT_SSH_PORT),
             `${profile.user}@${profile.host}`,

@@ -32,12 +32,19 @@ describe('ShellFactory', () => {
   it('SSH 組出 plink 參數，未指定 port 時用 22', () => {
     const spec = factory.create({ type: 'ssh', host: 'example.com', user: 'robert' });
     expect(spec.file).toBe('RESOLVED(plink.exe)');
-    expect(spec.args).toEqual(['-ssh', '-P', '22', 'robert@example.com']);
+    expect(spec.args).toEqual(['-ssh', '-no-antispoof', '-P', '22', 'robert@example.com']);
   });
 
   it('SSH 使用自訂 port', () => {
     const spec = factory.create({ type: 'ssh', host: 'h', user: 'u', port: 2222 });
-    expect(spec.args).toEqual(['-ssh', '-P', '2222', 'u@h']);
+    expect(spec.args).toEqual(['-ssh', '-no-antispoof', '-P', '2222', 'u@h']);
+  });
+
+  it('SSH 帶 -no-antispoof，否則使用者輸入的第一行會被 plink 的防偽提示吃掉', () => {
+    const spec = factory.create({ type: 'ssh', host: 'h', user: 'u' });
+    expect(spec.args).toContain('-no-antispoof');
+    // -batch 會關掉主機金鑰確認提示，刻意不加。
+    expect(spec.args).not.toContain('-batch');
   });
 
   it('Claude 以 PowerShell 為基礎 shell，並帶出啟動指令', () => {
