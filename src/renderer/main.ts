@@ -39,6 +39,11 @@ const state = new AppState();
 
 /** sessionId -> TerminalView。只有作用中的那個會顯示。*/
 const terminals = new Map<string, TerminalView>();
+/**
+ * 還沒認領的輸出。main 送 session:data 可能比 createSession 的回覆更早到
+ * (agent 任務的第一行標題就是同步發出的)，那時還不知道 id 對應哪個 TerminalView。
+ */
+const pendingData = new Map<string, string>();
 const terminalsEl = $<HTMLDivElement>('terminals');
 const emptyHint = $<HTMLDivElement>('empty-hint');
 
@@ -74,9 +79,18 @@ async function createSession(profile: ConnectionProfile): Promise<void> {
     const info = await api.createSession(profile, cols, rows);
     id = info.id;
     terminals.set(info.id, view);
+    const buffered = pendingData.get(info.id);
+    if (buffered !== undefined) {
+      view.write(buffered);
+      pendingData.delete(info.id);
+    }
+    // main 的 created 事件「通常」比 invoke 的回覆更早到，但兩者走不同的 IPC 佇列，
+    // 順序沒有保證。反過來的時候 state.sessions 還看不到這個 id，
+    // 下面的 syncTerminals() 就會把剛建好的 view 當成殘留的清掉 (畫面一片空白)。
+    if (!state.sessions.some((s) => s.id === info.id)) {
+      state.setSessions([...state.sessions, info]);
+    }
     state.setActive(info.id);
-    // main 的 created 事件通常比 invoke 的回覆更早到，那時 terminals 還沒有這個 view，
-    // 所以這裡要再同步一次畫面。
     syncTerminals();
   } catch (error) {
     view.dispose();
@@ -150,7 +164,11 @@ new ProfileListView(
 state.subscribe(syncTerminals);
 api.onSessionsChanged((sessions) => state.setSessions(sessions));
 api.onProfilesChanged((profiles) => state.setProfiles(profiles));
-api.onData(({ id, data }) => terminals.get(id)?.write(data));
+api.onData(({ id, data }) => {
+  const view = terminals.get(id);
+  if (view) view.write(data);
+  else pendingData.set(id, (pendingData.get(id) ?? '') + data);
+});
 api.onExit(({ id }) => terminals.get(id)?.write('\r\n\x1b[33m[工作階段已結束]\x1b[0m\r\n'));
 
 window.addEventListener('resize', () => activeTerminal()?.resize());
