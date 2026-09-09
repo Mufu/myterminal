@@ -1,0 +1,14 @@
+{"type":"thread.started","thread_id":"01a08436-5df0-7771-8b1e-3542567d3dc7"}
+{"type":"turn.started"}
+{"type":"error","message":"Reconnecting... 2/5 (unexpected status 404 Not Found: The model `gpt-5.5` does not exist or you do not have access to it.)"}
+{"type":"error","message":"Reconnecting... 3/5 (unexpected status 404 Not Found: The model `gpt-5.5` does not exist or you do not have access to it.)"}
+{"type":"error","message":"Reconnecting... 4/5 (unexpected status 404 Not Found: The model `gpt-5.5` does not exist or you do not have access to it.)"}
+{"type":"error","message":"Reconnecting... 5/5 (unexpected status 404 Not Found: The model `gpt-5.5` does not exist or you do not have access to it.)"}
+{"type":"item.completed","item":{"id":"item_0","type":"error","message":"Falling back from WebSockets to HTTPS transport. unexpected status 404 Not Found: The model `gpt-5.5` does not exist or you do not have access to it."}}
+{"type":"error","message":"Reconnecting... 1/5 (unexpected status 404 Not Found: The model `gpt-5.5` does not exist or you do not have access to it., url: https://chatgpt.com/backend-api/codex/responses, cf-ray: a3831c6f4ec056f5-TPE, request id: 0f1d548b-dbb5-44a5-a253-6b0949c51dad)"}
+{"type":"error","message":"Reconnecting... 2/5 (unexpected status 404 Not Found: The model `gpt-5.5` does not exist or you do not have access to it., url: https://chatgpt.com/backend-api/codex/responses, cf-ray: a3831c7799ab8085-TPE, request id: d9c808a8-3e4c-4732-801b-bbd4128a857b)"}
+{"type":"error","message":"Reconnecting... 3/5 (unexpected status 404 Not Found: The model `gpt-5.5` does not exist or you do not have access to it., url: https://chatgpt.com/backend-api/codex/responses, cf-ray: a3831c82ec1a4a62-TPE, request id: 8820a844-c6c2-4f1f-9418-576961bfb3e3)"}
+{"type":"error","message":"Reconnecting... 4/5 (unexpected status 404 Not Found: The model `gpt-5.5` does not exist or you do not have access to it., url: https://chatgpt.com/backend-api/codex/responses, cf-ray: a3831c91bbc377f1-TPE, request id: 973af3dc-1921-41ea-8806-dbed99c5893e)"}
+{"type":"error","message":"Reconnecting... 5/5 (unexpected status 404 Not Found: The model `gpt-5.5` does not exist or you do not have access to it., url: https://chatgpt.com/backend-api/codex/responses, cf-ray: a3831cc21f84a3a5-TPE, request id: efa9853a-c231-42a9-9e0f-77e86a14f1d3)"}
+{"type":"error","message":"unexpected status 404 Not Found: The model `gpt-5.5` does not exist or you do not have access to it., url: https://chatgpt.com/backend-api/codex/responses, cf-ray: a3831d0f8f414a9f-TPE, request id: c9127abd-0160-4486-905c-d07554966a46"}
+{"type":"turn.failed","error":{"message":"unexpected status 404 Not Found: The model `gpt-5.5` does not exist or you do not have access to it., url: https://chatgpt.com/backend-api/codex/responses, cf-ray: a3831d0f8f414a9f-TPE, request id: c9127abd-0160-4486-905c-d07554966a46"}}
