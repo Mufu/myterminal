@@ -16,9 +16,13 @@
     "dist": "electron-vite build && electron-builder --win"
   },
   "dependencies": {
+    "@langchain/core": "1.2.10",
+    "@langchain/langgraph": "1.4.14",
+    "@langchain/langgraph-checkpoint": "1.1.5",
     "@xterm/addon-fit": "0.10.0",
     "@xterm/xterm": "5.5.0",
-    "node-pty": "1.1.0"
+    "node-pty": "1.1.0",
+    "zod": "4.6.2"
   },
   "devDependencies": {
     "@playwright/test": "1.56.1",
