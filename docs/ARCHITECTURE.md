@@ -13,11 +13,14 @@ flowchart TB
     Toolbar --> Commands
     SessionListView --> AppState
     ProfileListView --> Commands
+    WorkflowListView --> Commands
+    WorkflowRunDialog --> Commands
     Commands --> AppState
     Commands --> TerminalView
     AppState -. 訂閱通知 .-> Toolbar
     AppState -. 訂閱通知 .-> SessionListView
     AppState -. 訂閱通知 .-> ProfileListView
+    AppState -. 訂閱通知 .-> WorkflowListView
     NewConnectionDialog --> Commands
     InputPanel --> Commands
   end
@@ -30,6 +33,12 @@ flowchart TB
     IPCLayer["ipc.ts"] --> SessionManager
     IPCLayer --> SessionLogger
     IPCLayer --> ProfileStore
+    IPCLayer --> WorkflowService
+    WorkflowService --> GraphCompiler
+    GraphCompiler --> LangGraph["LangGraph StateGraph"]
+    GraphCompiler --> IAgentRunner
+    GraphCompiler --> SessionManager
+    WorkflowService --> JsonFileSaver
     SessionManager --> ShellFactory
     SessionManager --> IPtySpawner
     SessionManager --> IAgentRunner
@@ -38,7 +47,7 @@ flowchart TB
   end
 
   subgraph shared["shared (三方共用型別)"]
-    Profile["ConnectionProfile / SavedProfile<br/>SessionInfo<br/>IPC 契約<br/>validateProfile"]
+    Profile["ConnectionProfile / SavedProfile<br/>SessionInfo<br/>WorkflowDefinition / RunState<br/>IPC 契約<br/>validateProfile / validateWorkflow"]
   end
 
   Commands --> Bridge
@@ -64,6 +73,7 @@ renderer 拿不到 `ipcRenderer` 也拿不到 Node，只看得到 `preload` 白�
 | **Dependency Injection** | `SessionManager`、`SessionLogger`、每個 `Command` 的建構子 | 所有跟外界（行程、檔案系統、剪貼簿、DOM）接觸的東西都從建構子傳進來，預設值是正式實作，測試傳假的。 |
 | **Observer** | `SessionManager`（typed `EventEmitter`）、`AppState`（`subscribe`） | main 端 pty 的輸出是推送式的；renderer 端多個 View 要對同一份狀態反應。兩邊都用訂閱而不是互相持有參考。 |
 | **Decorator / Observer** | `main/session-logger.ts` | 紀錄功能掛在 `SessionManager` 的 `data` 事件上，不改變資料流本身，也不需要 `SessionManager` 知道紀錄這回事。 |
+| **Builder / Interpreter** | `main/workflow/graph-compiler.ts` | 「定義」與「執行」分成兩件事：JSON 是資料，`compile()` 把它翻譯成 LangGraph 的 `StateGraph`。加一種節點型別只要在一個 `switch` 加一個 `case`，跟 `ShellFactory` 是同一個手法。Phase 2 的畫布只動資料那一半，執行這一半完全不用改。 |
 | **Repository** | `main/profile-store.ts` | 已儲存的連線設定就是一份 JSON，`list` / `save` / `remove` 三個方法把「存在哪、怎麼序列化、檔案壞了怎麼辦」包在裡面。IPC 與 renderer 只看得到 `SavedProfile[]`，換成別的儲存方式不會影響到它們。 |
 | **Command** | `renderer/commands.ts` | 工具列七個按鈕各是一個 `ICommand`。按鈕只負責「按下去就 `execute()`」，行為本身不碰 DOM，可以單獨測試。 |
 
@@ -145,6 +155,96 @@ flowchart LR
 
 實測記錄與決策見 [`AGENT-SPIKE.md`](AGENT-SPIKE.md)。
 
+## 工作流 (LangGraph)
+
+Agent 任務是「跑一次」，工作流是「跑一串，中間可以分支、可以問人」。
+規則只有一條：**每個工作流都跑在 LangGraph 上**，沒有自己寫的排程器。
+
+```mermaid
+flowchart LR
+  Def["WorkflowDefinition<br/>(shared/workflow.ts，JSON)"] --> GC[GraphCompiler]
+  GC --> SG["LangGraph StateGraph<br/>(compile 出來的)"]
+  WS[WorkflowService] --> GC
+  WS -->|invoke / Command resume| SG
+  SG -->|checkpoint| JFS[JsonFileSaver]
+  JFS --> Files["userData/workflow-runs/&lt;runId&gt;.json"]
+  SG -->|agent 節點| R[IAgentRunner]
+  SG -->|adoptAgentRun| SM[SessionManager]
+  WS -->|changed / RunState| IPCLayer[ipc.ts]
+```
+
+| 元件 | 職責 |
+| --- | --- |
+| **`shared/workflow.ts`** | 定義的型別與 `validateWorkflow()`。純資料 + 純函式，是唯一的真相來源（Phase 2 的畫布編輯的也是它，所以 schema 已經帶著節點 `position`）。 |
+| **`main/workflow/graph-compiler.ts`** | 唯一知道 LangGraph 的地方：`compile(def, deps)` 把定義變成 `StateGraph`。節點 → `addNode`，`start` 的單一連線 → `addEdge`，有出口的節點 → `addConditionalEdges` + 只看 `lastPort` 的 router。 |
+| **`main/workflow/json-file-saver.ts`** | `BaseCheckpointSaver` 的實作，一個執行一個 JSON 檔。 |
+| **`main/workflow/workflow-service.ts`** | Observer，跟 `SessionManager` 同一個寫法。`start` / `resume` / `cancel` / `list`，以及 `RunState` 的持久化。 |
+| **`main/workflow/templates.ts`** | 內建範本。就是一份 `WorkflowDefinition`，沒有第二套格式。 |
+
+### 為什麼是 LangGraph 而不是自己寫迴圈
+
+[`AGENT-SPIKE.md`](AGENT-SPIKE.md) 第 9 節說「要到分支、平行、人工介入節點才值得付
+LangGraph 的抽象成本」。Phase 1 的範本同時要**分支**（審查 PASS / FAIL）、**迴圈**
+（修正 → 再審查，有次數上限）與**人工介入**（批准），三樣都齊了。真正省下來的是
+「中斷之後怎麼接回去」：`interrupt()` + checkpointer 讓 app 關掉再開還能從批准那一步
+繼續，這件事自己寫會是一整套狀態機序列化。
+
+### 狀態
+
+圖的狀態是 `Annotation.Root` 的四個 channel：`outputs`（節點輸出，reducer 是合併）、
+`attempts`（合併）、`lastPort`（合併）、`totalCostUsd`（相加）。
+提示樣板 `{{節點id.text}}` 就是從 `outputs` 代入的。
+
+畫面看到的是另一份 `RunState`（`WorkflowService` 維護）。分開是刻意的：
+圖的狀態要等超步結束才看得到，但畫面要馬上知道「哪個節點正在跑、開了哪個工作階段」，
+所以編排層在節點開始／結束時透過注入的 `NodeReport` 回報。
+
+### 一個節點怎麼變成工作階段
+
+`agent` 節點用既有的 `IAgentRunner` 開一次 CLI 執行，然後把那個 `IAgentRun`
+交給 `SessionManager.adoptAgentRun()`，包成 `AgentRunPty` 收編成一個普通的工作階段
+（名字是「<工作流> · <節點>」）。所以右側清單、切換、關閉、輸出紀錄、**接手**
+全部不必為工作流改一行 —— 跟 Agent 任務走的是同一條路，只是「誰開的執行」不同：
+
+| 入口 | 誰開 `IAgentRun` | 怎麼進 SessionManager |
+| --- | --- | --- |
+| Agent 任務（對話框） | `SessionManager` 自己（`startAgent`） | `create()` |
+| 工作流的 agent 節點 | `GraphCompiler` 的節點函式 | `adoptAgentRun()` |
+
+兩條路共用抽出來的 `register()`（掛事件、收進清單）與 `watchAgentSessionId()`
+（CLI 回報 session id 之後推 `updated`，「接手」按鈕才出現）。
+
+renderer 那邊因此多一件事：工作流的工作階段不是 `createSession()` 開的，
+所以 `syncTerminals()` 第一次在清單裡看到它時要補一個 `TerminalView`
+（`adoptTerminal`）。`createSession()` 進行中時不補 —— 那時 `state` 裡已經有一個
+「檢視還沒認領 id」的工作階段，補下去會變成同一個 id 兩個檢視。
+
+### 中斷與持久化
+
+`approval` 節點呼叫 `interrupt({ question })`：LangGraph 丟出 `GraphInterrupt`，
+整張圖停住，`invoke` 的回傳值帶著 `__interrupt__`。人按批准／退回時，
+`resume()` 用 `new Command({ resume: { approved } })` 再 `invoke` 一次。
+
+> `resume` 的值一定要是**真值**：`mapCommand` 用 `if (cmd.resume)` 判斷，
+> 傳 `false` 會被當成空輸入丟 `EmptyInputError`。所以送的是 `{ approved }` 物件。
+
+`JsonFileSaver` 寫法照 `MemorySaver`（同一組 storage / writes 結構），差別是
+換成一個 thread 一個檔案，而且序列化後的位元組會再 `JSON.parse` 一次存成巢狀物件，
+所以 checkpoint 檔是看得懂的 JSON —— 跟 `profiles.json` 同一個態度。
+**刻意不用 better-sqlite3**：原生模組會把 `electron-builder` 的 `npmRebuild: false`
+那條路弄斷（見 README 的「打包成執行檔」）。
+
+執行清單的摘要另外存在 `userData/workflow-runs.json`，連定義與參數一起存 ——
+重開之後要重新編譯出圖才接得下去。「執行中」的執行接不回去（CLI 行程已經沒了），
+開機時會被標成失敗。
+
+### 相依套件與打包
+
+`@langchain/langgraph@1.4.14` 有 CJS entry（`dist/index.cjs`），所以
+`externalizeDepsPlugin()` 把它留成 `require()` 就能用，**不必**排除外部化讓 Vite
+打進 bundle。`@langchain/langgraph-checkpoint` 同理；`@langchain/core` 與 `zod`
+是 peer，只被型別引用，一起釘成精確版本。
+
 ## IPC 契約
 
 頻道名稱與 payload 型別都定義在 `src/shared/ipc.ts`，三邊共用同一份。
@@ -163,6 +263,11 @@ renderer → main（`ipcMain.handle`，全部回傳 Promise）：
 | `profiles:list` | — | `SavedProfile[]` |
 | `profiles:save` | `SavedProfile` | — |
 | `profiles:remove` | `name` | — |
+| `workflow:templates` | — | `WorkflowTemplateInfo[]` |
+| `workflow:start` | `{ templateId, params }` | `runId` |
+| `workflow:resume` | `{ runId, approved }` | — |
+| `workflow:cancel` | `runId` | — |
+| `workflow:runs` | — | `RunState[]` |
 
 main → renderer（`webContents.send`）：
 
@@ -172,6 +277,7 @@ main → renderer（`webContents.send`）：
 | `session:exit` | `{ id, exitCode }` | pty 結束 |
 | `session:changed` | `SessionInfo[]` | 建立、關閉、結束、紀錄狀態改變、agent 回報 session id |
 | `profiles:changed` | `SavedProfile[]` | 儲存或刪除設定檔之後 |
+| `workflow:changed` | `RunState[]` | 執行開始／節點進度／等待批准／收尾 |
 
 `ipc.ts` 只做轉接，沒有商業邏輯；所以「IPC 沒被測試」不代表邏輯沒被測試。
 
@@ -193,6 +299,12 @@ main → renderer（`webContents.send`）：
   所以 renderer 有一個 `pendingData`：認領不到 id 的輸出先存著，
   `TerminalView` 一登記就補寫進去。
 
+工作流的節點**不走這條路**：那個工作階段是 main 自己開的，renderer 從
+`session:changed` 才第一次看到它。`syncTerminals()` 因此會替沒有檢視的
+工作階段補一個（`adoptTerminal`），`pendingData` 同樣會補寫進去。
+補的條件是「目前沒有 `createSession` 在進行中」—— 進行中的那個已經有一個
+還沒認領 id 的檢視，補下去會變成同一個 id 兩個檢視。
+
 ## TDD 縫線（fakes）
 
 | 被測單元 | 注入的假物件 | 檔案 |
@@ -207,6 +319,16 @@ main → renderer（`webContents.send`）：
 | `validateProfile` | 不需要（純函式） | `test/validate-profile.spec.ts` |
 | `ClaudeCodeRunner` / `CodexRunner` | `FakeProcessSpawner` + `test/fixtures/*.jsonl`（真的跑出來的輸出） | `test/agent-runner.spec.ts` |
 | `AgentRunPty` | `FakeAgentRun` | `test/agent-run-pty.spec.ts` |
+| `validateWorkflow` | 不需要（純函式） | `test/workflow.spec.ts` |
+| `GraphCompiler` | `ScriptedRunner` / `FakeSessions` / `ManualTimers` + `MemorySaver` | `test/fakes/fake-workflow.ts` |
+| `JsonFileSaver` | 真的暫存目錄（`mkdtempSync`），另一半是注入的 `SaverFs` | `test/json-file-saver.spec.ts` |
+| `WorkflowService` | 同上三個 + 記憶體字串當 `workflow-runs.json` | `test/workflow-service.spec.ts` |
+
+工作流這一層刻意**用真的 LangGraph 測**（`MemorySaver` 或真的 `JsonFileSaver`）：
+要驗的正是「編譯出來的圖真的會這樣走」，換成假的圖就什麼都沒測到。
+花錢的那一端（CLI）才是假的 —— `ScriptedRunner` 依呼叫順序回答，
+所以分支、迴圈、逾時、預算、中斷與接續全部測得起來，一毛錢都不用花。
+`ManualTimers` 讓「逾時」不必真的等十分鐘。
 
 原則：**不測 node-pty 和 xterm.js 本身**，只測自己包在它們外面的邏輯。
 真正會碰到它們的地方（`NodePtySpawner`、`TerminalView`）刻意寫得很薄，

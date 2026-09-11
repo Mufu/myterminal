@@ -1,6 +1,6 @@
 import { test, expect, _electron as electron } from '@playwright/test';
 import type { ElectronApplication, Page } from '@playwright/test';
-import { existsSync, mkdtempSync } from 'node:fs';
+import { existsSync, mkdtempSync, realpathSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -14,7 +14,14 @@ const TASK = '在工作目錄建立 hello.txt，內容只有一行 hello';
 /** 兩次真的模型呼叫 + Electron 冷啟動，給很寬鬆的時間。*/
 const MODEL_TIMEOUT = 480_000;
 
-const temp = (prefix: string): string => mkdtempSync(join(tmpdir(), `myterminal-${prefix}-`));
+/**
+ * 暫存目錄，而且一定要是**長路徑**。這台機器的 %TEMP% 是 8.3 短檔名
+ * (C:\Users\ROBERT~1\...)，claude 會把短路徑當成可疑路徑要求手動核准，
+ * 在 -p 非互動模式下核准不了，acceptEdits 也救不回來 —— 實測 agent 會回
+ * 「寫入被權限系統擋下」然後什麼都不做。realpathSync.native 展開成長路徑就好了。
+ */
+const temp = (prefix: string): string =>
+  realpathSync.native(mkdtempSync(join(tmpdir(), `myterminal-${prefix}-`)));
 
 interface Launched {
   app: ElectronApplication;
