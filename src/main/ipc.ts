@@ -4,11 +4,15 @@ import type {
   CreateSessionRequest,
   WriteRequest,
   ResizeRequest,
+  ResumeWorkflowRequest,
+  StartWorkflowRequest,
 } from '../shared/ipc';
 import type { SavedProfile } from '../shared/profile';
 import type { SessionManager } from './session-manager';
 import type { SessionLogger } from './session-logger';
 import type { ProfileStore } from './profile-store';
+import type { WorkflowService } from './workflow/workflow-service';
+import { findTemplate, templateInfos } from './workflow/templates';
 
 /**
  * IPC 橋接層：刻意保持很薄。
@@ -19,6 +23,7 @@ export function registerIpc(
   manager: SessionManager,
   logger: SessionLogger,
   profiles: ProfileStore,
+  workflows: WorkflowService,
   getWebContents: () => WebContents | null,
 ): void {
   const send = (channel: string, payload: unknown): void => {
@@ -39,6 +44,7 @@ export function registerIpc(
   manager.on('created', pushSessions);
   manager.on('updated', pushSessions);
   manager.on('closed', pushSessions);
+  workflows.on('changed', (runs) => send(IPC.workflowChanged, runs));
 
   // renderer -> main
   ipcMain.handle(IPC.createSession, (_e, req: CreateSessionRequest) =>
@@ -80,4 +86,18 @@ export function registerIpc(
     profiles.remove(name);
     pushProfiles();
   });
+
+  ipcMain.handle(IPC.workflowTemplates, () => templateInfos());
+
+  ipcMain.handle(IPC.startWorkflow, (_e, req: StartWorkflowRequest) => {
+    const definition = findTemplate(req.templateId);
+    if (!definition) throw new Error(`找不到工作流範本 ${req.templateId}`);
+    return workflows.start(definition, req.params);
+  });
+
+  ipcMain.handle(IPC.resumeWorkflow, (_e, req: ResumeWorkflowRequest) =>
+    workflows.resume(req.runId, { approved: req.approved }),
+  );
+  ipcMain.handle(IPC.cancelWorkflow, (_e, runId: string) => workflows.cancel(runId));
+  ipcMain.handle(IPC.workflowRuns, () => workflows.list());
 }

@@ -16,12 +16,18 @@ export const IPC = {
   listProfiles: 'profiles:list',
   saveProfile: 'profiles:save',
   removeProfile: 'profiles:remove',
+  workflowTemplates: 'workflow:templates',
+  startWorkflow: 'workflow:start',
+  resumeWorkflow: 'workflow:resume',
+  cancelWorkflow: 'workflow:cancel',
+  workflowRuns: 'workflow:runs',
 
   /** main -> renderer (send) */
   data: 'session:data',
   exit: 'session:exit',
   sessionsChanged: 'session:changed',
   profilesChanged: 'profiles:changed',
+  workflowChanged: 'workflow:changed',
 } as const;
 
 export interface CreateSessionRequest {
@@ -54,4 +60,15 @@ export interface ExitEvent {
 /** startLog 的回傳：實際寫入的檔案路徑。*/
 export interface StartLogResult {
   path: string;
+}
+
+export interface StartWorkflowRequest {
+  templateId: string;
+  /** 範本的啟動參數，樣板裡用 {{params.x}} 取用。*/
+  params: Record<string, string>;
+}
+
+export interface ResumeWorkflowRequest {
+  runId: string;
+  approved: boolean;
 }

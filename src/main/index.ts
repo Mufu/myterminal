@@ -5,6 +5,9 @@ import { SessionLogger, defaultLogDir, ensureLogDir } from './session-logger';
 import { NodePtySpawner } from './node-pty-spawner';
 import { ShellFactory } from './shell-factory';
 import { fileProfileStore } from './profile-store';
+import { defaultAgentRunners } from './agent-runner';
+import { fileCheckpointSaver } from './workflow/json-file-saver';
+import { WorkflowService, fileRunStore } from './workflow/workflow-service';
 import { registerIpc } from './ipc';
 
 let win: BrowserWindow | null = null;
@@ -20,8 +23,17 @@ const manager = new SessionManager(new NodePtySpawner(), new ShellFactory());
 const logger = new SessionLogger(logDir);
 const profiles = fileProfileStore(join(app.getPath('userData'), 'profiles.json'));
 
+// 工作流：圖的 checkpoint 一個執行一個檔，清單摘要則是一份 JSON。
+// 節點的 CLI 執行透過 SessionManager.adoptAgentRun 變成畫面上的工作階段。
+const workflows = new WorkflowService({
+  runnerFactory: defaultAgentRunners,
+  sessions: manager,
+  checkpointer: fileCheckpointSaver(join(app.getPath('userData'), 'workflow-runs')),
+  ...fileRunStore(join(app.getPath('userData'), 'workflow-runs.json')),
+});
+
 // 關窗之後 pty 的 exit 事件才可能送達，那時 webContents 已經被銷毀。
-registerIpc(manager, logger, profiles, () =>
+registerIpc(manager, logger, profiles, workflows, () =>
   win && !win.isDestroyed() ? win.webContents : null,
 );
 

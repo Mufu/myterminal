@@ -20,12 +20,22 @@ const api: MyTerminalApi = {
   saveProfile: (profile) => ipcRenderer.invoke(IPC.saveProfile, profile),
   removeProfile: (name) => ipcRenderer.invoke(IPC.removeProfile, name),
 
+  workflowTemplates: () => ipcRenderer.invoke(IPC.workflowTemplates),
+  startWorkflow: (templateId, params) =>
+    ipcRenderer.invoke(IPC.startWorkflow, { templateId, params }),
+  resumeWorkflow: (runId, approved) =>
+    ipcRenderer.invoke(IPC.resumeWorkflow, { runId, approved }),
+  cancelWorkflow: (runId) => ipcRenderer.invoke(IPC.cancelWorkflow, runId),
+  workflowRuns: () => ipcRenderer.invoke(IPC.workflowRuns),
+
   onData: (listener) => void ipcRenderer.on(IPC.data, (_e, payload) => listener(payload)),
   onExit: (listener) => void ipcRenderer.on(IPC.exit, (_e, payload) => listener(payload)),
   onSessionsChanged: (listener) =>
     void ipcRenderer.on(IPC.sessionsChanged, (_e, payload) => listener(payload)),
   onProfilesChanged: (listener) =>
     void ipcRenderer.on(IPC.profilesChanged, (_e, payload) => listener(payload)),
+  onWorkflowChanged: (listener) =>
+    void ipcRenderer.on(IPC.workflowChanged, (_e, payload) => listener(payload)),
 };
 
 contextBridge.exposeInMainWorld('myterminal', api);
