@@ -60,6 +60,13 @@ const clipboard: ClipboardPort = {
   writeText: (text) => navigator.clipboard.writeText(text),
 };
 
+/**
+ * 還沒收到 id 的 createSession 個數。main 自己開的工作階段要補一個終端機檢視
+ * (見 adoptTerminal)，但這期間 state 裡可能已經有一個「檢視還沒認領 id」的
+ * 工作階段，補下去會變成同一個 id 兩個檢視。
+ */
+let pendingCreates = 0;
+
 /** 建立工作階段：先開終端機量出 cols/rows，再請 main spawn。*/
 async function createSession(profile: ConnectionProfile): Promise<void> {
   let id: string | null = null;
@@ -78,6 +85,7 @@ async function createSession(profile: ConnectionProfile): Promise<void> {
 
   activeTerminal()?.hide();
   view.show();
+  pendingCreates += 1;
 
   try {
     const { cols, rows } = view.dimensions;
@@ -99,14 +107,43 @@ async function createSession(profile: ConnectionProfile): Promise<void> {
     syncTerminals();
   } catch (error) {
     view.dispose();
-    syncTerminals();
     alert(`建立工作階段失敗：${String(error)}`);
+  } finally {
+    pendingCreates -= 1;
+    syncTerminals();
+  }
+}
+
+/**
+ * main 自己開的工作階段 (工作流的節點) 沒有經過 createSession，
+ * 所以第一次在清單裡看到它的時候要補一個終端機檢視，
+ * 點節點那一列才有東西可以看。
+ */
+function adoptTerminal(id: string): void {
+  const view = new TerminalView(
+    terminalsEl,
+    {
+      onInput: (data) => void api.write(id, data),
+      onResize: (cols, rows) => void api.resize(id, cols, rows),
+    },
+    themeStore,
+  );
+  view.hide();
+  terminals.set(id, view);
+
+  const buffered = pendingData.get(id);
+  if (buffered !== undefined) {
+    view.write(buffered);
+    pendingData.delete(id);
   }
 }
 
 /** 讓畫面上顯示的終端機與 AppState 一致，並清掉已關閉工作階段的檢視。*/
 function syncTerminals(): void {
   const alive = new Set(state.sessions.map((s) => s.id));
+  if (pendingCreates === 0) {
+    for (const id of alive) if (!terminals.has(id)) adoptTerminal(id);
+  }
   for (const [id, view] of terminals) {
     if (!alive.has(id)) {
       view.dispose();
