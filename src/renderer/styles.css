@@ -726,7 +726,8 @@ body {
 }
 
 #session-panel-head,
-#profile-panel-head {
+#profile-panel-head,
+#workflow-panel-head {
   display: flex;
   flex: none;
   align-items: center;
@@ -737,7 +738,8 @@ body {
 }
 
 #session-panel-head h2,
-#profile-panel-head h2 {
+#profile-panel-head h2,
+#workflow-panel-head h2 {
   margin: 0;
   font-family: var(--head-font);
   font-size: var(--head-size);
@@ -754,7 +756,8 @@ body {
 }
 
 #session-list,
-#profile-list {
+#profile-list,
+#workflow-list {
   display: flex;
   flex-direction: column;
   gap: var(--list-gap);
@@ -964,7 +967,8 @@ html[data-theme='warm'] .session-item.active .session-dot {
 }
 
 /* ---- 已儲存連線：跟 session 清單同一套 token，只差沒有狀態指示器 ---- */
-#profile-panel-head {
+#profile-panel-head,
+#workflow-panel-head {
   border-top: 1px solid var(--border);
 }
 
@@ -1004,7 +1008,8 @@ html[data-theme='warm'] .session-item.active .session-dot {
   opacity: 1;
 }
 
-.profile-empty {
+.profile-empty,
+.workflow-empty {
   padding: var(--item-pad);
   background: var(--item-bg);
   color: var(--dim);
@@ -1013,8 +1018,202 @@ html[data-theme='warm'] .session-item.active .session-dot {
   letter-spacing: var(--meta-tracking);
 }
 
-/* ---- 新連接對話框 ---- */
-#new-connection {
+/* ---- 工作流：一次執行一塊，裡面是節點的狀態列 ---- */
+#btn-workflow-run {
+  padding: 2px 8px;
+  border: var(--tag-border-width) solid var(--tag-border);
+  border-radius: var(--radius-sm);
+  background: var(--tag-bg);
+  color: var(--text-button);
+  font: inherit;
+  font-size: var(--meta-size);
+  letter-spacing: var(--meta-tracking);
+  cursor: pointer;
+}
+
+#btn-workflow-run:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.workflow-run {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: var(--item-pad);
+  border-radius: var(--item-radius);
+  background: var(--item-bg);
+}
+
+.workflow-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.workflow-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--name-size);
+  color: var(--text);
+}
+
+.workflow-status {
+  flex: none;
+  white-space: nowrap;
+  padding: var(--tag-pad);
+  border: var(--tag-border-width) solid var(--tag-border);
+  border-radius: var(--tag-radius);
+  background: var(--tag-bg);
+  color: var(--tag-fg);
+  font-family: var(--meta-font);
+  font-size: var(--tag-size);
+  letter-spacing: var(--tag-tracking);
+}
+
+.workflow-status.running,
+.workflow-status.waiting_approval {
+  color: var(--accent);
+}
+
+.workflow-status.done {
+  color: var(--running);
+}
+
+.workflow-status.failed {
+  color: var(--recording);
+}
+
+.workflow-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-family: var(--meta-font);
+  font-size: var(--meta-size);
+  letter-spacing: var(--meta-tracking);
+  color: var(--muted);
+}
+
+.workflow-error {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--recording);
+}
+
+.workflow-nodes {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.workflow-node {
+  display: grid;
+  grid-template-columns: var(--dot-inline-size) 1fr auto;
+  column-gap: var(--item-gap);
+  align-items: center;
+  padding: 3px 4px;
+  border-radius: var(--radius-sm);
+  font-family: var(--meta-font);
+  font-size: var(--meta-size);
+  letter-spacing: var(--meta-tracking);
+  color: var(--muted);
+}
+
+.workflow-node.has-session {
+  cursor: pointer;
+}
+
+.workflow-node.has-session:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.workflow-node-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workflow-node-cost {
+  color: var(--dim);
+}
+
+/* 節點的狀態點沿用 .session-dot，只是換顏色；
+   等待批准是空心的，略過是只有外框。*/
+.session-dot.done {
+  background: var(--running);
+}
+
+.session-dot.failed {
+  background: var(--recording);
+}
+
+.session-dot.waiting {
+  background: transparent;
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.session-dot.skipped {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--exited);
+}
+
+.workflow-question {
+  margin: 0;
+  padding: 6px 8px;
+  border-left: 2px solid var(--accent);
+  background: var(--hover);
+  font-size: var(--meta-size);
+  color: var(--text);
+}
+
+.workflow-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.workflow-actions button {
+  flex: 1;
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--selected);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--meta-size);
+  letter-spacing: var(--meta-tracking);
+  cursor: pointer;
+}
+
+.workflow-actions button:hover {
+  background: var(--dialog-hover-bg);
+}
+
+.workflow-actions .workflow-approve {
+  border-color: transparent;
+  background: var(--primary-bg);
+  color: var(--primary-fg);
+  font-weight: var(--primary-weight);
+}
+
+.workflow-actions .workflow-approve:hover {
+  background: var(--primary-hover-bg);
+  color: var(--primary-hover-fg);
+}
+
+/* ---- 對話框：新連接與執行範本共用同一套規則 ---- */
+#new-connection,
+#workflow-run {
   min-width: 420px;
   padding: 0;
   border: 1px solid var(--border);
@@ -1023,24 +1222,28 @@ html[data-theme='warm'] .session-item.active .session-dot {
   color: var(--text);
 }
 
-#new-connection::backdrop {
+#new-connection::backdrop,
+#workflow-run::backdrop {
   background: var(--backdrop);
 }
 
-#new-connection form {
+#new-connection form,
+#workflow-run form {
   display: flex;
   flex-direction: column;
   gap: 10px;
   padding: 16px;
 }
 
-#new-connection h2 {
+#new-connection h2,
+#workflow-run h2 {
   margin: 0;
   font-size: 15px;
   font-weight: 600;
 }
 
-#new-connection label {
+#new-connection label,
+#workflow-run label {
   display: flex;
   gap: 8px;
   align-items: center;
@@ -1050,7 +1253,10 @@ html[data-theme='warm'] .session-item.active .session-dot {
 
 #new-connection input,
 #new-connection select,
-#new-connection textarea {
+#new-connection textarea,
+#workflow-run input,
+#workflow-run select,
+#workflow-run textarea {
   flex: 1;
   max-width: 260px;
   padding: 5px 8px;
@@ -1064,17 +1270,23 @@ html[data-theme='warm'] .session-item.active .session-dot {
 
 #new-connection input:focus,
 #new-connection select:focus,
-#new-connection textarea:focus {
+#new-connection textarea:focus,
+#workflow-run input:focus,
+#workflow-run select:focus,
+#workflow-run textarea:focus {
   outline: none;
   border-color: var(--accent);
 }
 
 #new-connection input::placeholder,
-#new-connection textarea::placeholder {
+#new-connection textarea::placeholder,
+#workflow-run input::placeholder,
+#workflow-run textarea::placeholder {
   color: var(--dim);
 }
 
-#new-connection textarea {
+#new-connection textarea,
+#workflow-run textarea {
   resize: vertical;
 }
 
@@ -1115,7 +1327,8 @@ html[data-theme='warm'] .session-item.active .session-dot {
   white-space: pre-line;
 }
 
-#new-connection menu {
+#new-connection menu,
+#workflow-run menu {
   display: flex;
   gap: 8px;
   justify-content: flex-end;
@@ -1123,7 +1336,8 @@ html[data-theme='warm'] .session-item.active .session-dot {
   padding: 0;
 }
 
-#new-connection menu button {
+#new-connection menu button,
+#workflow-run menu button {
   height: 30px;
   padding: 0 16px;
   border: 1px solid var(--border);
@@ -1135,11 +1349,13 @@ html[data-theme='warm'] .session-item.active .session-dot {
   cursor: pointer;
 }
 
-#new-connection menu button:hover {
+#new-connection menu button:hover,
+#workflow-run menu button:hover {
   background: var(--dialog-hover-bg);
 }
 
-#new-connection menu button.primary:hover {
+#new-connection menu button.primary:hover,
+#workflow-run menu button.primary:hover {
   background: var(--accent-hover);
   border-color: var(--accent-hover);
 }

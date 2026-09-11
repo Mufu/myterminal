@@ -154,6 +154,43 @@ export class TakeOverCommand implements ICommand {
   }
 }
 
+/** 「執行範本」對話框按下開始：把範本與參數交給 main，之後全部走 workflow:changed。*/
+export class StartWorkflowCommand implements ICommand {
+  constructor(
+    private readonly api: MyTerminalApi,
+    private readonly templateId: string,
+    private readonly params: Record<string, string>,
+  ) {}
+  async execute(): Promise<void> {
+    await this.api.startWorkflow(this.templateId, this.params);
+  }
+}
+
+/** 批准／退回：等待批准的執行從中斷的地方接下去。*/
+export class ResumeWorkflowCommand implements ICommand {
+  constructor(
+    private readonly api: MyTerminalApi,
+    private readonly runId: string,
+    private readonly approved: boolean,
+  ) {}
+  async execute(): Promise<void> {
+    await this.api.resumeWorkflow(this.runId, this.approved);
+  }
+}
+
+/** 取消執行中的工作流：會砍掉正在跑的 CLI，所以先問一次。*/
+export class CancelWorkflowCommand implements ICommand {
+  constructor(
+    private readonly api: MyTerminalApi,
+    private readonly confirm: ConfirmPort,
+    private readonly run: { runId: string; name: string },
+  ) {}
+  async execute(): Promise<void> {
+    if (!this.confirm(`取消工作流「${this.run.name}」？`)) return;
+    await this.api.cancelWorkflow(this.run.runId);
+  }
+}
+
 /** 已儲存連線的 ✕：確認之後才刪除。*/
 export class RemoveProfileCommand implements ICommand {
   constructor(

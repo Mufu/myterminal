@@ -13,6 +13,9 @@ import {
   RemoveProfileCommand,
   TakeOverCommand,
   resumeCommand,
+  StartWorkflowCommand,
+  ResumeWorkflowCommand,
+  CancelWorkflowCommand,
 } from '../src/renderer/commands';
 import { ThemeStore } from '../src/renderer/theme';
 import type { TerminalPort, ClipboardPort, InputPanelPort, DialogPort } from '../src/renderer/ports';
@@ -72,11 +75,17 @@ const fakeApi = () =>
     startLog: vi.fn().mockResolvedValue('D:/logs/a.log'),
     stopLog: vi.fn().mockResolvedValue(undefined),
     removeProfile: vi.fn().mockResolvedValue(undefined),
+    startWorkflow: vi.fn().mockResolvedValue('run-1'),
+    resumeWorkflow: vi.fn().mockResolvedValue(undefined),
+    cancelWorkflow: vi.fn().mockResolvedValue(undefined),
   }) as unknown as MyTerminalApi & {
     write: ReturnType<typeof vi.fn>;
     startLog: ReturnType<typeof vi.fn>;
     stopLog: ReturnType<typeof vi.fn>;
     removeProfile: ReturnType<typeof vi.fn>;
+    startWorkflow: ReturnType<typeof vi.fn>;
+    resumeWorkflow: ReturnType<typeof vi.fn>;
+    cancelWorkflow: ReturnType<typeof vi.fn>;
   };
 
 let state: AppState;
@@ -290,5 +299,56 @@ describe('TakeOverCommand', () => {
   it('resumeCommand 兩種 CLI 的形式', () => {
     expect(resumeCommand('claude', 'x')).toBe('claude --resume x');
     expect(resumeCommand('codex', 'x')).toBe('codex resume x');
+  });
+});
+
+describe('工作流的三個 Command', () => {
+  let api: ReturnType<typeof fakeApi>;
+
+  beforeEach(() => {
+    api = fakeApi();
+  });
+
+  it('StartWorkflowCommand 把範本與參數交給 main', async () => {
+    await new StartWorkflowCommand(api, 'implement-review-approve', {
+      task: '建立 hello.txt',
+      cwd: 'D:/tmp',
+    }).execute();
+
+    expect(api.startWorkflow).toHaveBeenCalledWith('implement-review-approve', {
+      task: '建立 hello.txt',
+      cwd: 'D:/tmp',
+    });
+  });
+
+  it('ResumeWorkflowCommand 分別送出批准與退回', async () => {
+    await new ResumeWorkflowCommand(api, 'run-1', true).execute();
+    await new ResumeWorkflowCommand(api, 'run-1', false).execute();
+
+    expect(api.resumeWorkflow).toHaveBeenNthCalledWith(1, 'run-1', true);
+    expect(api.resumeWorkflow).toHaveBeenNthCalledWith(2, 'run-1', false);
+  });
+
+  it('CancelWorkflowCommand 先問過才取消', async () => {
+    const asked: string[] = [];
+    await new CancelWorkflowCommand(
+      api,
+      (message) => {
+        asked.push(message);
+        return true;
+      },
+      { runId: 'run-1', name: '實作 → 審查 → 批准' },
+    ).execute();
+
+    expect(asked).toEqual(['取消工作流「實作 → 審查 → 批准」？']);
+    expect(api.cancelWorkflow).toHaveBeenCalledWith('run-1');
+  });
+
+  it('不確認就不取消', async () => {
+    await new CancelWorkflowCommand(api, () => false, {
+      runId: 'run-1',
+      name: 'x',
+    }).execute();
+    expect(api.cancelWorkflow).not.toHaveBeenCalled();
   });
 });

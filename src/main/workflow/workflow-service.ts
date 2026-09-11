@@ -76,7 +76,10 @@ export class WorkflowService extends EventEmitter<WorkflowEvents> {
         name: definition.name,
         status: 'running',
         nodes: Object.fromEntries(
-          definition.nodes.map((node) => [node.id, { status: 'idle' as const, attempts: 0 }]),
+          definition.nodes.map((node) => [
+            node.id,
+            { label: node.label, status: 'idle' as const, attempts: 0 },
+          ]),
         ),
         totalCostUsd: 0,
         startedAt: this.now(),

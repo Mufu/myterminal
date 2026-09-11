@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { AppState } from '../src/renderer/app-state';
 import type { SessionInfo } from '../src/shared/session';
 import type { SavedProfile } from '../src/shared/profile';
+import type { RunState } from '../src/shared/workflow';
 
 const session = (id: string, over: Partial<SessionInfo> = {}): SessionInfo => ({
   id,
@@ -119,6 +120,38 @@ describe('AppState 已儲存連線', () => {
     state.setProfiles([profile]);
     state.setSessions([session('a')]);
     expect(state.profiles).toEqual([profile]);
+    expect(state.activeSessionId).toBe('a');
+  });
+});
+
+describe('AppState 工作流', () => {
+  const run: RunState = {
+    runId: 'run-1',
+    workflowId: 'w',
+    name: '實作 → 審查 → 批准',
+    status: 'waiting_approval',
+    question: '要保留這次的變更嗎？',
+    nodes: { implement: { label: '實作', status: 'done', attempts: 1 } },
+    totalCostUsd: 0.27,
+    startedAt: 1,
+  };
+
+  it('初始是空清單', () => {
+    expect(state.runs).toEqual([]);
+  });
+
+  it('setRuns 換掉清單並通知訂閱者 (Observer)', () => {
+    let notified = 0;
+    state.subscribe(() => (notified += 1));
+    state.setRuns([run]);
+    expect(state.runs).toEqual([run]);
+    expect(notified).toBe(1);
+  });
+
+  it('工作流不影響工作階段與已儲存連線', () => {
+    state.setRuns([run]);
+    state.setSessions([session('a')]);
+    expect(state.runs).toEqual([run]);
     expect(state.activeSessionId).toBe('a');
   });
 });

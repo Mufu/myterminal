@@ -143,6 +143,8 @@ export type RunStatus = 'running' | 'waiting_approval' | 'done' | 'failed' | 'ca
 export type RunNodeStatus = 'idle' | 'running' | 'done' | 'failed' | 'waiting' | 'skipped';
 
 export interface RunNodeState {
+  /** 節點在定義裡的顯示名稱，複製一份過來讓 renderer 不必拿到整份定義。*/
+  label: string;
   status: RunNodeStatus;
   /** 這個節點的 CLI 執行在畫面上對應的工作階段，點一下可以切過去看。*/
   sessionId?: string;

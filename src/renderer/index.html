@@ -105,6 +105,12 @@
           <span id="profile-count">0</span>
         </header>
         <ul id="profile-list"></ul>
+
+        <header id="workflow-panel-head">
+          <h2>工作流</h2>
+          <button id="btn-workflow-run" type="button">執行範本</button>
+        </header>
+        <ul id="workflow-list"></ul>
       </aside>
     </div>
 
@@ -187,6 +193,33 @@
         <menu>
           <button id="f-cancel" value="cancel" type="submit">取消</button>
           <button id="f-ok" value="ok" type="submit" class="primary">建立</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <dialog id="workflow-run">
+      <form method="dialog">
+        <h2>執行工作流範本</h2>
+
+        <label>
+          範本
+          <select id="w-template"></select>
+        </label>
+
+        <label>
+          任務
+          <textarea id="w-task" rows="4" placeholder="要 agent 做什麼"></textarea>
+        </label>
+
+        <label>
+          工作目錄 <input id="w-cwd" type="text" placeholder="agent 會在這裡修改檔案" />
+        </label>
+
+        <p id="w-errors" class="errors"></p>
+
+        <menu>
+          <button id="w-cancel" value="cancel" type="submit">取消</button>
+          <button id="w-ok" value="ok" type="submit" class="primary">開始</button>
         </menu>
       </form>
     </dialog>

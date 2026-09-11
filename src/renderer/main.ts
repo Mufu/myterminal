@@ -5,7 +5,9 @@ import { AppState } from './app-state';
 import { TerminalView } from './terminal-view';
 import { SessionListView } from './session-list-view';
 import { ProfileListView } from './profile-list-view';
+import { WorkflowListView } from './workflow-list-view';
 import { NewConnectionDialog } from './new-connection-dialog';
+import { WorkflowRunDialog } from './workflow-run-dialog';
 import { InputPanel } from './input-panel';
 import { Toolbar } from './toolbar';
 import {
@@ -20,6 +22,9 @@ import {
   ConnectFromProfileCommand,
   RemoveProfileCommand,
   TakeOverCommand,
+  StartWorkflowCommand,
+  ResumeWorkflowCommand,
+  CancelWorkflowCommand,
 } from './commands';
 import { ThemeStore } from './theme';
 import type { ClipboardPort, ConfirmPort } from './ports';
@@ -161,9 +166,24 @@ new ProfileListView(
   (name) => void new RemoveProfileCommand(api, confirmRemove, name).execute(),
 );
 
+const workflowDialog = new WorkflowRunDialog((templateId, params) => {
+  void new StartWorkflowCommand(api, templateId, params).execute();
+});
+$<HTMLButtonElement>('btn-workflow-run').addEventListener('click', () => workflowDialog.open());
+
+new WorkflowListView(
+  $<HTMLUListElement>('workflow-list'),
+  state,
+  (runId, approved) => void new ResumeWorkflowCommand(api, runId, approved).execute(),
+  (run) => void new CancelWorkflowCommand(api, confirmRemove, run).execute(),
+  // 節點那一列點下去就是切換工作階段，跟點右側清單是同一件事。
+  (sessionId) => state.setActive(sessionId),
+);
+
 state.subscribe(syncTerminals);
 api.onSessionsChanged((sessions) => state.setSessions(sessions));
 api.onProfilesChanged((profiles) => state.setProfiles(profiles));
+api.onWorkflowChanged((runs) => state.setRuns(runs));
 api.onData(({ id, data }) => {
   const view = terminals.get(id);
   if (view) view.write(data);
@@ -175,3 +195,5 @@ window.addEventListener('resize', () => activeTerminal()?.resize());
 
 void api.list().then((sessions) => state.setSessions(sessions));
 void api.listProfiles().then((profiles) => state.setProfiles(profiles));
+void api.workflowRuns().then((runs) => state.setRuns(runs));
+void api.workflowTemplates().then((templates) => workflowDialog.setTemplates(templates));

@@ -1,5 +1,6 @@
 import type { SessionInfo } from '../shared/session';
 import type { SavedProfile } from '../shared/profile';
+import type { RunState } from '../shared/workflow';
 
 type Listener = () => void;
 
@@ -13,6 +14,7 @@ export class AppState {
   private _activeSessionId: string | null = null;
   private _inputPanelVisible = false;
   private _profiles: SavedProfile[] = [];
+  private _runs: RunState[] = [];
 
   get sessions(): SessionInfo[] {
     return this._sessions;
@@ -28,6 +30,10 @@ export class AppState {
 
   get profiles(): SavedProfile[] {
     return this._profiles;
+  }
+
+  get runs(): RunState[] {
+    return this._runs;
   }
 
   subscribe(listener: Listener): () => void {
@@ -57,6 +63,11 @@ export class AppState {
 
   setProfiles(profiles: SavedProfile[]): void {
     this._profiles = profiles;
+    this.notify();
+  }
+
+  setRuns(runs: RunState[]): void {
+    this._runs = runs;
     this.notify();
   }
 
