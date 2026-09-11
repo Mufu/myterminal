@@ -2,13 +2,22 @@ import { EventEmitter } from 'node:events';
 import { homedir } from 'node:os';
 import type { AgentTaskProfile, ConnectionProfile } from '../shared/profile';
 import { TYPE_LABELS } from '../shared/profile';
+import type { AgentKind } from '../shared/agent';
 import type { SessionInfo } from '../shared/session';
 import type { DataEvent, ExitEvent } from '../shared/ipc';
 import type { IPtyProcess, IPtySpawner } from './pty';
 import { ShellFactory } from './shell-factory';
-import type { IAgentRunnerFactory } from './agent-runner';
+import type { IAgentRun, IAgentRunnerFactory } from './agent-runner';
 import { defaultAgentRunners } from './agent-runner';
 import { AgentRunPty } from './agent-run-pty';
+
+/** adoptAgentRun 需要知道的東西：畫面上叫什麼、哪個 CLI、提示與工作目錄。*/
+export interface AdoptSpec {
+  name: string;
+  kind: AgentKind;
+  prompt: string;
+  cwd: string;
+}
 
 interface Session {
   info: SessionInfo;
@@ -51,8 +60,7 @@ export class SessionManager extends EventEmitter<SessionEvents> {
   }
 
   create(profile: ConnectionProfile, cols: number, rows: number): SessionInfo {
-    this.counter += 1;
-    const id = `s${this.counter}`;
+    const id = this.nextId();
     const info: SessionInfo = {
       id,
       name: profile.name?.trim() || `${TYPE_LABELS[profile.type]} ${this.counter}`,
@@ -62,7 +70,45 @@ export class SessionManager extends EventEmitter<SessionEvents> {
       cwd: profile.cwd,
     };
     const { pty, startupCommand } = this.open(profile, info, cols, rows);
+    this.register(info, pty);
 
+    if (startupCommand) {
+      // 稍等 shell 起來再送，避免指令被還沒開始讀 stdin 的 shell 吃掉。
+      this.schedule(() => pty.write(`${startupCommand}\r`), STARTUP_DELAY_MS);
+    }
+
+    this.emit('created', info);
+    return info;
+  }
+
+  /**
+   * 工作流的節點：CLI 執行已經由編排層開好了，這裡只把它登記成一個普通的
+   * 工作階段 —— 右側清單、切換、關閉、紀錄、接手全部照舊。
+   */
+  adoptAgentRun(run: IAgentRun, spec: AdoptSpec): SessionInfo {
+    const info: SessionInfo = {
+      id: this.nextId(),
+      name: spec.name,
+      type: 'agent',
+      state: 'running',
+      logging: false,
+      cwd: spec.cwd,
+      agentKind: spec.kind,
+    };
+    this.watchAgentSessionId(run, info);
+    this.register(info, new AgentRunPty(run, spec.kind, spec.prompt));
+    this.emit('created', info);
+    return info;
+  }
+
+  private nextId(): string {
+    this.counter += 1;
+    return `s${this.counter}`;
+  }
+
+  /** 把 pty 接上事件流並收進清單；create 與 adoptAgentRun 共用。*/
+  private register(info: SessionInfo, pty: IPtyProcess): void {
+    const id = info.id;
     this.sessions.set(id, { info, pty });
 
     pty.onData((data) => this.emit('data', { id, data }));
@@ -74,14 +120,6 @@ export class SessionManager extends EventEmitter<SessionEvents> {
       }
       this.emit('exit', { id, exitCode });
     });
-
-    if (startupCommand) {
-      // 稍等 shell 起來再送，避免指令被還沒開始讀 stdin 的 shell 吃掉。
-      this.schedule(() => pty.write(`${startupCommand}\r`), STARTUP_DELAY_MS);
-    }
-
-    this.emit('created', info);
-    return info;
   }
 
   /**
@@ -114,7 +152,12 @@ export class SessionManager extends EventEmitter<SessionEvents> {
       cwd,
       allowEdits: profile.allowEdits,
     });
-    // CLI 一開始就會報 session id，記下來右側清單才能顯示「接手」。
+    this.watchAgentSessionId(run, info);
+    return new AgentRunPty(run, profile.kind, profile.prompt);
+  }
+
+  /** CLI 一開始就會報 session id，記下來右側清單才能顯示「接手」。*/
+  private watchAgentSessionId(run: IAgentRun, info: SessionInfo): void {
     run.onEvent((event) => {
       const sessionId =
         event.type === 'init' || event.type === 'result' ? event.sessionId : undefined;
@@ -122,7 +165,6 @@ export class SessionManager extends EventEmitter<SessionEvents> {
       info.agentSessionId = sessionId;
       this.emit('updated', { ...info });
     });
-    return new AgentRunPty(run, profile.kind, profile.prompt);
   }
 
   write(id: string, data: string): void {
