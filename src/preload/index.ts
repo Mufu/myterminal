@@ -20,9 +20,12 @@ const api: MyTerminalApi = {
   saveProfile: (profile) => ipcRenderer.invoke(IPC.saveProfile, profile),
   removeProfile: (name) => ipcRenderer.invoke(IPC.removeProfile, name),
 
-  workflowTemplates: () => ipcRenderer.invoke(IPC.workflowTemplates),
-  startWorkflow: (templateId, params) =>
-    ipcRenderer.invoke(IPC.startWorkflow, { templateId, params }),
+  listWorkflows: () => ipcRenderer.invoke(IPC.listWorkflows),
+  getWorkflow: (id) => ipcRenderer.invoke(IPC.getWorkflow, id),
+  saveWorkflow: (definition) => ipcRenderer.invoke(IPC.saveWorkflow, definition),
+  deleteWorkflow: (id) => ipcRenderer.invoke(IPC.deleteWorkflow, id),
+  startWorkflow: (workflowId, params) =>
+    ipcRenderer.invoke(IPC.startWorkflow, { workflowId, params }),
   resumeWorkflow: (runId, approved) =>
     ipcRenderer.invoke(IPC.resumeWorkflow, { runId, approved }),
   cancelWorkflow: (runId) => ipcRenderer.invoke(IPC.cancelWorkflow, runId),

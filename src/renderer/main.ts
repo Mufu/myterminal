@@ -203,8 +203,8 @@ new ProfileListView(
   (name) => void new RemoveProfileCommand(api, confirmRemove, name).execute(),
 );
 
-const workflowDialog = new WorkflowRunDialog((templateId, params) => {
-  void new StartWorkflowCommand(api, templateId, params).execute();
+const workflowDialog = new WorkflowRunDialog((workflowId, params) => {
+  void new StartWorkflowCommand(api, workflowId, params).execute();
 });
 $<HTMLButtonElement>('btn-workflow-run').addEventListener('click', () => workflowDialog.open());
 
@@ -233,4 +233,4 @@ window.addEventListener('resize', () => activeTerminal()?.resize());
 void api.list().then((sessions) => state.setSessions(sessions));
 void api.listProfiles().then((profiles) => state.setProfiles(profiles));
 void api.workflowRuns().then((runs) => state.setRuns(runs));
-void api.workflowTemplates().then((templates) => workflowDialog.setTemplates(templates));
+void api.listWorkflows().then((infos) => workflowDialog.setWorkflows(infos));

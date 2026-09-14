@@ -8,11 +8,13 @@ import type {
   StartWorkflowRequest,
 } from '../shared/ipc';
 import type { SavedProfile } from '../shared/profile';
+import type { WorkflowDefinition } from '../shared/workflow';
 import type { SessionManager } from './session-manager';
 import type { SessionLogger } from './session-logger';
 import type { ProfileStore } from './profile-store';
 import type { WorkflowService } from './workflow/workflow-service';
-import { findTemplate, templateInfos } from './workflow/templates';
+import type { WorkflowStore } from './workflow/workflow-store';
+import { findWorkflow, listWorkflows } from './workflow/catalog';
 
 /**
  * IPC 橋接層：刻意保持很薄。
@@ -24,6 +26,7 @@ export function registerIpc(
   logger: SessionLogger,
   profiles: ProfileStore,
   workflows: WorkflowService,
+  definitions: WorkflowStore,
   getWebContents: () => WebContents | null,
 ): void {
   const send = (channel: string, payload: unknown): void => {
@@ -87,11 +90,16 @@ export function registerIpc(
     pushProfiles();
   });
 
-  ipcMain.handle(IPC.workflowTemplates, () => templateInfos());
+  ipcMain.handle(IPC.listWorkflows, () => listWorkflows(definitions));
+  ipcMain.handle(IPC.getWorkflow, (_e, id: string) => findWorkflow(id, definitions));
+  ipcMain.handle(IPC.saveWorkflow, (_e, definition: WorkflowDefinition) =>
+    definitions.save(definition),
+  );
+  ipcMain.handle(IPC.deleteWorkflow, (_e, id: string) => definitions.remove(id));
 
   ipcMain.handle(IPC.startWorkflow, (_e, req: StartWorkflowRequest) => {
-    const definition = findTemplate(req.templateId);
-    if (!definition) throw new Error(`找不到工作流範本 ${req.templateId}`);
+    const definition = findWorkflow(req.workflowId, definitions);
+    if (!definition) throw new Error(`找不到工作流 ${req.workflowId}`);
     return workflows.start(definition, req.params);
   });
 

@@ -159,6 +159,35 @@ type WorkflowEdge = {
 
 `GraphCompiler.compile()` 第一件事就是跑它，不合法直接丟例外，不會編譯出半殘的圖。
 
+### 自訂工作流的儲存
+
+內建範本寫死在 `templates.ts`，使用者自己的工作流存成一份 JSON：
+
+```
+%APPDATA%\myterminal\workflows.json
+```
+
+就是一個 `WorkflowDefinition` 陣列，**跟範本同一種格式**，手動編輯也可以
+（形狀不對的項目讀的時候直接忽略，壞掉的 JSON 當成空清單）。管它的是
+[`workflow-store.ts`](../src/main/workflow/workflow-store.ts) 的 `WorkflowStore`，
+跟 `ProfileStore` 同一個寫法：讀寫都是注入的兩個函式，測試不碰檔案系統。
+
+- **存的時候會先驗證**：`validateWorkflow()` 有錯就丟例外（訊息是每行一條），整份不寫。
+- **不能蓋掉內建範本**：id 撞到 `TEMPLATES` 裡的就丟「不能覆蓋內建範本」。
+- 以 `id` upsert，覆寫時保留原本的順序。
+
+[`catalog.ts`](../src/main/workflow/catalog.ts) 把兩邊併起來，IPC 只問它 ——
+`listWorkflows()` 是內建的排前面、自訂的（`builtin: false`）接在後面，
+`findWorkflow(id)` 先找範本再找自訂的。所以 `workflow:start` 不必知道
+一個 id 是哪一種。
+
+| 頻道 | 參數 | 回傳 |
+| --- | --- | --- |
+| `workflow:list` | — | `WorkflowInfo[]`（`{ id, name, builtin }`） |
+| `workflow:get` | `id` | `WorkflowDefinition` 或 `undefined` |
+| `workflow:save` | `WorkflowDefinition` | — ，不合法就以驗證訊息 reject |
+| `workflow:delete` | `id` | — ，不存在就什麼都不做 |
+
 ## 執行時的狀態
 
 LangGraph 的 `Annotation` 有四個 channel（[`graph-compiler.ts`](../src/main/workflow/graph-compiler.ts)）：
@@ -230,9 +259,8 @@ schema 不用改就能撐住的部分：
 - **連線與出口**已經是 `edges[].port`，畫布上就是節點右邊的兩個接點。
 - **驗證**是純函式，畫布可以邊拉邊跑 `validateWorkflow()` 即時回報。
 
-畫布要另外加的東西（Phase 1 刻意沒做）：定義的儲存庫（現在只有寫死的範本，
-`TEMPLATES` 要變成一個像 `ProfileStore` 的 Repository）、節點屬性面板、
-以及連線的路徑計算。**執行這一側完全不用動**：畫布存出來的還是同一份
+定義的儲存庫已經有了（上面的[自訂工作流的儲存](#自訂工作流的儲存)），畫布要另外加的
+是節點屬性面板與連線的路徑計算。**執行這一側完全不用動**：畫布存出來的還是同一份
 `WorkflowDefinition`，`GraphCompiler` 照樣編譯。
 
 Phase 1 也刻意沒有的：平行節點（LangGraph 的 `Send`）、`{{節點.text}}` 與

@@ -115,14 +115,16 @@ AGENT_E2E_OK
 ## 工作流
 
 把「跑一次 agent」串成「跑一串 agent，中間可以分支、可以問人」。
-右側清單最下面那一段就是它：按「執行範本」選一個範本、填任務與工作目錄就開始跑。
+右側清單最下面那一段就是它：按「執行工作流」選一個工作流、填任務與工作目錄就開始跑。
 
 **每個工作流都跑在 LangGraph 上**（`@langchain/langgraph`）——
 一份 JSON 定義編譯成真的 `StateGraph`，沒有自己寫的排程器。
 JSON schema、節點型別、怎麼加一種新節點、Phase 2 的畫布會加什麼，
 見 [`docs/WORKFLOW.md`](docs/WORKFLOW.md)。
 
-目前只有一個內建範本 **「實作 → 審查 → 批准」**：
+內建範本只有一個 **「實作 → 審查 → 批准」**（自己存的工作流放在
+`%APPDATA%\myterminal\workflows.json`，跟範本同一種格式，見
+[`docs/WORKFLOW.md`](docs/WORKFLOW.md) 的「自訂工作流的儲存」）：
 
 ```
 開始 → 實作 ──ok──→ 審查 ──ok──→ 檢查 ──PASS──→ 批准 ──批准──→ 結束

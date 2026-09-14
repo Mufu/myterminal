@@ -1,4 +1,4 @@
-import type { WorkflowTemplateInfo } from '../shared/workflow';
+import type { WorkflowInfo } from '../shared/workflow';
 import type { DialogPort } from './ports';
 
 const $ = <T extends HTMLElement>(id: string): T => {
@@ -8,8 +8,8 @@ const $ = <T extends HTMLElement>(id: string): T => {
 };
 
 /**
- * 範本的啟動參數驗證。工作目錄是必填的 ——
- * 這個範本的 agent 真的會改檔案，不能讓它掉進家目錄。
+ * 工作流的啟動參數驗證。工作目錄是必填的 ——
+ * 這些 agent 真的會改檔案，不能讓它掉進家目錄。
  */
 export function validateRunParams(params: { task: string; cwd: string }): string[] {
   const errors: string[] = [];
@@ -21,24 +21,35 @@ export function validateRunParams(params: { task: string; cwd: string }): string
 /** WorkflowRunDialog：跟 NewConnectionDialog 同一個寫法，對外只有 DialogPort.open()。*/
 export class WorkflowRunDialog implements DialogPort {
   private readonly dialog = $<HTMLDialogElement>('workflow-run');
-  private readonly template = $<HTMLSelectElement>('w-template');
+  private readonly workflow = $<HTMLSelectElement>('w-template');
   private readonly task = $<HTMLTextAreaElement>('w-task');
   private readonly cwd = $<HTMLInputElement>('w-cwd');
   private readonly errors = $<HTMLParagraphElement>('w-errors');
 
   constructor(
-    private readonly onStart: (templateId: string, params: Record<string, string>) => void,
+    private readonly onStart: (workflowId: string, params: Record<string, string>) => void,
   ) {
     $('w-ok').addEventListener('click', (event) => this.submit(event));
   }
 
-  setTemplates(templates: WorkflowTemplateInfo[]): void {
-    this.template.textContent = '';
-    for (const { id, name } of templates) {
-      const option = document.createElement('option');
-      option.value = id;
-      option.textContent = name;
-      this.template.appendChild(option);
+  /** 內建範本與自訂工作流各自一個分組；沒有自訂的就不要那個空分組。*/
+  setWorkflows(infos: WorkflowInfo[]): void {
+    this.workflow.textContent = '';
+    for (const [label, builtin] of [
+      ['內建', true],
+      ['自訂', false],
+    ] as const) {
+      const group = infos.filter((info) => info.builtin === builtin);
+      if (group.length === 0) continue;
+      const optgroup = document.createElement('optgroup');
+      optgroup.label = label;
+      for (const { id, name } of group) {
+        const option = document.createElement('option');
+        option.value = id;
+        option.textContent = name;
+        optgroup.appendChild(option);
+      }
+      this.workflow.appendChild(optgroup);
     }
   }
 
@@ -58,6 +69,6 @@ export class WorkflowRunDialog implements DialogPort {
       return;
     }
     this.errors.textContent = '';
-    this.onStart(this.template.value, params);
+    this.onStart(this.workflow.value, params);
   }
 }

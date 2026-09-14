@@ -3,6 +3,7 @@ import type { IAgentRun, IAgentRunner } from '../../src/main/agent-runner';
 import type { AdoptSpec } from '../../src/main/session-manager';
 import type { IWorkflowSessions, Timers } from '../../src/main/workflow/graph-compiler';
 import type { SessionInfo } from '../../src/shared/session';
+import type { WorkflowDefinition } from '../../src/shared/workflow';
 import { FakeAgentRun } from './fake-agent';
 
 /** 依照呼叫順序回答的 runner；回傳 null 代表這次永遠不回答 (測逾時／取消用)。*/
@@ -88,3 +89,26 @@ export async function until(predicate: () => boolean): Promise<void> {
   }
   if (!predicate()) throw new Error('等不到預期的狀態');
 }
+
+/** 最小的合法工作流：開始 → agent → 結束。存取相關的測試只需要這麼多。*/
+export const minimalWorkflow = (id: string, name = id): WorkflowDefinition => ({
+  version: 1,
+  id,
+  name,
+  nodes: [
+    { id: 'start', type: 'start', label: '開始', position: { x: 0, y: 0 } },
+    {
+      id: 'a',
+      type: 'agent',
+      label: 'a',
+      position: { x: 180, y: 0 },
+      config: { kind: 'claude', prompt: 'x', allowEdits: false },
+    },
+    { id: 'end', type: 'end', label: '結束', position: { x: 360, y: 0 } },
+  ],
+  edges: [
+    { from: 'start', to: 'a' },
+    { from: 'a', to: 'end', port: 'ok' },
+    { from: 'a', to: 'end', port: 'fail' },
+  ],
+});

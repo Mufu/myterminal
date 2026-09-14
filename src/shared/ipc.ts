@@ -16,7 +16,10 @@ export const IPC = {
   listProfiles: 'profiles:list',
   saveProfile: 'profiles:save',
   removeProfile: 'profiles:remove',
-  workflowTemplates: 'workflow:templates',
+  listWorkflows: 'workflow:list',
+  getWorkflow: 'workflow:get',
+  saveWorkflow: 'workflow:save',
+  deleteWorkflow: 'workflow:delete',
   startWorkflow: 'workflow:start',
   resumeWorkflow: 'workflow:resume',
   cancelWorkflow: 'workflow:cancel',
@@ -63,8 +66,8 @@ export interface StartLogResult {
 }
 
 export interface StartWorkflowRequest {
-  templateId: string;
-  /** 範本的啟動參數，樣板裡用 {{params.x}} 取用。*/
+  workflowId: string;
+  /** 工作流的啟動參數，樣板裡用 {{params.x}} 取用。*/
   params: Record<string, string>;
 }
 

@@ -8,6 +8,7 @@ import { fileProfileStore } from './profile-store';
 import { defaultAgentRunners } from './agent-runner';
 import { fileCheckpointSaver } from './workflow/json-file-saver';
 import { WorkflowService, fileRunStore } from './workflow/workflow-service';
+import { fileWorkflowStore } from './workflow/workflow-store';
 import { registerIpc } from './ipc';
 
 let win: BrowserWindow | null = null;
@@ -32,8 +33,11 @@ const workflows = new WorkflowService({
   ...fileRunStore(join(app.getPath('userData'), 'workflow-runs.json')),
 });
 
+// 自訂工作流的定義：畫布存進去、執行的時候從這裡找。
+const workflowDefinitions = fileWorkflowStore(join(app.getPath('userData'), 'workflows.json'));
+
 // 關窗之後 pty 的 exit 事件才可能送達，那時 webContents 已經被銷毀。
-registerIpc(manager, logger, profiles, workflows, () =>
+registerIpc(manager, logger, profiles, workflows, workflowDefinitions, () =>
   win && !win.isDestroyed() ? win.webContents : null,
 );
 

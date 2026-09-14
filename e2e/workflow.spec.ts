@@ -35,7 +35,7 @@ async function launch(userData: string): Promise<Launched> {
   return { app, window };
 }
 
-/** 開「執行範本」對話框，填任務與工作目錄，按開始。*/
+/** 開「執行工作流」對話框，選內建範本，填任務與工作目錄，按開始。*/
 async function startTemplate(window: Page, cwd: string): Promise<void> {
   await window.click('#btn-workflow-run');
   await expect(window.locator('#workflow-run')).toBeVisible();

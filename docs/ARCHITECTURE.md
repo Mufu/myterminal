@@ -263,8 +263,11 @@ renderer → main（`ipcMain.handle`，全部回傳 Promise）：
 | `profiles:list` | — | `SavedProfile[]` |
 | `profiles:save` | `SavedProfile` | — |
 | `profiles:remove` | `name` | — |
-| `workflow:templates` | — | `WorkflowTemplateInfo[]` |
-| `workflow:start` | `{ templateId, params }` | `runId` |
+| `workflow:list` | — | `WorkflowInfo[]`（內建範本 + 自訂） |
+| `workflow:get` | `id` | `WorkflowDefinition \| undefined` |
+| `workflow:save` | `WorkflowDefinition` | — （不合法就 reject） |
+| `workflow:delete` | `id` | — |
+| `workflow:start` | `{ workflowId, params }` | `runId` |
 | `workflow:resume` | `{ runId, approved }` | — |
 | `workflow:cancel` | `runId` | — |
 | `workflow:runs` | — | `RunState[]` |
@@ -323,6 +326,7 @@ main → renderer（`webContents.send`）：
 | `GraphCompiler` | `ScriptedRunner` / `FakeSessions` / `ManualTimers` + `MemorySaver` | `test/fakes/fake-workflow.ts` |
 | `JsonFileSaver` | 真的暫存目錄（`mkdtempSync`），另一半是注入的 `SaverFs` | `test/json-file-saver.spec.ts` |
 | `WorkflowService` | 同上三個 + 記憶體字串當 `workflow-runs.json` | `test/workflow-service.spec.ts` |
+| `WorkflowStore` | 假的讀／寫函式（記憶體裡的一個字串） | `test/workflow-store.spec.ts` |
 
 工作流這一層刻意**用真的 LangGraph 測**（`MemorySaver` 或真的 `JsonFileSaver`）：
 要驗的正是「編譯出來的圖真的會這樣走」，換成假的圖就什麼都沒測到。

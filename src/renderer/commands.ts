@@ -154,15 +154,15 @@ export class TakeOverCommand implements ICommand {
   }
 }
 
-/** 「執行範本」對話框按下開始：把範本與參數交給 main，之後全部走 workflow:changed。*/
+/** 「執行工作流」對話框按下開始：把工作流與參數交給 main，之後全部走 workflow:changed。*/
 export class StartWorkflowCommand implements ICommand {
   constructor(
     private readonly api: MyTerminalApi,
-    private readonly templateId: string,
+    private readonly workflowId: string,
     private readonly params: Record<string, string>,
   ) {}
   async execute(): Promise<void> {
-    await this.api.startWorkflow(this.templateId, this.params);
+    await this.api.startWorkflow(this.workflowId, this.params);
   }
 }
 

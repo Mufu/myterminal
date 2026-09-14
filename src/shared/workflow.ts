@@ -177,8 +177,9 @@ export interface RunState {
   error?: string;
 }
 
-/** 內建範本在清單上的樣子。*/
-export interface WorkflowTemplateInfo {
+/** 工作流在清單上的樣子；內建範本與自訂工作流共用一種。*/
+export interface WorkflowInfo {
   id: string;
   name: string;
+  builtin: boolean;
 }

@@ -1,4 +1,4 @@
-import type { WorkflowDefinition, WorkflowTemplateInfo } from '../../shared/workflow';
+import type { WorkflowDefinition, WorkflowInfo } from '../../shared/workflow';
 
 /**
  * 內建範本。就是一份 WorkflowDefinition —— 跟使用者之後在畫布上拉出來的東西
@@ -84,8 +84,8 @@ const IMPLEMENT_REVIEW_APPROVE: WorkflowDefinition = {
 
 export const TEMPLATES: readonly WorkflowDefinition[] = [IMPLEMENT_REVIEW_APPROVE];
 
-export function templateInfos(): WorkflowTemplateInfo[] {
-  return TEMPLATES.map(({ id, name }) => ({ id, name }));
+export function templateInfos(): WorkflowInfo[] {
+  return TEMPLATES.map(({ id, name }) => ({ id, name, builtin: true }));
 }
 
 export function findTemplate(id: string): WorkflowDefinition | undefined {
