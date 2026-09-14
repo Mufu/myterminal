@@ -149,8 +149,9 @@ type WorkflowEdge = {
 
 ### 驗證
 
-`validateWorkflow(def)` 回傳錯誤訊息陣列（空陣列代表合法），十條規則：
+`validateWorkflow(def)` 回傳錯誤訊息陣列（空陣列代表合法），十一條規則：
 
+0. 名稱不能是空白 —— `工作流名稱不能是空的`
 1. 剛好一個 `start` 節點
 2. 至少一個 `end` 節點
 3. 每條連線的兩端節點都存在
@@ -181,7 +182,11 @@ type WorkflowEdge = {
 ```
 
 就是一個 `WorkflowDefinition` 陣列，**跟範本同一種格式**，手動編輯也可以
-（形狀不對的項目讀的時候直接忽略，壞掉的 JSON 當成空清單）。管它的是
+（壞掉的 JSON 當成空清單）。讀的時候會檢查**形狀**：每個節點要有
+`id` / `type` / `label` / `position.x` / `position.y`（agent、condition、approval 還要有 `config`），
+每條連線要有 `from` / `to`，不對的那一筆整個忽略 —— 不然畫布會在
+`node.position.x` 上丟例外，一片空白。**只檢查形狀**：提示留白這種
+`validateWorkflow` 才抱怨的問題仍然列得出來、改得了。管它的是
 [`workflow-store.ts`](../src/main/workflow/workflow-store.ts) 的 `WorkflowStore`，
 跟 `ProfileStore` 同一個寫法：讀寫都是注入的兩個函式，測試不碰檔案系統。
 
@@ -222,7 +227,7 @@ type WorkflowEdge = {
 
 ### 操作
 
-- **加節點**：調色盤的「＋ Agent／條件／批准／結束」。新節點放在**最右邊那個節點的右側**，
+- **加節點**：調色盤的「＋ Agent／條件／批准／結束」。新節點放在**最右邊那個節點的右側**（排到 x 超過 1000 就換下一行），
   拖到你要的位置（座標會吸附到 10px 的格線上）。id 自動取 `agent-1`、`condition-2` 這種，
   刪掉之後號碼會補回來。**開始節點刪不掉**。
 - **接線**：從節點**右側的出口**圓點拉到另一個節點**左側的入口**圓點（放在卡片上也算）。
