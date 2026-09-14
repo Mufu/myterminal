@@ -15,12 +15,16 @@ flowchart TB
     ProfileListView --> Commands
     WorkflowListView --> Commands
     WorkflowRunDialog --> Commands
+    WorkflowEditorView --> Commands
+    WorkflowEditorView --> WorkflowEditorModel
     Commands --> AppState
+    Commands --> WorkflowEditorModel
     Commands --> TerminalView
     AppState -. 訂閱通知 .-> Toolbar
     AppState -. 訂閱通知 .-> SessionListView
     AppState -. 訂閱通知 .-> ProfileListView
     AppState -. 訂閱通知 .-> WorkflowListView
+    WorkflowEditorModel -. 訂閱通知 .-> WorkflowEditorView
     NewConnectionDialog --> Commands
     InputPanel --> Commands
   end
@@ -73,12 +77,28 @@ renderer 拿不到 `ipcRenderer` 也拿不到 Node，只看得到 `preload` 白�
 | **Dependency Injection** | `SessionManager`、`SessionLogger`、每個 `Command` 的建構子 | 所有跟外界（行程、檔案系統、剪貼簿、DOM）接觸的東西都從建構子傳進來，預設值是正式實作，測試傳假的。 |
 | **Observer** | `SessionManager`（typed `EventEmitter`）、`AppState`（`subscribe`） | main 端 pty 的輸出是推送式的；renderer 端多個 View 要對同一份狀態反應。兩邊都用訂閱而不是互相持有參考。 |
 | **Decorator / Observer** | `main/session-logger.ts` | 紀錄功能掛在 `SessionManager` 的 `data` 事件上，不改變資料流本身，也不需要 `SessionManager` 知道紀錄這回事。 |
-| **Builder / Interpreter** | `main/workflow/graph-compiler.ts` | 「定義」與「執行」分成兩件事：JSON 是資料，`compile()` 把它翻譯成 LangGraph 的 `StateGraph`。加一種節點型別只要在一個 `switch` 加一個 `case`，跟 `ShellFactory` 是同一個手法。Phase 2 的畫布只動資料那一半，執行這一半完全不用改。 |
+| **Builder / Interpreter** | `main/workflow/graph-compiler.ts` | 「定義」與「執行」分成兩件事：JSON 是資料，`compile()` 把它翻譯成 LangGraph 的 `StateGraph`。加一種節點型別只要在一個 `switch` 加一個 `case`，跟 `ShellFactory` 是同一個手法。畫布編輯器只動資料那一半，執行這一半完全不用改。 |
 | **Repository** | `main/profile-store.ts` | 已儲存的連線設定就是一份 JSON，`list` / `save` / `remove` 三個方法把「存在哪、怎麼序列化、檔案壞了怎麼辦」包在裡面。IPC 與 renderer 只看得到 `SavedProfile[]`，換成別的儲存方式不會影響到它們。 |
-| **Command** | `renderer/commands.ts` | 工具列七個按鈕各是一個 `ICommand`。按鈕只負責「按下去就 `execute()`」，行為本身不碰 DOM，可以單獨測試。 |
+| **Command** | `renderer/commands.ts` | 工具列七個按鈕各是一個 `ICommand`。按鈕只負責「按下去就 `execute()`」，行為本身不碰 DOM，可以單獨測試。畫布編輯器的開啟／關閉／儲存／刪除／儲存並執行也是同一套。 |
 
 刻意**沒有**引入的東西：設定系統、外掛架構、狀態管理框架、UI 框架。
-renderer 是純 TypeScript + DOM。
+renderer 是純 TypeScript + DOM —— 連工作流的畫布也是（節點是絕對定位的
+`<div>`，連線是一層 `<svg>` 的 `<path>`，沒有畫布／流程圖套件）。
+
+renderer 的模組：
+
+| 檔案 | 做什麼 |
+| --- | --- |
+| `main.ts` | 組裝：建立 View 與 Command、訂閱 `window.myterminal` 的事件 |
+| `app-state.ts` | 唯一的狀態來源（工作階段、設定檔、工作流執行、主畫面是終端機還是畫布） |
+| `commands.ts` | 每個按鈕一個 `ICommand` |
+| `ports.ts` | Command 需要的最小介面（終端機、剪貼簿、對話框、確認） |
+| `terminal-view.ts` | 一個工作階段一個 xterm.js |
+| `session-list-view.ts` / `profile-list-view.ts` / `workflow-list-view.ts` | 右側三段清單，都訂閱 `AppState` |
+| `new-connection-dialog.ts` / `workflow-run-dialog.ts` | 兩個 `<dialog>` |
+| `input-panel.ts` / `toolbar.ts` / `theme.ts` | 輸入面板、工具列、主題 |
+| `workflow-editor-model.ts` | 畫布的狀態與規則（純物件，不碰 DOM） |
+| `workflow-editor-view.ts` | 畫布的 DOM 殼：卡片、連線、屬性面板、滑鼠 |
 
 ## 主題
 
@@ -175,7 +195,7 @@ flowchart LR
 
 | 元件 | 職責 |
 | --- | --- |
-| **`shared/workflow.ts`** | 定義的型別與 `validateWorkflow()`。純資料 + 純函式，是唯一的真相來源（Phase 2 的畫布編輯的也是它，所以 schema 已經帶著節點 `position`）。 |
+| **`shared/workflow.ts`** | 定義的型別與 `validateWorkflow()`。純資料 + 純函式，是唯一的真相來源（畫布編輯器編輯的也是它，所以 schema 帶著節點 `position`）。 |
 | **`main/workflow/graph-compiler.ts`** | 唯一知道 LangGraph 的地方：`compile(def, deps)` 把定義變成 `StateGraph`。節點 → `addNode`，`start` 的單一連線 → `addEdge`，有出口的節點 → `addConditionalEdges` + 只看 `lastPort` 的 router。 |
 | **`main/workflow/json-file-saver.ts`** | `BaseCheckpointSaver` 的實作，一個執行一個 JSON 檔。 |
 | **`main/workflow/workflow-service.ts`** | Observer，跟 `SessionManager` 同一個寫法。`start` / `resume` / `cancel` / `list`，以及 `RunState` 的持久化。 |
@@ -184,7 +204,7 @@ flowchart LR
 ### 為什麼是 LangGraph 而不是自己寫迴圈
 
 [`AGENT-SPIKE.md`](AGENT-SPIKE.md) 第 9 節說「要到分支、平行、人工介入節點才值得付
-LangGraph 的抽象成本」。Phase 1 的範本同時要**分支**（審查 PASS / FAIL）、**迴圈**
+LangGraph 的抽象成本」。內建範本同時要**分支**（審查 PASS / FAIL）、**迴圈**
 （修正 → 再審查，有次數上限）與**人工介入**（批准），三樣都齊了。真正省下來的是
 「中斷之後怎麼接回去」：`interrupt()` + checkpointer 讓 app 關掉再開還能從批准那一步
 繼續，這件事自己寫會是一整套狀態機序列化。

@@ -1,8 +1,8 @@
 import type { WorkflowDefinition, WorkflowInfo } from '../../shared/workflow';
 
 /**
- * 內建範本。就是一份 WorkflowDefinition —— 跟使用者之後在畫布上拉出來的東西
- * 是同一種資料，沒有第二套格式。position 是給 Phase 2 的畫布用的，
+ * 內建範本。就是一份 WorkflowDefinition —— 跟使用者在畫布上拉出來的東西
+ * 是同一種資料，沒有第二套格式。position 是給畫布用的，
  * 由左到右排，只有「修正」掉到下面那一排 (它是回頭的那條線)。
  */
 const IMPLEMENT_REVIEW_APPROVE: WorkflowDefinition = {

@@ -4,8 +4,8 @@ import { findRole } from './roles';
 
 /**
  * 工作流定義 (version 1)：純 JSON，是唯一的真相來源 ——
- * 編排層 (GraphCompiler) 與之後 Phase 2 的畫布都只看這一份。
- * `position` 目前沒有人讀，但畫布要靠它擺節點，所以現在就寫進 schema。
+ * 編排層 (GraphCompiler) 與畫布編輯器都只看這一份。
+ * `position` 是畫布上的座標，執行那一側不看它。
  */
 
 export type WorkflowNodeType = 'start' | 'end' | 'agent' | 'condition' | 'approval';

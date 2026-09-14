@@ -119,8 +119,16 @@ AGENT_E2E_OK
 
 **每個工作流都跑在 LangGraph 上**（`@langchain/langgraph`）——
 一份 JSON 定義編譯成真的 `StateGraph`，沒有自己寫的排程器。
-JSON schema、節點型別、怎麼加一種新節點、Phase 2 的畫布會加什麼，
-見 [`docs/WORKFLOW.md`](docs/WORKFLOW.md)。
+JSON schema、節點型別、怎麼加一種新節點，見
+[`docs/WORKFLOW.md`](docs/WORKFLOW.md)。
+
+自己的工作流不必手寫 JSON：右側「工作流」那一列的**「編輯」**會打開一張
+**LabVIEW 風格的畫布**——從上面的調色盤放下 Agent／條件／批准／結束節點，
+拖到想要的位置，從節點右側的出口（成功／失敗、是／否、批准／退回）拉一條線到
+另一個節點左側的入口就是一條連線，右側的屬性面板設每個 agent 節點的執行者
+（claude／codex）、角色與提示。按「儲存」就是一份跟內建範本同格式的自訂工作流
+（存進 `%APPDATA%\myterminal\workflows.json`），「儲存並執行」則是存完直接開
+執行對話框。用法與規則見 [`docs/WORKFLOW.md`](docs/WORKFLOW.md) 的「畫布編輯器」。
 
 內建範本只有一個 **「實作 → 審查 → 批准」**（自己存的工作流放在
 `%APPDATA%\myterminal\workflows.json`，跟範本同一種格式，見
@@ -269,7 +277,7 @@ npm install      # 安裝相依套件
 npm run dev      # 開發模式（electron-vite，支援熱更新）
 npm test         # 單元測試（Vitest）
 npm run build    # 建置到 out/
-npm run e2e      # 先 build 再跑 Playwright 冒煙測試，截圖寫到 test-results/smoke.png
+npm run e2e      # 先 build 再跑 Playwright 端到端測試（冒煙、設定檔、主題、畫布編輯器），截圖寫到 test-results/
 npm run e2e:ssh  # SSH 端到端測試，要先開好本機 sshd，見「本機 SSH 測試環境」
 npm run e2e:agent # Agent 任務端到端測試，會真的呼叫 claude / codex（要登入、會花錢）
 npm run e2e:workflow # 工作流範本端到端測試，會真的呼叫 claude（要登入、會花錢）
@@ -305,6 +313,10 @@ npm run dist
   安裝版與 `win-unpacked` 沒有這段等待。
 - **沒有簽章、沒有自訂圖示**：用 Electron 預設圖示；未簽章的 exe 第一次執行
   Windows SmartScreen 會跳警告，選「仍要執行」即可。
+
+`e2e/editor.spec.ts` 是畫布編輯器的端到端：加一個 agent 節點、設角色、用滑鼠把
+三個節點接起來、儲存，再確認執行對話框的「自訂」分組看得到它。它不呼叫任何 CLI，
+所以不花錢，跟冒煙測試一樣屬於預設的 `npm run e2e`（截圖在 `test-results/editor.png`）。
 
 `e2e/packaged.spec.ts` 會用 `dist/win-unpacked/myterminal.exe` 重跑一次冒煙測試，
 確認 asar 外面的 node-pty 真的能開出 PowerShell；沒有打包過的話這個測試會自動 skip。

@@ -1,4 +1,4 @@
-# 工作流（Phase 1）
+# 工作流
 
 把「跑一次 agent」串成「跑一串 agent，中間可以分支、可以問人」。
 
@@ -6,8 +6,8 @@
 排程器：`GraphCompiler` 把一份 JSON 定義編譯成真的 `StateGraph`，節點之間怎麼走、
 狀態怎麼合併、中斷之後怎麼接回去，全部是 LangGraph 的工作。
 
-Phase 1 只有一個內建範本與一份清單畫面。**Phase 2 會是 LabVIEW 風格的拖拉畫布**，
-畫布編輯的就是下面這份 JSON —— 所以 schema 現在就帶著節點座標。
+內建範本一個，加上一張 **LabVIEW 風格的拖拉畫布**（見下面的[畫布編輯器](#畫布編輯器)）——
+畫布編輯的就是下面這份 JSON，所以 schema 一開始就帶著節點座標。
 
 ## JSON schema（version 1）
 
@@ -26,7 +26,7 @@ type WorkflowNode = {
   id: string;
   type: 'start' | 'end' | 'agent' | 'condition' | 'approval';
   label: string;              // 畫面上與畫布上顯示的名字
-  position: { x: number; y: number };   // Phase 2 的畫布用
+  position: { x: number; y: number };   // 畫布上的位置
   config: ...;                // 依 type 而定，start / end 沒有 config
 };
 
@@ -188,6 +188,77 @@ type WorkflowEdge = {
 | `workflow:save` | `WorkflowDefinition` | — ，不合法就以驗證訊息 reject |
 | `workflow:delete` | `id` | — ，不存在就什麼都不做 |
 
+## 畫布編輯器
+
+自己的工作流不必手寫 JSON。右側「工作流」那一列的**「編輯」**打開畫布，
+它編輯的就是上面那份 `WorkflowDefinition` —— 存出來跟內建範本是同一種東西。
+
+```
+[開始]───────→[ Agent 實作 ]──成功──→[ 條件 檢查 ]──是──→[ 結束 ]
+                  工程師 claude ●失敗                  ●否
+```
+
+### 畫面
+
+| 區塊 | 內容 |
+| --- | --- |
+| 上方那一條 | 「← 回終端機」、工作流下拉（＋新工作流／內建／自訂）、名稱、調色盤、刪除、儲存、儲存並執行 |
+| 中間 | 畫布：節點卡片與連線。按著空白處拖曳可以平移 |
+| 右側 | 屬性面板：選到的節點（或連線）的設定 |
+| 上方那一條下面 | 驗證與儲存的錯誤，一行一條；沒有錯誤時不出現 |
+
+### 操作
+
+- **加節點**：調色盤的「＋ Agent／條件／批准／結束」。新節點放在**最右邊那個節點的右側**，
+  拖到你要的位置（座標會吸附到 10px 的格線上）。id 自動取 `agent-1`、`condition-2` 這種，
+  刪掉之後號碼會補回來。**開始節點刪不掉**。
+- **接線**：從節點**右側的出口**圓點拉到另一個節點**左側的入口**圓點（放在卡片上也算）。
+  規則跟 `validateWorkflow` 一致：不能接回自己、不能接到開始節點、出口必須是自己這個
+  型別有的那幾個。**同一個出口再拉一次是「改接」不是多一條**（出口只能有一條線），
+  這一點跟 LabVIEW 一樣。接不起來時原因會在上面顯示三秒。
+- **刪東西**：點一下節點或連線選起來（連線的感應範圍比看到的粗），按 `Delete` 或
+  `Backspace`。刪節點會一起刪掉它的連線，以及別的節點對它的 `resumeFrom` / `source` 參照。
+- **改內容**：選起來之後在右側面板改。
+
+### 屬性面板
+
+| 節點 | 可以設的東西 |
+| --- | --- |
+| 全部 | 節點 id（唯讀，提示裡用 `{{<id>.text}}` 取得它的輸出）、名稱 |
+| `agent` | 執行者（claude／codex）、角色、提示、工作目錄、允許修改檔案、接續對話（`resumeFrom`）、最多幾次、逾時 |
+| `condition` | 看哪個 agent 節點的輸出、判斷方式（最後一行等於／符合正規式）與值 |
+| `approval` | 要問的問題 |
+
+換**角色**時「允許修改檔案」會跟著跳到那個角色的預設值（跟「新連接」對話框一樣），
+之後還是可以自己改。角色的清單見上面的[角色](#角色)。
+
+### 儲存
+
+按「儲存」會先在本地跑一次 `validateWorkflow()`，有錯就列在上面且不送出去；
+沒錯才走 `workflow:save`（main 存檔前還會再驗證一次）。
+
+- **內建範本存的是副本**：載入的是內建範本時，儲存會自動換一個新 id 並在名字後面加
+  「 (副本)」，接下來編輯的就是那份副本 —— 範本永遠不會被蓋掉（main 那邊本來就不讓覆蓋）。
+- 存進 `%APPDATA%\myterminal\workflows.json`，跟手寫的自訂工作流同一個檔案、同一種格式，
+  細節見上面的[自訂工作流的儲存](#自訂工作流的儲存)。
+- 存完「刪除」才會亮（只有自訂工作流刪得掉），而且執行對話框的「自訂」分組馬上看得到它。
+- **「儲存並執行」**＝存起來 + 打開執行對話框並預選這一個。
+
+### 程式碼
+
+沒有用任何畫布／流程圖套件：節點是絕對定位的 `<div>`，連線是一層 `<svg>` 裡的
+`<path>`（立方貝茲，另有一條加粗的透明線負責吃滑鼠）。
+
+| 檔案 | 責任 |
+| --- | --- |
+| [`workflow-editor-model.ts`](../src/renderer/workflow-editor-model.ts) | 狀態與規則：id、座標吸附、接線合不合法、刪節點要清掉什麼、接點座標。跟 `AppState` 同一套 Observer，**完全不碰 DOM** |
+| [`workflow-editor-view.ts`](../src/renderer/workflow-editor-view.ts) | DOM 殼：卡片、連線、屬性面板、滑鼠與鍵盤 |
+| [`commands.ts`](../src/renderer/commands.ts) | 開啟／關閉／儲存／刪除／儲存並執行，各一個 `ICommand` |
+
+規則都在 model 裡，所以 vitest 的 node 環境測得到
+（`test/workflow-editor-model.spec.ts`）；畫面與滑鼠則由
+`e2e/editor.spec.ts` 顧（不呼叫任何 CLI，所以不花錢）。
+
 ## 執行時的狀態
 
 LangGraph 的 `Annotation` 有四個 channel（[`graph-compiler.ts`](../src/main/workflow/graph-compiler.ts)）：
@@ -251,20 +322,13 @@ Checkpointer 是 `JsonFileSaver`：一個執行一個檔案，
 驗證、router、持久化、畫面都不必改 —— 畫面是照 `RunState.nodes` 畫的，
 新節點自動會有一列。
 
-## Phase 2（畫布）會加什麼
+## 還沒做的
 
-schema 不用改就能撐住的部分：
+平行節點（LangGraph 的 `Send`）、`{{節點.text}}` 與 `{{params.x}}` 以外的變數、
+子圖、排程。畫布這一側：復原／重做、框選、縮放。
 
-- **節點座標**已經在 `position` 裡，畫布直接讀寫。
-- **連線與出口**已經是 `edges[].port`，畫布上就是節點右邊的兩個接點。
-- **驗證**是純函式，畫布可以邊拉邊跑 `validateWorkflow()` 即時回報。
-
-定義的儲存庫已經有了（上面的[自訂工作流的儲存](#自訂工作流的儲存)），畫布要另外加的
-是節點屬性面板與連線的路徑計算。**執行這一側完全不用動**：畫布存出來的還是同一份
-`WorkflowDefinition`，`GraphCompiler` 照樣編譯。
-
-Phase 1 也刻意沒有的：平行節點（LangGraph 的 `Send`）、`{{節點.text}}` 與
-`{{params.x}}` 以外的變數、子圖、排程。
+加畫布時**執行那一側一行都沒改** —— 畫布存出來的還是同一份 `WorkflowDefinition`，
+`GraphCompiler` 照樣編譯。
 
 ## Windows 上的坑
 
