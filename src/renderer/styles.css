@@ -1568,11 +1568,28 @@ html[data-theme='warm'] .session-item.active .session-dot {
   color: var(--text);
 }
 
+/* 兩欄：左邊是會被 … 收掉的摘要，右邊把位子讓給絕對定位的出口文字。*/
 .wf-node-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 6px;
+  padding: 6px 8px;
+}
+
+.wf-summary {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 8px;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* 出口文字最多兩個字，這個寬度在三個主題下都夠。*/
+.wf-port-space {
+  width: 28px;
 }
 
 .wf-node-body .role-tag.empty {

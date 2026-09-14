@@ -23,8 +23,9 @@ import { NODE_HEADER, NODE_WIDTH, PORT_LABELS, PORT_ROW } from './workflow-edito
 const SVG_NS = 'http://www.w3.org/2000/svg';
 /** svg 給一個夠大的固定尺寸就好，畫布靠平移看不同的地方。*/
 const SVG_SIZE = 4000;
-/** 連線控制點往外拉多遠。*/
-const BEND = 60;
+/** 連線控制點往外拉多遠：最少這麼多，最多這麼多。*/
+const MIN_BEND = 16;
+const MAX_BEND = 60;
 
 /** 卡片標頭上的型別。*/
 export const TYPE_LABELS: Record<WorkflowNodeType, string> = {
@@ -35,9 +36,19 @@ export const TYPE_LABELS: Record<WorkflowNodeType, string> = {
   approval: '批准',
 };
 
-/** 連線是一條立方貝茲：兩端都先水平拉出去，看起來才像接線而不是折線。*/
+/**
+ * 連線是一條立方貝茲：兩端都先水平拉出去，看起來才像接線而不是折線。
+ * 控制點跟著水平距離縮放 —— 固定值在節點靠得很近時 (內建範本相鄰兩個節點
+ * 只差 20px) 會把線拉成一個 S 形的圈。往回接的線則反過來要拉得更開，
+ * 繞出去的那個圈才看得出是一條回頭的線。
+ */
 export function edgePath(from: NodePosition, to: NodePosition): string {
-  return `M ${from.x} ${from.y} C ${from.x + BEND} ${from.y}, ${to.x - BEND} ${to.y}, ${to.x} ${to.y}`;
+  const dx = to.x - from.x;
+  const bend =
+    dx >= 0
+      ? Math.min(Math.max(dx / 2, MIN_BEND), MAX_BEND)
+      : Math.min(120, 40 + Math.abs(dx) / 4);
+  return `M ${from.x} ${from.y} C ${from.x + bend} ${from.y}, ${to.x - bend} ${to.y}, ${to.x} ${to.y}`;
 }
 
 /** 卡片內文：條件是規則摘要、批准是問題開頭，其餘留給角色標籤或空白。*/
@@ -221,15 +232,24 @@ export class WorkflowEditorView {
 
     const body = document.createElement('div');
     body.className = 'wf-node-body';
+    const summary = span('wf-summary', '');
     if (node.type === 'agent') {
       const role = node.config.role ? findRole(node.config.role) : undefined;
       const tag = span('role-tag', role ? role.label : '未設角色');
       if (!role) tag.classList.add('empty');
-      body.append(tag, span('wf-kind', node.config.kind));
+      summary.append(tag, span('wf-kind', node.config.kind));
+      summary.title = `${role ? role.label : '未設角色'} · ${node.config.kind}`;
     } else {
-      const summary = nodeSummary(node);
-      if (summary) body.appendChild(span('wf-note', summary));
+      const text = nodeSummary(node);
+      if (text) {
+        summary.appendChild(span('wf-note', text));
+        // 卡片只有 160 寬，裝不下的用 … 收掉，滑過去看全文。
+        summary.title = text;
+      }
     }
+    body.appendChild(summary);
+    // 出口的文字是絕對定位在卡片右緣的，右邊這一欄把位子讓出來，不要疊在一起。
+    if (ports.length > 0) body.appendChild(span('wf-port-space', ''));
     card.appendChild(body);
 
     if (node.type !== 'start') card.appendChild(this.port(node, 'in'));
