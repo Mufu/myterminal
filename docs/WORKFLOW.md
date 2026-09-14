@@ -268,12 +268,29 @@ LangGraph 的 `Annotation` 有四個 channel（[`graph-compiler.ts`](../src/main
 | `outputs` | 合併 | `節點id -> { text, sessionId?, ok, costUsd?, durationMs? }`，`sessionId` 是 **CLI 的** session（`resumeFrom` 用的） |
 | `attempts` | 合併 | `節點id -> 跑過幾次`，`maxAttempts` 看它 |
 | `lastPort` | 合併 | `節點id -> 走了哪個出口`，`addConditionalEdges` 的 router 只看它 |
-| `totalCostUsd` | 相加 | 這次執行累計花了多少錢 |
+| `totalCostUsd` | 相加 | 這次執行累計的用量（訂閱帳號是估算，見下面的「用量與上限」） |
 
 `WorkflowService` 另外維護給畫面看的 `RunState`（執行狀態、每個節點的狀態與
 **畫面上的** `sessionId`、累計費用）。兩者分開是刻意的：圖的狀態是編排用的，
 `RunState` 是 UI 用的，後者由編排層在節點開始／結束時回報（`NodeReport`）—— 因為
 圖的狀態要等超步結束才看得到，但畫面要馬上知道「哪個節點正在跑」。
+
+## 用量與上限
+
+CLI 回報的 `total_cost_usd` **不一定是錢**：用訂閱登入（claude.ai / ChatGPT）時
+它只是依 token 用量估算的 API 等值金額，不另外收費，只算進方案的用量上限；
+用 API 金鑰登入才是真的帳單。app 開機時問一次兩支 CLI
+（`claude auth status`、`codex login status`，見
+[`src/main/cli-auth-probe.ts`](../src/main/cli-auth-probe.ts)），結果顯示在右側面板
+最下面那一行（`#cli-status`），並決定金額怎麼寫：估算是 `≈$0.175`，真的費用是 `$0.175`。
+
+用量上限因此是**這一次執行的**選項，不是寫死的預算：
+
+| 在哪裡 | 行為 |
+| --- | --- |
+| 執行對話框「用量上限（估算美元）」 | 留空＝不限制。只有 `claude` 是用 API 金鑰登入時才預先填 `DEFAULT_MAX_TOTAL_COST_USD`（$2） |
+| `workflow:start` 的 `maxTotalCostUsd` | 一路傳到 `WorkflowService.start(def, params, { maxTotalCostUsd })`，再變成 `CompileDeps.budget` |
+| `GraphCompiler` | `budget.maxTotalCostUsd` 是 `undefined` 就永遠不會超出；有值而且累計加上這次會超過時，那個節點算失敗、輸出寫「超出這次執行的用量上限 (估算 $2)」並收尾 |
 
 ## 一個節點怎麼變成工作階段
 

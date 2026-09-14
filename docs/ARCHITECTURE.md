@@ -24,6 +24,7 @@ flowchart TB
     AppState -. 訂閱通知 .-> SessionListView
     AppState -. 訂閱通知 .-> ProfileListView
     AppState -. 訂閱通知 .-> WorkflowListView
+    AppState -. 訂閱通知 .-> CliStatusView
     WorkflowEditorModel -. 訂閱通知 .-> WorkflowEditorView
     NewConnectionDialog --> Commands
     InputPanel --> Commands
@@ -35,6 +36,7 @@ flowchart TB
 
   subgraph main["main (Node)"]
     IPCLayer["ipc.ts"] --> SessionManager
+    IPCLayer --> CliAuthProbe["cli-auth-probe.ts"]
     IPCLayer --> SessionLogger
     IPCLayer --> ProfileStore
     IPCLayer --> WorkflowService
@@ -48,6 +50,7 @@ flowchart TB
     SessionManager --> IAgentRunner
     IPtySpawner --> NodePty["node-pty (conpty)"]
     IAgentRunner --> AgentCli["claude -p / codex exec"]
+    CliAuthProbe --> AuthCli["claude auth status /<br/>codex login status"]
   end
 
   subgraph shared["shared (三方共用型別)"]
@@ -95,6 +98,7 @@ renderer 的模組：
 | `ports.ts` | Command 需要的最小介面（終端機、剪貼簿、對話框、確認） |
 | `terminal-view.ts` | 一個工作階段一個 xterm.js |
 | `session-list-view.ts` / `profile-list-view.ts` / `workflow-list-view.ts` | 右側三段清單，都訂閱 `AppState` |
+| `cli-status-view.ts` | 面板最下面那一行：兩支 CLI 的登入方式，一樣訂閱 `AppState` |
 | `new-connection-dialog.ts` / `workflow-run-dialog.ts` | 兩個 `<dialog>` |
 | `input-panel.ts` / `toolbar.ts` / `theme.ts` | 輸入面板、工具列、主題 |
 | `workflow-editor-model.ts` | 畫布的狀態與規則（純物件，不碰 DOM） |
@@ -160,6 +164,7 @@ flowchart LR
 | --- | --- |
 | **`IAgentRunner` / `IAgentRun`** (`main/agent-runner.ts`) | 把「CLI 的旗標、JSONL、Windows 的 `.cmd` shim」關在一個地方，對外只有 `start(task)` 與 `init / text / tool / result / error` 五種事件。行程本身再透過 `IProcessSpawner` 注入，所以解析器可以用 `FakeProcessSpawner` 加上 `test/fixtures/` 裡真的抓下來的 JSONL 測，一毛錢都不用花。 |
 | **`AgentRunPty`** (`main/agent-run-pty.ts`) | 把事件流裝成 `IPtyProcess` 的樣子（`onData` 給格式化過的文字、`onExit` 給離開碼、`kill` 等於取消）。 |
+| **`probeCliAuth`** (`main/cli-auth-probe.ts`) | 同一個 `IProcessSpawner` 的第三個用途：開機問一次 `claude auth status` 與 `codex login status`，把「訂閱還是 API 金鑰」變成 `CliAuthStatus`。判斷不出來、逾時、找不到執行檔都只是那一支變成「無法判斷」，不會 reject。解析與文字（`≈$0.091` 還是 `$0.091`）是 `shared/cli-auth.ts` 的純函式，main 與 renderer 共用。 |
 
 **為什麼要繞回 `SessionManager`**：因為這樣「一次 agent 執行」在系統裡就是一個普通的
 工作階段 —— 右側清單、切換、關閉、輸出紀錄、`session:data` / `session:exit`
@@ -287,10 +292,11 @@ renderer → main（`ipcMain.handle`，全部回傳 Promise）：
 | `workflow:get` | `id` | `WorkflowDefinition \| undefined` |
 | `workflow:save` | `WorkflowDefinition` | — （不合法就 reject） |
 | `workflow:delete` | `id` | — |
-| `workflow:start` | `{ workflowId, params }` | `runId` |
+| `workflow:start` | `{ workflowId, params, maxTotalCostUsd? }` | `runId` |
 | `workflow:resume` | `{ runId, approved }` | — |
 | `workflow:cancel` | `runId` | — |
 | `workflow:runs` | — | `RunState[]` |
+| `cli:auth` | — | `CliAuthStatus`（開機探測一次的結果，之後都回同一份） |
 
 main → renderer（`webContents.send`）：
 
@@ -342,6 +348,8 @@ main → renderer（`webContents.send`）：
 | `validateProfile` | 不需要（純函式） | `test/validate-profile.spec.ts` |
 | `ClaudeCodeRunner` / `CodexRunner` | `FakeProcessSpawner` + `test/fixtures/*.jsonl`（真的跑出來的輸出） | `test/agent-runner.spec.ts` |
 | `AgentRunPty` | `FakeAgentRun` | `test/agent-run-pty.spec.ts` |
+| `parseClaudeAuth` / `parseCodexAuth` / `usageLabel` | 不需要（純函式，餵真的 CLI 輸出） | `test/cli-auth.spec.ts` |
+| `probeCliAuth` | `FakeProcessSpawner` + `vi.useFakeTimers()`（逾時那條） | `test/cli-auth-probe.spec.ts` |
 | `validateWorkflow` | 不需要（純函式） | `test/workflow.spec.ts` |
 | `GraphCompiler` | `ScriptedRunner` / `FakeSessions` / `ManualTimers` + `MemorySaver` | `test/fakes/fake-workflow.ts` |
 | `JsonFileSaver` | 真的暫存目錄（`mkdtempSync`），另一半是注入的 `SaverFs` | `test/json-file-saver.spec.ts` |
@@ -351,7 +359,7 @@ main → renderer（`webContents.send`）：
 工作流這一層刻意**用真的 LangGraph 測**（`MemorySaver` 或真的 `JsonFileSaver`）：
 要驗的正是「編譯出來的圖真的會這樣走」，換成假的圖就什麼都沒測到。
 花錢的那一端（CLI）才是假的 —— `ScriptedRunner` 依呼叫順序回答，
-所以分支、迴圈、逾時、預算、中斷與接續全部測得起來，一毛錢都不用花。
+所以分支、迴圈、逾時、用量上限、中斷與接續全部測得起來，一毛錢都不用花。
 `ManualTimers` 讓「逾時」不必真的等十分鐘。
 
 原則：**不測 node-pty 和 xterm.js 本身**，只測自己包在它們外面的邏輯。

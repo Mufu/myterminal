@@ -92,6 +92,9 @@
 **牆鐘比 CLI 自報的久 2～5 秒**：那是 CLI 自己啟動（Node、設定、MCP 探測）的時間，
 編排層估時要算進去。
 
+> 上面表格裡的 `$` 是 CLI 自報的 `total_cost_usd`。這台機器是訂閱登入，
+> 所以那些數字是 API 等值的**估算**，見文末的「2026-09-14 更新」。
+
 費用要注意：這台機器 `claude` 的預設模型是 opus-5，
 一句「只回覆 OK」也要 **$0.07～0.09** —— 幾乎全部是冷啟動時建立 prompt cache 的錢
 （`cache_creation_input_tokens` 6576，輸出只有 15 tokens）。
@@ -109,6 +112,8 @@
 （`e2e/agent.spec.ts` 會斷言接手後的終端機出現 Claude 的介面）。
 
 ## 5. Codex 在這台機器上跑不起來
+
+> 2026-09-14 已經不是這樣了，見文末的「2026-09-14 更新」。這一節留著原樣。
 
 `codex login status` 是 `Logged in using ChatGPT`，但設定裡的模型 `gpt-5.5` 回：
 
@@ -207,3 +212,34 @@ run.cancel();
 要到分支、平行、人工介入節點才值得付 LangGraph 的抽象成本。
 另外，Codex 這半在帳號能用之前都只能算「理論上可行」，
 不要把編排層設計成假設兩個 CLI 對等。
+
+## 2026-09-14 更新
+
+這份 spike 之後有兩件事變了。
+
+**Codex 跑得起來了。** 同一台機器、同一版 `codex-cli` 0.142.2、同一個模型 `gpt-5.5`，
+但這次 ChatGPT 訂閱拿得到它。`MYTERMINAL_AGENT_E2E_CODEX=1 npm run e2e:agent` 整條路徑
+（app → `cmd.exe /c codex exec --json` → 事件解析 → 畫面）跑完是綠的，一次大約兩分鐘。
+所以第 5 節的「只驗證到失敗路徑」不再成立 —— 成功路徑也驗過了，
+命令、事件形狀與收尾方式都跟當初寫的一樣，一行程式都不用改。
+
+**兩支 CLI 都是訂閱登入，所以這份文件裡的 `$` 全部是估算。**
+
+```
+> claude auth status
+{"loggedIn":true,"authMethod":"claude.ai","apiProvider":"firstParty", … ,"subscriptionType":"max"}
+
+> codex login status
+Logged in using ChatGPT
+```
+
+（`codex login status` 那一行是印在 **stderr** 的，exit 0；`claude auth status` 才是 stdout。
+探測兩邊都讀。）
+
+`total_cost_usd` 在這種帳號下是 CLI 依 token 用量算出來的 **API 等值金額**，
+不另外收費，只算進方案的用量上限（用 API 金鑰登入才是真的帳單）。
+app 因此在開機時探測一次登入方式（[`../src/main/cli-auth-probe.ts`](../src/main/cli-auth-probe.ts)，
+解析器在 [`../src/shared/cli-auth.ts`](../src/shared/cli-auth.ts)），右側面板最下面一行會寫
+`Claude · Max 訂閱` / `Codex · ChatGPT 訂閱`，估算的金額一律寫成 `≈$0.091`。
+第 9 節說的「先把費用釘死」也因此換了做法：**不再有寫死的預算上限**，
+用量上限變成執行對話框上的選填欄位，只有 API 金鑰登入才預先填 $2。
