@@ -149,7 +149,9 @@
     </div>
 
     <dialog id="new-connection">
-      <form method="dialog">
+      <!-- novalidate：驗證全部交給 validateProfile。不然被隱藏欄位
+           (例如上一次留在連接埠裡的 70000) 擋下來時，畫面上什麼都沒發生。 -->
+      <form method="dialog" novalidate>
         <h2>新連接</h2>
 
         <label>
@@ -228,15 +230,17 @@
 
         <p id="f-errors" class="errors"></p>
 
+        <!-- 確定鍵放前面：在欄位裡按 Enter 時瀏覽器會挑「第一個送出鍵」，
+             還是取消的話按 Enter 等於關掉對話框。視覺上的左右由 CSS 翻回來。 -->
         <menu>
-          <button id="f-cancel" value="cancel" type="submit" formnovalidate>取消</button>
           <button id="f-ok" value="ok" type="submit" class="primary">建立</button>
+          <button id="f-cancel" value="cancel" type="submit" formnovalidate>取消</button>
         </menu>
       </form>
     </dialog>
 
     <dialog id="workflow-run">
-      <form method="dialog">
+      <form method="dialog" novalidate>
         <h2>執行工作流</h2>
 
         <label>
@@ -261,8 +265,8 @@
         <p id="w-errors" class="errors"></p>
 
         <menu>
-          <button id="w-cancel" value="cancel" type="submit" formnovalidate>取消</button>
           <button id="w-ok" value="ok" type="submit" class="primary">開始</button>
+          <button id="w-cancel" value="cancel" type="submit" formnovalidate>取消</button>
         </menu>
       </form>
     </dialog>

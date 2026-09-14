@@ -1394,11 +1394,14 @@ html[data-theme='warm'] .session-item.active .session-dot {
   white-space: pre-line;
 }
 
+/* DOM 裡確定鍵排在前面 (Enter 的隱含送出要挑到它)，所以這裡把順序翻回來：
+   row-reverse 的主軸是從右往左，flex-start 就是靠右。*/
 #new-connection menu,
 #workflow-run menu {
   display: flex;
+  flex-direction: row-reverse;
   gap: 8px;
-  justify-content: flex-end;
+  justify-content: flex-start;
   margin: 0;
   padding: 0;
 }

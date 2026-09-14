@@ -124,6 +124,18 @@ test.describe('新連接對話框的驗證', () => {
     await shot(window, 'agent-no-prompt');
   });
 
+  /** 欄位裡按 Enter 是「隱含送出」，瀏覽器挑的是第一個送出鍵。*/
+  test('在名稱欄位按 Enter 等於按「建立」，不是取消', async () => {
+    await openDialog('powershell');
+    await window.fill('#f-name', 'Enter 建立的');
+    await window.locator('#f-name').press('Enter');
+
+    await expect(window.locator('#new-connection')).toBeHidden();
+    await expect(window.locator('.session-item')).toHaveCount(1);
+    await expect(window.locator('.session-item')).toContainText('Enter 建立的');
+    await shot(window, 'enter-creates');
+  });
+
   test('以上驗證都沒有跳出 alert，視窗還有反應', async () => {
     expect(dialogs).toEqual([]);
     await expectAlive(app, window);
