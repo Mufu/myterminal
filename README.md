@@ -130,6 +130,8 @@ JSON schema、節點型別、怎麼加一種新節點，見
 （存進 `%APPDATA%\myterminal\workflows.json`），「儲存並執行」則是存完直接開
 執行對話框。用法與規則見 [`docs/WORKFLOW.md`](docs/WORKFLOW.md) 的「畫布編輯器」。
 
+![畫布編輯器](docs/UI-editor.png)
+
 內建範本只有一個 **「實作 → 審查 → 批准」**（自己存的工作流放在
 `%APPDATA%\myterminal\workflows.json`，跟範本同一種格式，見
 [`docs/WORKFLOW.md`](docs/WORKFLOW.md) 的「自訂工作流的儲存」）：
