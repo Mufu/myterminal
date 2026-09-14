@@ -369,6 +369,14 @@ describe('工作流的三個 Command', () => {
     expect(api.startWorkflow).toHaveBeenCalledWith('implement-review-approve', {}, 2);
   });
 
+  /** main 拒絕 (例如工作目錄不存在) 時對話框要留著顯示原因，所以不能吞掉。*/
+  it('StartWorkflowCommand 把 main 的拒絕往外丟', async () => {
+    api.startWorkflow.mockRejectedValueOnce(new Error('工作目錄不存在：D:/nope'));
+    await expect(
+      new StartWorkflowCommand(api, 'implement-review-approve', { cwd: 'D:/nope' }).execute(),
+    ).rejects.toThrow('工作目錄不存在：D:/nope');
+  });
+
   it('ResumeWorkflowCommand 分別送出批准與退回', async () => {
     await new ResumeWorkflowCommand(api, 'run-1', true).execute();
     await new ResumeWorkflowCommand(api, 'run-1', false).execute();

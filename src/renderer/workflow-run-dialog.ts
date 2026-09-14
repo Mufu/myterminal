@@ -42,7 +42,7 @@ export class WorkflowRunDialog implements DialogPort {
       workflowId: string,
       params: Record<string, string>,
       maxTotalCostUsd?: number,
-    ) => void,
+    ) => void | Promise<void>,
   ) {
     $('w-ok').addEventListener('click', (event) => this.submit(event));
   }
@@ -84,15 +84,27 @@ export class WorkflowRunDialog implements DialogPort {
   }
 
   private submit(event: Event): void {
+    // 一律阻止 <form method="dialog"> 關閉對話框：main 也可能拒絕
+    // (例如工作目錄不存在)，那時要留在原地把原因顯示出來。
+    event.preventDefault();
     const params = { task: this.task.value.trim(), cwd: this.cwd.value.trim() };
     const errors = validateRunParams(params);
     if (errors.length > 0) {
-      // 阻止 <form method="dialog"> 關閉對話框，讓使用者修正。
-      event.preventDefault();
       this.errors.textContent = errors.join('\n');
       return;
     }
     this.errors.textContent = '';
-    this.onStart(this.workflow.value, params, parseBudget(this.budget.value));
+    void this.start(params);
+  }
+
+  /** main 收下了才關對話框；被拒絕就把訊息留在上面。*/
+  private async start(params: Record<string, string>): Promise<void> {
+    try {
+      await this.onStart(this.workflow.value, params, parseBudget(this.budget.value));
+    } catch (error) {
+      this.errors.textContent = error instanceof Error ? error.message : String(error);
+      return;
+    }
+    this.dialog.close();
   }
 }

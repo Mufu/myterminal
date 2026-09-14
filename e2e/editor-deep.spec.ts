@@ -601,7 +601,7 @@ test('條件節點沒設「看誰的輸出」時，儲存要擋下來', async ()
 
 // ---- 10c. 工作目錄不存在 ----
 
-test('工作目錄不存在時，執行要收在失敗而不是一直卡在執行中', async () => {
+test('工作目錄不存在時，對話框留著並說明原因，不會開始執行', async () => {
   test.setTimeout(120_000);
   const userData = userDataFor('missing-cwd');
   const { app, window } = await launch(userData);
@@ -609,17 +609,20 @@ test('工作目錄不存在時，執行要收在失敗而不是一直卡在執�
   try {
     await window.click('#btn-workflow-run');
     await window.fill('#w-task', '這個執行不會真的呼叫 CLI');
-    // 目錄不存在 -> spawn 直接 ENOENT，不會有任何模型呼叫，所以不花錢。
+    // 目錄不存在 -> main 直接拒絕，不會有任何模型呼叫，所以不花錢。
     await window.fill('#w-cwd', 'D:\\myterminal-e2e-no-such-dir-97531');
     await window.click('#w-ok');
-    await expect(window.locator('#workflow-run')).toBeHidden();
 
-    const run = window.locator('.workflow-run').first();
-    await expect(run.locator('.workflow-status')).toHaveText('失敗', { timeout: 60_000 });
-    // 失敗原因要看得出來是工作目錄的問題。
-    await expect(run.locator('.workflow-error')).toBeVisible();
-    console.log(`[工作目錄不存在] 錯誤訊息：${await run.locator('.workflow-error').innerText()}`);
+    await expect(window.locator('#workflow-run')).toBeVisible();
+    await expect(window.locator('#w-errors')).toContainText(
+      '工作目錄不存在：D:\\myterminal-e2e-no-such-dir-97531',
+    );
+    // 一個工作流都沒真的跑起來。
+    await expect(window.locator('.workflow-empty')).toHaveText('尚無工作流執行');
     await shot(window, 'missing-cwd');
+
+    await window.click('#w-cancel');
+    await expect(window.locator('#workflow-run')).toBeHidden();
   } finally {
     await app.close();
   }

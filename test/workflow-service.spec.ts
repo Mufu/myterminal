@@ -64,6 +64,7 @@ class Disk {
       timers: new ManualTimers(),
       now: () => 1_000,
       newRunId: () => 'run-1',
+      exists: () => true,
       ...over,
     };
   }
@@ -121,6 +122,20 @@ describe('WorkflowService', () => {
     expect(waiting.nodes.impl).toMatchObject({ role: 'coder', kind: 'claude' });
     expect(waiting.nodes.ask.role).toBeUndefined();
     expect(waiting.nodes.ask.kind).toBeUndefined();
+  });
+
+  /** 目錄不存在時 CLI 只會回一句 spawn ENOENT，那是看不懂的。*/
+  it('工作目錄不存在時不開始執行，直接丟例外', () => {
+    const service = new WorkflowService(disk.deps({ exists: () => false }));
+    expect(() => service.start(linear(), { cwd: 'D:/no-such-dir' })).toThrow(
+      '工作目錄不存在：D:/no-such-dir',
+    );
+    expect(service.list()).toEqual([]);
+  });
+
+  it('沒有工作目錄參數的工作流不檢查', () => {
+    const service = new WorkflowService(disk.deps({ exists: () => false }));
+    expect(() => service.start(linear(), {})).not.toThrow();
   });
 
   it('start 給了用量上限，超過的那個節點就讓執行收尾', async () => {

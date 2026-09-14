@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events';
 import { randomUUID } from 'node:crypto';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { Command } from '@langchain/langgraph';
 import type { BaseCheckpointSaver } from '@langchain/langgraph';
 import type { RunState, RunStatus, WorkflowDefinition } from '../../shared/workflow';
@@ -33,6 +33,8 @@ export interface WorkflowServiceDeps {
   timers?: Timers;
   now?: () => number;
   newRunId?: () => string;
+  /** 工作目錄存不存在的縫線，測試注入假的。*/
+  exists?: (path: string) => boolean;
 }
 
 type WorkflowEvents = { changed: [RunState[]] };
@@ -71,6 +73,10 @@ export class WorkflowService extends EventEmitter<WorkflowEvents> {
     params: Record<string, string>,
     options: { maxTotalCostUsd?: number } = {},
   ): string {
+    // 工作目錄不存在時 CLI 只會丟一句 spawn ENOENT，先擋下來把話講清楚。
+    const cwd = params.cwd?.trim();
+    if (cwd && !(this.deps.exists ?? existsSync)(cwd)) throw new Error(`工作目錄不存在：${cwd}`);
+
     const runId = (this.deps.newRunId ?? randomUUID)();
     const stored: StoredRun = {
       definition,

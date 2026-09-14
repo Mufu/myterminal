@@ -21,6 +21,9 @@ beforeEach(() => {
     new ShellFactory((name) => name),
     (fn) => fn(),
     () => agents,
+    undefined,
+    // 測試裡的工作目錄都是假的，一律當成存在。
+    () => true,
   );
 });
 
@@ -226,6 +229,30 @@ describe('SessionManager 的 agent 任務', () => {
 
     expect(data.map((e) => e.data)).toContain('OK\r\n');
     expect(exits).toEqual([{ id: info.id, exitCode: 0 }]);
+  });
+
+  /** 目錄不存在時 spawn 只會丟 ENOENT，看不出是目錄的問題。*/
+  it('工作目錄不存在時不叫 CLI，終端機直接顯示原因並結束', async () => {
+    const missing = new SessionManager(
+      spawner,
+      new ShellFactory((name) => name),
+      (fn) => fn(),
+      () => agents,
+      undefined,
+      () => false,
+    );
+    const data: DataEvent[] = [];
+    const exits: ExitEvent[] = [];
+    missing.on('data', (e) => data.push(e));
+    missing.on('exit', (e) => exits.push(e));
+
+    const info = missing.create({ ...task, cwd: 'D:/no-such-dir' }, 80, 24);
+    await Promise.resolve();
+
+    expect(agents.tasks).toEqual([]);
+    expect(data.map((e) => e.data).join('')).toContain('✘ 失敗：工作目錄不存在：D:/no-such-dir');
+    expect(exits).toEqual([{ id: info.id, exitCode: 1 }]);
+    expect(missing.list()[0].state).toBe('exited');
   });
 
   it('關閉 agent 工作階段會取消執行', () => {

@@ -1,8 +1,9 @@
 import { EventEmitter } from 'node:events';
+import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import type { AgentTaskProfile, ConnectionProfile } from '../shared/profile';
 import { TYPE_LABELS } from '../shared/profile';
-import type { AgentKind } from '../shared/agent';
+import type { AgentEvent, AgentKind } from '../shared/agent';
 import type { BillingMode } from '../shared/cli-auth';
 import { findRole } from '../shared/roles';
 import type { SessionInfo } from '../shared/session';
@@ -59,6 +60,8 @@ export class SessionManager extends EventEmitter<SessionEvents> {
     private readonly agents: IAgentRunnerFactory = defaultAgentRunners,
     /** CLI 的登入方式；開機探測完才知道，所以注入的是一個取值函式。*/
     private readonly billing: (kind: AgentKind) => BillingMode = () => 'unknown',
+    /** 工作目錄存不存在的縫線，測試注入假的。*/
+    private readonly exists: (path: string) => boolean = existsSync,
   ) {
     super();
   }
@@ -151,6 +154,12 @@ export class SessionManager extends EventEmitter<SessionEvents> {
     info.agentKind = profile.kind;
     info.role = profile.role;
 
+    // 工作目錄不存在時 spawn 只會丟 ENOENT，看不出是目錄的問題。
+    if (!this.exists(cwd)) {
+      const failed = new FailedRun(`工作目錄不存在：${cwd}`);
+      return new AgentRunPty(failed, profile.kind, profile.prompt, this.billing(profile.kind));
+    }
+
     const run = this.agents(profile.kind).start({
       kind: profile.kind,
       prompt: profile.prompt,
@@ -209,4 +218,21 @@ export class SessionManager extends EventEmitter<SessionEvents> {
   list(): SessionInfo[] {
     return [...this.sessions.values()].map((s) => ({ ...s.info }));
   }
+}
+
+/**
+ * 還沒開始就註定失敗的執行 (目前只有「工作目錄不存在」)：不 spawn 任何東西，
+ * 直接以結果事件收場，畫面上就跟 CLI 自己回報失敗一樣。
+ */
+class FailedRun implements IAgentRun {
+  constructor(private readonly message: string) {}
+
+  onEvent(listener: (event: AgentEvent) => void): void {
+    // 等 SessionManager 把 pty 登記好再發，不然結束事件會早於工作階段本身。
+    queueMicrotask(() =>
+      listener({ type: 'result', ok: false, text: this.message, exitCode: 1 }),
+    );
+  }
+
+  cancel(): void {}
 }

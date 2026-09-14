@@ -214,9 +214,10 @@ new ProfileListView(
   (name) => void new RemoveProfileCommand(api, confirmRemove, name).execute(),
 );
 
-const workflowDialog = new WorkflowRunDialog((workflowId, params, maxTotalCostUsd) => {
-  void new StartWorkflowCommand(api, workflowId, params, maxTotalCostUsd).execute();
-});
+// 回傳 Promise：main 拒絕 (例如工作目錄不存在) 時對話框要留著顯示原因。
+const workflowDialog = new WorkflowRunDialog((workflowId, params, maxTotalCostUsd) =>
+  new StartWorkflowCommand(api, workflowId, params, maxTotalCostUsd).execute(),
+);
 $<HTMLButtonElement>('btn-workflow-run').addEventListener('click', () => workflowDialog.open());
 
 // 畫布編輯器：編輯的就是那份 WorkflowDefinition，存出去之後跟內建範本同一種東西。
