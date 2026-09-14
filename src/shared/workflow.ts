@@ -103,8 +103,20 @@ export function validateWorkflow(def: WorkflowDefinition): string[] {
   if (!def.nodes.some((node) => node.type === 'end')) errors.push('必須至少有一個結束節點');
 
   for (const node of def.nodes) {
-    if (node.type !== 'agent' || node.config.role === undefined) continue;
-    if (!findRole(node.config.role)) errors.push(`節點 ${node.id} 的角色不存在：${node.config.role}`);
+    if (node.type === 'agent') {
+      if (!node.config.prompt.trim()) errors.push(`節點 ${node.id} 的提示不能是空的`);
+      if (!node.config.cwd?.trim()) errors.push(`節點 ${node.id} 的工作目錄不能是空的`);
+      if (node.config.role !== undefined && !findRole(node.config.role)) {
+        errors.push(`節點 ${node.id} 的角色不存在：${node.config.role}`);
+      }
+    } else if (node.type === 'condition') {
+      // 來源沒設或指到沒有輸出的節點，執行時那個條件永遠走「否」。
+      const source = byId.get(node.config.source);
+      if (source?.type !== 'agent') {
+        errors.push(`節點 ${node.id} 的條件來源不存在：${node.config.source}`);
+      }
+      if (!compiles(node.config.rule)) errors.push(`節點 ${node.id} 的正規式無效`);
+    }
   }
 
   const taken = new Set<string>();
@@ -131,6 +143,17 @@ export function validateWorkflow(def: WorkflowDefinition): string[] {
   }
 
   return errors;
+}
+
+/** 正規式是使用者打的，編不起來的話等到執行時才丟例外就太晚了。*/
+function compiles(rule: ConditionRule): boolean {
+  if (rule.type !== 'regex') return true;
+  try {
+    new RegExp(rule.pattern);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** 從開始節點做一次 BFS，沒被走到的都是孤兒。沒有開始節點時不重複報錯。*/

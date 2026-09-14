@@ -102,7 +102,7 @@ export const minimalWorkflow = (id: string, name = id): WorkflowDefinition => ({
       type: 'agent',
       label: 'a',
       position: { x: 180, y: 0 },
-      config: { kind: 'claude', prompt: 'x', allowEdits: false },
+      config: { kind: 'claude', prompt: 'x', cwd: 'D:/work', allowEdits: false },
     },
     { id: 'end', type: 'end', label: '結束', position: { x: 360, y: 0 } },
   ],

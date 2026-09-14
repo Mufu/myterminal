@@ -386,6 +386,9 @@ test('兩個孤兒節點各報一條錯，接起來之後錯誤消失', async ()
     await window.click('#btn-workflow-edit');
     await window.click('#btn-add-agent');
     await dragNodeTo(window, 'agent-1', 250, 60);
+    // 提示是必填的，先填好，這個案例要看的是孤兒節點的錯誤。
+    await window.click(`${card('agent-1')} .wf-node-body`);
+    await window.fill('#props-prompt', '{{params.task}}');
     await window.click('#btn-add-approval');
     await dragNodeTo(window, 'approval-1', 470, 60);
 
@@ -419,6 +422,8 @@ test('儲存並執行會打開執行對話框並預選剛存好的工作流', as
     await window.click('#btn-workflow-edit');
     await window.click('#btn-add-agent');
     await dragNodeTo(window, 'agent-1', 300, 120);
+    await window.click(`${card('agent-1')} .wf-node-body`);
+    await window.fill('#props-prompt', '{{params.task}}');
     await wire(window, out('start'), inPort('agent-1'));
     await wire(window, out('agent-1', 'ok'), inPort('end'));
     await window.fill('#editor-name', '儲存並執行');
@@ -548,14 +553,9 @@ test('執行對話框：任務或工作目錄沒填就不讓開始', async () =>
   }
 });
 
-// ---- 10b. 條件沒設來源 (已知缺陷) ----
+// ---- 10b. 條件沒設來源 ----
 
-test('條件節點沒設「看誰的輸出」時，儲存應該要擋下來', async () => {
-  test.fail(
-    true,
-    'validateWorkflow 只檢查角色存不存在，沒檢查 condition.source，' +
-      '所以來源空著也存得進去，執行時那個條件永遠走「否」。',
-  );
+test('條件節點沒設「看誰的輸出」時，儲存要擋下來', async () => {
   const userData = userDataFor('condition-source');
   const { app, window } = await launch(userData);
 
@@ -570,7 +570,7 @@ test('條件節點沒設「看誰的輸出」時，儲存應該要擋下來', as
     await wire(window, out('agent-1', 'ok'), inPort('condition-1'));
     await wire(window, out('condition-1', 'yes'), inPort('end'));
 
-    // agent 的工作目錄清空 (執行時會掉進家目錄)，提示也留白。
+    // agent 的工作目錄清空，提示也留白。
     await window.click(`${card('agent-1')} .wf-node-body`);
     await window.fill('#props-cwd', '');
 
@@ -581,19 +581,19 @@ test('條件節點沒設「看誰的輸出」時，儲存應該要擋下來', as
     await window.fill('#editor-name', '沒來源的條件');
     await window.click('#btn-editor-save');
 
-    // 現況：存得下去，檔案裡的 source 就是空字串。
-    const saved = storedWorkflows(userData);
-    expect(saved).toHaveLength(1);
-    expect(saved[0].nodes.find((n) => n.id === 'condition-1')?.config?.source).toBe('');
-    // 同一個漏洞：agent 的提示整個空著、工作目錄也空著，一樣照存不誤
-    // (graph-compiler 對空的 cwd 是 fallback 到 homedir())。
-    const agent = saved[0].nodes.find((n) => n.id === 'agent-1')?.config;
-    expect(agent?.prompt).toBe('');
-    expect(agent?.cwd).toBe('');
-    await shot(window, 'condition-no-source');
-
-    // 期望：跟「角色不存在」一樣，儲存時就該報錯。
+    // 跟「角色不存在」一樣，儲存時就報錯：來源、提示、工作目錄各一條。
     await expect(window.locator('#editor-errors')).toBeVisible();
+    await expect(window.locator('#editor-errors')).toContainText(
+      '節點 condition-1 的條件來源不存在',
+    );
+    await expect(window.locator('#editor-errors')).toContainText(
+      '節點 agent-1 的提示不能是空的',
+    );
+    await expect(window.locator('#editor-errors')).toContainText(
+      '節點 agent-1 的工作目錄不能是空的',
+    );
+    expect(storedWorkflows(userData)).toHaveLength(0);
+    await shot(window, 'condition-no-source');
   } finally {
     await app.close();
   }
@@ -637,6 +637,8 @@ test('自訂工作流在 app 重開之後還在執行對話框裡', async () => 
     await first.window.click('#btn-workflow-edit');
     await first.window.click('#btn-add-agent');
     await dragNodeTo(first.window, 'agent-1', 300, 120);
+    await first.window.click(`${card('agent-1')} .wf-node-body`);
+    await first.window.fill('#props-prompt', '{{params.task}}');
     await wire(first.window, out('start'), inPort('agent-1'));
     await wire(first.window, out('agent-1', 'ok'), inPort('end'));
     await first.window.fill('#editor-name', '重開還在');

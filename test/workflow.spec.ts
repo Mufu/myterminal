@@ -1,6 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { validateWorkflow } from '../src/shared/workflow';
-import type { WorkflowDefinition, WorkflowEdge, WorkflowNode } from '../src/shared/workflow';
+import type {
+  ConditionRule,
+  WorkflowDefinition,
+  WorkflowEdge,
+  WorkflowNode,
+} from '../src/shared/workflow';
+import { TEMPLATES } from '../src/main/workflow/templates';
 import type { AgentRole } from '../src/shared/roles';
 
 const at = { x: 0, y: 0 };
@@ -12,7 +18,14 @@ const agent = (id: string): WorkflowNode => ({
   type: 'agent',
   label: id,
   position: at,
-  config: { kind: 'claude', prompt: 'x', allowEdits: false },
+  config: { kind: 'claude', prompt: 'x', cwd: 'D:/work', allowEdits: false },
+});
+const condition = (id: string, source: string, rule?: ConditionRule): WorkflowNode => ({
+  id,
+  type: 'condition',
+  label: id,
+  position: at,
+  config: { source, rule: rule ?? { type: 'lastLineEquals', value: 'PASS' } },
 });
 const approval = (id: string): WorkflowNode => ({
   id,
@@ -113,6 +126,60 @@ describe('validateWorkflow', () => {
     const bad = minimal();
     (bad.nodes[1] as Extract<WorkflowNode, { type: 'agent' }>).config.role = 'boss' as AgentRole;
     expect(validateWorkflow(bad)).toEqual(['節點 a 的角色不存在：boss']);
+  });
+
+  it('agent 節點的提示與工作目錄不能是空的', () => {
+    const blank = minimal();
+    const config = (blank.nodes[1] as Extract<WorkflowNode, { type: 'agent' }>).config;
+    config.prompt = '  ';
+    config.cwd = '';
+    expect(validateWorkflow(blank)).toEqual([
+      '節點 a 的提示不能是空的',
+      '節點 a 的工作目錄不能是空的',
+    ]);
+
+    const missing = minimal();
+    delete (missing.nodes[1] as Extract<WorkflowNode, { type: 'agent' }>).config.cwd;
+    expect(validateWorkflow(missing)).toEqual(['節點 a 的工作目錄不能是空的']);
+  });
+
+  /** 來源沒設或指到不是 agent 的節點，執行時那個條件永遠走「否」。*/
+  it('condition 的來源必須是存在的 agent 節點', () => {
+    const wired = (source: string, extra: WorkflowNode[] = []): WorkflowDefinition =>
+      def(
+        [start(), agent('a'), condition('c', source), end(), ...extra],
+        [
+          { from: 'start', to: 'a' },
+          { from: 'a', to: 'c', port: 'ok' },
+          { from: 'a', to: 'end', port: 'fail' },
+          { from: 'c', to: 'end', port: 'yes' },
+          { from: 'c', to: 'end', port: 'no' },
+        ],
+      );
+
+    expect(validateWorkflow(wired('a'))).toEqual([]);
+    expect(validateWorkflow(wired(''))).toEqual(['節點 c 的條件來源不存在：']);
+    expect(validateWorkflow(wired('nope'))).toEqual(['節點 c 的條件來源不存在：nope']);
+    // 指到 start 這種沒有輸出的節點也不算數。
+    expect(validateWorkflow(wired('start'))).toEqual(['節點 c 的條件來源不存在：start']);
+  });
+
+  it('condition 的正規式編不起來就報錯', () => {
+    const bad = def(
+      [start(), agent('a'), condition('c', 'a', { type: 'regex', pattern: '(' }), end()],
+      [
+        { from: 'start', to: 'a' },
+        { from: 'a', to: 'c', port: 'ok' },
+        { from: 'a', to: 'end', port: 'fail' },
+        { from: 'c', to: 'end', port: 'yes' },
+        { from: 'c', to: 'end', port: 'no' },
+      ],
+    );
+    expect(validateWorkflow(bad)).toEqual(['節點 c 的正規式無效']);
+  });
+
+  it('內建範本是合法的', () => {
+    for (const template of TEMPLATES) expect(validateWorkflow(template)).toEqual([]);
   });
 
   it('從開始節點走不到的節點是錯的', () => {
