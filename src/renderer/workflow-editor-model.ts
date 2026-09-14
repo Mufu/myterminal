@@ -18,6 +18,10 @@ import { NODE_PORTS, validateWorkflow } from '../shared/workflow';
  * 所以連線畫到哪、id 怎麼取、哪些連線不合法全部測得到。
  */
 
+/** 新節點超過這個 x 就換一行，免得一直往右排到看不見的地方。*/
+const WRAP_X = 1000;
+const ROW_GAP = 160;
+
 /** 節點卡片的寬、標頭高、一個出口佔的列高、座標吸附的格線。*/
 export const NODE_WIDTH = 160;
 export const NODE_HEADER = 30;
@@ -270,14 +274,17 @@ export class WorkflowEditorModel {
     }
   }
 
-  /** 沒指定位置就放在最右邊那個節點的右側。*/
+  /** 沒指定位置就放在最右邊那個節點的右側；排到畫面外就換下一行。*/
   private defaultPosition(): NodePosition {
     let right: WorkflowNode | undefined;
+    let bottom = 0;
     for (const node of this._definition.nodes) {
       if (!right || node.position.x > right.position.x) right = node;
+      bottom = Math.max(bottom, node.position.y);
     }
     if (!right) return { x: 40, y: 120 };
-    return { x: right.position.x + NODE_WIDTH + 40, y: right.position.y };
+    const x = right.position.x + NODE_WIDTH + 40;
+    return x > WRAP_X ? { x: 40, y: bottom + ROW_GAP } : { x, y: right.position.y };
   }
 
   private touch(): void {

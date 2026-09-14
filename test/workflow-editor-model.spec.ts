@@ -180,6 +180,17 @@ describe('加節點', () => {
     expect(model.node('agent-1')?.position).toEqual({ x: 600 + NODE_WIDTH + 40, y: 120 });
   });
 
+  /** 一直往右排的話第三個就跑到畫面外了。*/
+  it('排到最右邊就換下一行', () => {
+    // end 在 (600, 120)，加一個到 800，再加一個就要 1000 以上了。
+    model.addNode('agent');
+    expect(model.node('agent-1')?.position).toEqual({ x: 800, y: 120 });
+    model.addNode('agent');
+    expect(model.node('agent-2')?.position).toEqual({ x: 1000, y: 120 });
+    model.addNode('agent');
+    expect(model.node('agent-3')?.position).toEqual({ x: 40, y: 280 });
+  });
+
   it('指定的位置會吸附到格線上', () => {
     model.addNode('agent', { x: 123, y: 456 });
     expect(model.node('agent-1')?.position).toEqual({ x: 120, y: 460 });
