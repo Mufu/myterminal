@@ -12,6 +12,12 @@ export interface TerminalPort {
   getSelection(): string;
   clear(): void;
   focus(): void;
+  /**
+   * 貼上一段文字：xterm 會把 \r\n / \n 歸一化成 \r，
+   * 對方開了 bracketed paste (模式 2004) 時還會加上貼上標記，
+   * 所以多行貼上是一整段進去，不是一個一個按鍵。
+   */
+  paste(text: string): void;
 }
 
 export interface ClipboardPort {

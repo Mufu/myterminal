@@ -4,7 +4,7 @@ import { parseTheme } from './theme';
 import type { WorkflowEditorModel } from './workflow-editor-model';
 import { newWorkflowId } from './workflow-editor-model';
 import type { MyTerminalApi } from '../shared/api';
-import type { ConnectionProfile, SavedProfile, SessionType } from '../shared/profile';
+import type { ConnectionProfile, SavedProfile } from '../shared/profile';
 import type { AgentKind } from '../shared/agent';
 import type { SessionInfo } from '../shared/session';
 import type {
@@ -50,19 +50,22 @@ export class CopySelectionCommand implements ICommand {
   }
 }
 
-/** 貼上 */
+/**
+ * 貼上：走 xterm 的貼上路徑，不要自己把字丟進 pty ——
+ * 換行會被歸一化成 CR，對方開了 bracketed paste 時整段是一次進去的，
+ * 所以多行不會被 PSReadLine 拆成軟斷行，很大一段也不會一個字一個字重畫。
+ */
 export class PasteCommand implements ICommand {
   constructor(
-    private readonly state: AppState,
-    private readonly api: MyTerminalApi,
+    private readonly activeTerminal: ActiveTerminal,
     private readonly clipboard: ClipboardPort,
   ) {}
   async execute(): Promise<void> {
-    const id = this.state.activeSessionId;
-    if (!id) return;
+    const terminal = this.activeTerminal();
+    if (!terminal) return;
     const text = await this.clipboard.readText();
     if (!text) return;
-    await this.api.write(id, text);
+    terminal.paste(text);
   }
 }
 
@@ -88,32 +91,26 @@ export class ClearScreenCommand implements ICommand {
   }
 }
 
-/** 這幾種工作階段後面是 shell：一行就是一個指令。*/
-const SHELL_TYPES: readonly SessionType[] = ['powershell', 'wsl', 'ssh', 'custom'];
-
 /**
- * 整段文字送進 pty 之前要怎麼換行。
- * shell：LF 會被 PSReadLine 當成軟斷行，整段都不會執行，所以每一行都換成 CR (Enter)。
- * claude / codex / agent：收的是一段多行提示，裡面的 LF 就是換行，最後才送一個 CR。
+ * 輸入面板的「送出」：整段內容走跟「貼上」同一條 xterm 貼上路徑，
+ * 再補一個 CR 送出。shell 收到的是一段多行緩衝區，按下 Enter 才一次執行；
+ * Claude / Codex 的 TUI 也是一樣，貼上不會提早送出。
  */
-export function inputPayload(text: string, type: SessionType | undefined): string {
-  const shell = type === undefined || SHELL_TYPES.includes(type);
-  return `${shell ? text.replace(/\r?\n/g, '\r') : text}\r`;
-}
-
-/** 輸入面板的「送出」：把整段內容一次送進工作階段。*/
 export class SendInputCommand implements ICommand {
   constructor(
     private readonly state: AppState,
     private readonly api: MyTerminalApi,
     private readonly panel: InputPanelPort,
+    private readonly activeTerminal: ActiveTerminal,
   ) {}
   async execute(): Promise<void> {
-    const session = this.state.activeSession();
-    if (!session) return;
+    const id = this.state.activeSessionId;
+    const terminal = this.activeTerminal();
+    if (!id || !terminal) return;
     const text = this.panel.getText();
     if (!text.trim()) return;
-    await this.api.write(session.id, inputPayload(text, session.type));
+    terminal.paste(text);
+    await this.api.write(id, '\r');
     this.panel.clear();
   }
 }

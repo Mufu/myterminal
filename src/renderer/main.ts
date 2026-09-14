@@ -191,10 +191,10 @@ new Toolbar(state, {
   newConnection: new NewConnectionCommand(dialog),
   toggleInput: new ToggleInputPanelCommand(state),
   copy: new CopySelectionCommand(activeTerminal, clipboard),
-  paste: new PasteCommand(state, api, clipboard),
+  paste: new PasteCommand(activeTerminal, clipboard),
   toggleLog: new ToggleLogCommand(state, api),
   clear: new ClearScreenCommand(activeTerminal),
-  send: new SendInputCommand(state, api, inputPanel),
+  send: new SendInputCommand(state, api, inputPanel, activeTerminal),
   switchTheme: new SwitchThemeCommand(themeStore, () => themeSelect.value),
 });
 

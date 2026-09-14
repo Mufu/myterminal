@@ -81,6 +81,11 @@ export class TerminalView implements TerminalPort {
     this.term.clear();
   }
 
+  /** 交給 xterm 的貼上路徑：換行歸一化與 bracketed paste 都由它處理。*/
+  paste(text: string): void {
+    this.term.paste(text);
+  }
+
   focus(): void {
     this.term.focus();
   }

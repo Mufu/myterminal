@@ -42,6 +42,7 @@ class FakeTerminal implements TerminalPort {
   selection = '';
   cleared = 0;
   focused = 0;
+  readonly pasted: string[] = [];
   getSelection(): string {
     return this.selection;
   }
@@ -50,6 +51,9 @@ class FakeTerminal implements TerminalPort {
   }
   focus(): void {
     this.focused += 1;
+  }
+  paste(text: string): void {
+    this.pasted.push(text);
   }
 }
 
@@ -148,23 +152,30 @@ describe('複製文字', () => {
 });
 
 describe('貼上', () => {
-  it('把剪貼簿內容寫進作用中的工作階段', async () => {
+  /** 走 xterm 的貼上路徑：換行歸一化與 bracketed paste 都是它的事。*/
+  it('把剪貼簿內容交給終端機貼上，不自己寫進 pty', async () => {
     clipboard.text = 'npm test';
-    await new PasteCommand(state, api, clipboard).execute();
-    expect(api.write).toHaveBeenCalledWith('s1', 'npm test');
+    await new PasteCommand(activeTerminal, clipboard).execute();
+    expect(terminal.pasted).toEqual(['npm test']);
+    expect(api.write).not.toHaveBeenCalled();
   });
 
-  it('剪貼簿是空的就不寫', async () => {
+  it('多行的剪貼簿內容也是一整段貼上', async () => {
+    clipboard.text = 'echo A\necho B\n';
+    await new PasteCommand(activeTerminal, clipboard).execute();
+    expect(terminal.pasted).toEqual(['echo A\necho B\n']);
+  });
+
+  it('剪貼簿是空的就不貼', async () => {
     clipboard.text = '';
-    await new PasteCommand(state, api, clipboard).execute();
-    expect(api.write).not.toHaveBeenCalled();
+    await new PasteCommand(activeTerminal, clipboard).execute();
+    expect(terminal.pasted).toEqual([]);
   });
 
-  it('沒有作用中的工作階段就不寫', async () => {
-    state.setSessions([]);
+  it('沒有作用中的終端機就不貼', async () => {
     clipboard.text = 'x';
-    await new PasteCommand(state, api, clipboard).execute();
-    expect(api.write).not.toHaveBeenCalled();
+    await new PasteCommand(() => null, clipboard).execute();
+    expect(terminal.pasted).toEqual([]);
   });
 });
 
@@ -187,6 +198,7 @@ describe('紀錄', () => {
     await new ToggleLogCommand(state, api).execute();
     expect(api.startLog).not.toHaveBeenCalled();
   });
+
 });
 
 describe('清除畫面', () => {
@@ -201,53 +213,41 @@ describe('清除畫面', () => {
 });
 
 describe('送出 (輸入面板)', () => {
-  it('把整段文字加上換行送進工作階段，並清空輸入框', async () => {
+  it('整段文字走貼上路徑，再補一個 CR 送出，並清空輸入框', async () => {
     const panel = new FakeInputPanel();
     panel.text = '請幫我重構這段程式';
-    await new SendInputCommand(state, api, panel).execute();
-    expect(api.write).toHaveBeenCalledWith('s1', '請幫我重構這段程式\r');
+    await new SendInputCommand(state, api, panel, activeTerminal).execute();
+    expect(terminal.pasted).toEqual(['請幫我重構這段程式']);
+    expect(api.write).toHaveBeenCalledWith('s1', '\r');
     expect(panel.cleared).toBe(1);
+  });
+
+  /** 多行不拆開：shell 收到的是一段多行緩衝區，最後那個 CR 才一次執行。*/
+  it('多行內容原封不動交給貼上，只送一個 CR', async () => {
+    const panel = new FakeInputPanel();
+    panel.text = 'echo LINE_ONE\necho LINE_TWO';
+    await new SendInputCommand(state, api, panel, activeTerminal).execute();
+    expect(terminal.pasted).toEqual(['echo LINE_ONE\necho LINE_TWO']);
+    expect(api.write).toHaveBeenCalledTimes(1);
+    expect(api.write).toHaveBeenCalledWith('s1', '\r');
   });
 
   it('空白內容不送出也不清空', async () => {
     const panel = new FakeInputPanel();
     panel.text = '   ';
-    await new SendInputCommand(state, api, panel).execute();
+    await new SendInputCommand(state, api, panel, activeTerminal).execute();
+    expect(terminal.pasted).toEqual([]);
     expect(api.write).not.toHaveBeenCalled();
     expect(panel.cleared).toBe(0);
   });
 
-  /** shell 一行就是一個指令：LF 會被 PSReadLine 當成軟斷行，整段都不會執行。*/
-  it.each(['powershell', 'wsl', 'ssh', 'custom'] as const)(
-    '%s：多行的每一行都換成 CR，每一行都是 Enter',
-    async (type) => {
-      state.setSessions([session('s1', { type })]);
-      const panel = new FakeInputPanel();
-      panel.text = 'echo LINE_ONE\necho LINE_TWO';
-      await new SendInputCommand(state, api, panel).execute();
-      expect(api.write).toHaveBeenCalledWith('s1', 'echo LINE_ONE\recho LINE_TWO\r');
-    },
-  );
-
-  it('CRLF 的換行也算一行 (貼進來的文字可能帶 \\r\\n)', async () => {
-    state.setSessions([session('s1', { type: 'powershell' })]);
+  it('沒有作用中的終端機就什麼都不做', async () => {
     const panel = new FakeInputPanel();
-    panel.text = 'echo A\r\necho B';
-    await new SendInputCommand(state, api, panel).execute();
-    expect(api.write).toHaveBeenCalledWith('s1', 'echo A\recho B\r');
+    panel.text = 'x';
+    await new SendInputCommand(state, api, panel, () => null).execute();
+    expect(api.write).not.toHaveBeenCalled();
+    expect(panel.cleared).toBe(0);
   });
-
-  /** claude / codex / agent 收的是一段多行提示，裡面的 LF 就是換行 (Ctrl+J)。*/
-  it.each(['claude', 'codex', 'agent'] as const)(
-    '%s：保留段落裡的換行，最後才送一個 CR',
-    async (type) => {
-      state.setSessions([session('s1', { type })]);
-      const panel = new FakeInputPanel();
-      panel.text = '第一行\n第二行';
-      await new SendInputCommand(state, api, panel).execute();
-      expect(api.write).toHaveBeenCalledWith('s1', '第一行\n第二行\r');
-    },
-  );
 });
 
 describe('切換主題', () => {

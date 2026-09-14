@@ -85,6 +85,33 @@ test('貼上：剪貼簿的內容送進工作階段，按 Enter 就執行', asyn
   await app.close();
 });
 
+test('貼上：多行的剪貼簿內容一次進去，按 Enter 三行都執行', async () => {
+  const { app, window, dialogs } = await openWithSession();
+
+  await app.evaluate(({ clipboard }) =>
+    clipboard.writeText('echo PASTE_A\necho PASTE_B\necho PASTE_C\n'),
+  );
+  await window.click('#btn-paste');
+
+  // bracketed paste 進去的是一段多行緩衝區，還要自己按 Enter 才執行。
+  await window.locator('.term-host:not([hidden]) .xterm-screen').click();
+  await window.keyboard.press('Enter');
+
+  await expect(activeRows(window)).toContainText('PASTE_C', { timeout: 20_000 });
+  const text = await activeRows(window).innerText();
+  const seen = `終端機畫面：\n${text}`;
+  // 三行都真的「執行」過：回顯一次 + 輸出一次。
+  for (const mark of ['PASTE_A', 'PASTE_B', 'PASTE_C']) {
+    expect(text.match(new RegExp(mark, 'g'))?.length ?? 0, seen).toBeGreaterThanOrEqual(2);
+  }
+  expect(text.indexOf('PASTE_A'), seen).toBeLessThan(text.indexOf('PASTE_B'));
+  expect(text.indexOf('PASTE_B'), seen).toBeLessThan(text.indexOf('PASTE_C'));
+  await shot(window, 'paste-multiline');
+
+  expect(dialogs).toEqual([]);
+  await app.close();
+});
+
 test('複製文字：在終端機選一行，按複製之後剪貼簿就是那一行', async () => {
   const { app, window, dialogs } = await openWithSession();
 
