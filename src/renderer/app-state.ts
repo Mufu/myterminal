@@ -4,6 +4,9 @@ import type { RunState } from '../shared/workflow';
 
 type Listener = () => void;
 
+/** 中間那一塊顯示什麼：終端機，或是工作流的畫布編輯器。*/
+export type MainView = 'terminal' | 'editor';
+
 /**
  * AppState — renderer 端唯一的狀態來源，Observer。
  * 各個 View 訂閱它並在通知時重畫；Command 只透過它讀取目前作用中的工作階段。
@@ -15,6 +18,7 @@ export class AppState {
   private _inputPanelVisible = false;
   private _profiles: SavedProfile[] = [];
   private _runs: RunState[] = [];
+  private _view: MainView = 'terminal';
 
   get sessions(): SessionInfo[] {
     return this._sessions;
@@ -34,6 +38,10 @@ export class AppState {
 
   get runs(): RunState[] {
     return this._runs;
+  }
+
+  get view(): MainView {
+    return this._view;
   }
 
   subscribe(listener: Listener): () => void {
@@ -71,8 +79,22 @@ export class AppState {
     this.notify();
   }
 
+  showEditor(): void {
+    this.setView('editor');
+  }
+
+  showTerminal(): void {
+    this.setView('terminal');
+  }
+
   toggleInputPanel(): void {
     this._inputPanelVisible = !this._inputPanelVisible;
+    this.notify();
+  }
+
+  private setView(view: MainView): void {
+    if (view === this._view) return;
+    this._view = view;
     this.notify();
   }
 

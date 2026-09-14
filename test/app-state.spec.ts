@@ -101,6 +101,27 @@ describe('AppState 輸入面板', () => {
   });
 });
 
+describe('AppState 主畫面', () => {
+  it('預設是終端機，切到畫布編輯器會通知', () => {
+    let notified = 0;
+    state.subscribe(() => (notified += 1));
+    expect(state.view).toBe('terminal');
+    state.showEditor();
+    expect(state.view).toBe('editor');
+    state.showTerminal();
+    expect(state.view).toBe('terminal');
+    expect(notified).toBe(2);
+  });
+
+  it('切到同一個畫面不重複通知', () => {
+    state.showEditor();
+    let notified = 0;
+    state.subscribe(() => (notified += 1));
+    state.showEditor();
+    expect(notified).toBe(0);
+  });
+});
+
 describe('AppState 已儲存連線', () => {
   const profile: SavedProfile = { type: 'powershell', name: '我的 PS' };
 

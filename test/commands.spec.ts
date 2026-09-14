@@ -16,7 +16,13 @@ import {
   StartWorkflowCommand,
   ResumeWorkflowCommand,
   CancelWorkflowCommand,
+  OpenEditorCommand,
+  CloseEditorCommand,
+  SaveWorkflowCommand,
+  DeleteWorkflowCommand,
+  SaveAndRunWorkflowCommand,
 } from '../src/renderer/commands';
+import { WorkflowEditorModel } from '../src/renderer/workflow-editor-model';
 import { ThemeStore } from '../src/renderer/theme';
 import type { TerminalPort, ClipboardPort, InputPanelPort, DialogPort } from '../src/renderer/ports';
 import type { MyTerminalApi } from '../src/shared/api';
@@ -78,6 +84,8 @@ const fakeApi = () =>
     startWorkflow: vi.fn().mockResolvedValue('run-1'),
     resumeWorkflow: vi.fn().mockResolvedValue(undefined),
     cancelWorkflow: vi.fn().mockResolvedValue(undefined),
+    saveWorkflow: vi.fn().mockResolvedValue(undefined),
+    deleteWorkflow: vi.fn().mockResolvedValue(undefined),
   }) as unknown as MyTerminalApi & {
     write: ReturnType<typeof vi.fn>;
     startLog: ReturnType<typeof vi.fn>;
@@ -86,6 +94,8 @@ const fakeApi = () =>
     startWorkflow: ReturnType<typeof vi.fn>;
     resumeWorkflow: ReturnType<typeof vi.fn>;
     cancelWorkflow: ReturnType<typeof vi.fn>;
+    saveWorkflow: ReturnType<typeof vi.fn>;
+    deleteWorkflow: ReturnType<typeof vi.fn>;
   };
 
 let state: AppState;
@@ -350,5 +360,126 @@ describe('工作流的三個 Command', () => {
       name: 'x',
     }).execute();
     expect(api.cancelWorkflow).not.toHaveBeenCalled();
+  });
+});
+
+describe('畫布編輯器的 Command', () => {
+  let api: ReturnType<typeof fakeApi>;
+  let model: WorkflowEditorModel;
+  let errors: string[][];
+  let refreshed: number;
+
+  /** 一份接得起來的最小工作流，存下去才不會被驗證擋掉。*/
+  const wired = (): WorkflowEditorModel => {
+    const m = new WorkflowEditorModel();
+    m.newWorkflow();
+    m.connect('start', undefined, 'end');
+    return m;
+  };
+
+  const save = (): SaveWorkflowCommand =>
+    new SaveWorkflowCommand(
+      api,
+      model,
+      (messages) => errors.push(messages),
+      () => void (refreshed += 1),
+    );
+
+  beforeEach(() => {
+    api = fakeApi();
+    model = wired();
+    errors = [];
+    refreshed = 0;
+  });
+
+  it('OpenEditorCommand 沒有未存的東西時開一張新的', () => {
+    model.setName('改到一半');
+    new OpenEditorCommand(state, model).execute();
+    expect(state.view).toBe('editor');
+    expect(model.definition.name).toBe('改到一半');
+
+    model.markSaved();
+    new OpenEditorCommand(state, model).execute();
+    expect(model.definition.name).toBe('新工作流');
+  });
+
+  it('CloseEditorCommand 切回終端機', () => {
+    state.showEditor();
+    new CloseEditorCommand(state).execute();
+    expect(state.view).toBe('terminal');
+  });
+
+  it('SaveWorkflowCommand 存進去之後變乾淨，並重新取一次清單', async () => {
+    expect(await save().run()).toBe(true);
+    expect(api.saveWorkflow).toHaveBeenCalledWith(model.definition);
+    expect(model.dirty).toBe(false);
+    expect(model.source).toBe('custom');
+    expect(errors).toEqual([[]]);
+    expect(refreshed).toBe(1);
+  });
+
+  it('不合法就顯示錯誤，不送出去', async () => {
+    model.newWorkflow(); // 結束節點還沒接上
+    expect(await save().run()).toBe(false);
+    expect(api.saveWorkflow).not.toHaveBeenCalled();
+    expect(errors).toEqual([['節點 end 從開始節點走不到']]);
+  });
+
+  it('內建範本存成副本，不會蓋掉範本', async () => {
+    const template = { ...model.definition, id: 'implement-review-approve', name: '範本' };
+    model.load(template, 'builtin');
+
+    expect(await save().run()).toBe(true);
+    const saved = api.saveWorkflow.mock.calls[0][0];
+    expect(saved.id).not.toBe('implement-review-approve');
+    expect(saved.id).toMatch(/^wf-/);
+    expect(saved.name).toBe('範本 (副本)');
+    // 畫布接著編輯的就是那份副本
+    expect(model.definition.id).toBe(saved.id);
+    expect(model.source).toBe('custom');
+  });
+
+  it('main 拒絕時把訊息顯示出來，畫布還是髒的', async () => {
+    api.saveWorkflow.mockRejectedValueOnce(new Error('不能覆蓋內建範本'));
+    expect(await save().run()).toBe(false);
+    expect(errors).toEqual([['不能覆蓋內建範本']]);
+    expect(model.dirty).toBe(true);
+  });
+
+  it('DeleteWorkflowCommand 確認之後才刪，刪完回到新的畫布', async () => {
+    const id = model.definition.id;
+    const asked: string[] = [];
+    await new DeleteWorkflowCommand(
+      api,
+      (message) => {
+        asked.push(message);
+        return true;
+      },
+      model,
+      () => void (refreshed += 1),
+    ).execute();
+
+    expect(asked).toEqual(['刪除工作流「新工作流」？']);
+    expect(api.deleteWorkflow).toHaveBeenCalledWith(id);
+    expect(model.definition.id).not.toBe(id);
+    expect(refreshed).toBe(1);
+  });
+
+  it('不確認就不刪', async () => {
+    await new DeleteWorkflowCommand(api, () => false, model, () => {}).execute();
+    expect(api.deleteWorkflow).not.toHaveBeenCalled();
+  });
+
+  it('SaveAndRunWorkflowCommand 存好才開執行對話框', async () => {
+    const opened: string[] = [];
+    await new SaveAndRunWorkflowCommand(save(), model, (id) => opened.push(id)).execute();
+    expect(opened).toEqual([model.definition.id]);
+  });
+
+  it('存不起來就不開執行對話框', async () => {
+    model.newWorkflow();
+    const opened: string[] = [];
+    await new SaveAndRunWorkflowCommand(save(), model, (id) => opened.push(id)).execute();
+    expect(opened).toEqual([]);
   });
 });

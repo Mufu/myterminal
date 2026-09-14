@@ -91,6 +91,34 @@
             </button>
           </div>
         </section>
+
+        <section id="workflow-editor" hidden>
+          <header id="editor-bar">
+            <button id="btn-editor-close" type="button">← 回終端機</button>
+            <select id="editor-workflow" title="工作流" aria-label="工作流"></select>
+            <input id="editor-name" type="text" placeholder="工作流名稱" aria-label="工作流名稱" />
+            <span class="toolbar-sep"></span>
+            <button id="btn-add-agent" type="button">＋ Agent</button>
+            <button id="btn-add-condition" type="button">＋ 條件</button>
+            <button id="btn-add-approval" type="button">＋ 批准</button>
+            <button id="btn-add-end" type="button">＋ 結束</button>
+            <span class="toolbar-spacer"></span>
+            <button id="btn-editor-delete" type="button">刪除</button>
+            <button id="btn-editor-save" type="button" class="primary">儲存</button>
+            <button id="btn-editor-run" type="button">儲存並執行</button>
+          </header>
+
+          <p id="editor-errors" class="errors" hidden></p>
+
+          <div id="editor-body">
+            <div id="editor-canvas">
+              <div id="editor-viewport">
+                <svg id="editor-edges" aria-hidden="true"></svg>
+              </div>
+            </div>
+            <aside id="editor-props"></aside>
+          </div>
+        </section>
       </main>
 
       <aside id="session-panel">
@@ -108,6 +136,7 @@
 
         <header id="workflow-panel-head">
           <h2>工作流</h2>
+          <button id="btn-workflow-edit" type="button">編輯</button>
           <button id="btn-workflow-run" type="button">執行工作流</button>
         </header>
         <ul id="workflow-list"></ul>

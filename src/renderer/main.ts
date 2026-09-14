@@ -25,10 +25,18 @@ import {
   StartWorkflowCommand,
   ResumeWorkflowCommand,
   CancelWorkflowCommand,
+  OpenEditorCommand,
+  CloseEditorCommand,
+  SaveWorkflowCommand,
+  DeleteWorkflowCommand,
+  SaveAndRunWorkflowCommand,
 } from './commands';
+import { WorkflowEditorModel } from './workflow-editor-model';
+import { WorkflowEditorView } from './workflow-editor-view';
 import { ThemeStore } from './theme';
 import type { ClipboardPort, ConfirmPort } from './ports';
 import type { ConnectionProfile, SavedProfile } from '../shared/profile';
+import type { WorkflowInfo } from '../shared/workflow';
 
 const $ = <T extends HTMLElement>(id: string): T => {
   const el = document.getElementById(id);
@@ -51,6 +59,8 @@ const terminals = new Map<string, TerminalView>();
 const pendingData = new Map<string, string>();
 const terminalsEl = $<HTMLDivElement>('terminals');
 const emptyHint = $<HTMLDivElement>('empty-hint');
+const terminalArea = $<HTMLElement>('terminal-area');
+const editorEl = $<HTMLElement>('workflow-editor');
 
 const activeTerminal = (): TerminalView | null =>
   state.activeSessionId ? (terminals.get(state.activeSessionId) ?? null) : null;
@@ -208,6 +218,60 @@ const workflowDialog = new WorkflowRunDialog((workflowId, params) => {
 });
 $<HTMLButtonElement>('btn-workflow-run').addEventListener('click', () => workflowDialog.open());
 
+// 畫布編輯器：編輯的就是那份 WorkflowDefinition，存出去之後跟內建範本同一種東西。
+const editorModel = new WorkflowEditorModel();
+/** 執行對話框與畫布的下拉選單共用這一份清單，存完要重新取一次。*/
+let workflowInfos: WorkflowInfo[] = [];
+
+async function refreshWorkflows(): Promise<void> {
+  workflowInfos = await api.listWorkflows();
+  workflowDialog.setWorkflows(workflowInfos);
+  editorView.setWorkflows(workflowInfos);
+}
+
+/** 下拉選單換一份定義；手上還有沒存的東西就先問一次。*/
+async function pickWorkflow(id: string): Promise<void> {
+  if (editorModel.dirty && !confirmRemove('畫布上的變更還沒儲存，要放棄嗎？')) return;
+  if (!id) {
+    editorModel.newWorkflow();
+    return;
+  }
+  const definition = await api.getWorkflow(id);
+  if (!definition) return;
+  const builtin = workflowInfos.find((info) => info.id === id)?.builtin ?? false;
+  editorModel.load(definition, builtin ? 'builtin' : 'custom');
+}
+
+const editorView = new WorkflowEditorView(editorModel, {
+  close: () => new CloseEditorCommand(state).execute(),
+  save: () => void saveWorkflow.execute(),
+  saveAndRun: () =>
+    void new SaveAndRunWorkflowCommand(saveWorkflow, editorModel, (id) =>
+      workflowDialog.open(id),
+    ).execute(),
+  remove: () =>
+    void new DeleteWorkflowCommand(api, confirmRemove, editorModel, refreshWorkflows).execute(),
+  pick: (id) => void pickWorkflow(id),
+});
+
+const saveWorkflow = new SaveWorkflowCommand(
+  api,
+  editorModel,
+  (messages) => editorView.showErrors(messages),
+  refreshWorkflows,
+);
+
+$<HTMLButtonElement>('btn-workflow-edit').addEventListener('click', () =>
+  new OpenEditorCommand(state, editorModel).execute(),
+);
+
+/** 切畫面：終端機那三塊收起來，畫布顯示出來 (或反過來)。*/
+function syncView(): void {
+  const editing = state.view === 'editor';
+  terminalArea.classList.toggle('editing', editing);
+  editorEl.hidden = !editing;
+}
+
 new WorkflowListView(
   $<HTMLUListElement>('workflow-list'),
   state,
@@ -217,6 +281,8 @@ new WorkflowListView(
   (sessionId) => state.setActive(sessionId),
 );
 
+// 順序有意義：先把畫布收起來，syncTerminals 才量得到終端機的寬度。
+state.subscribe(syncView);
 state.subscribe(syncTerminals);
 api.onSessionsChanged((sessions) => state.setSessions(sessions));
 api.onProfilesChanged((profiles) => state.setProfiles(profiles));
@@ -233,4 +299,4 @@ window.addEventListener('resize', () => activeTerminal()?.resize());
 void api.list().then((sessions) => state.setSessions(sessions));
 void api.listProfiles().then((profiles) => state.setProfiles(profiles));
 void api.workflowRuns().then((runs) => state.setRuns(runs));
-void api.listWorkflows().then((infos) => workflowDialog.setWorkflows(infos));
+void refreshWorkflows();

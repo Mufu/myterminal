@@ -53,8 +53,10 @@ export class WorkflowRunDialog implements DialogPort {
     }
   }
 
-  open(): void {
+  /** 畫布的「儲存並執行」會指定要跑哪一個，其餘時候維持上一次的選擇。*/
+  open(workflowId?: string): void {
     this.errors.textContent = '';
+    if (workflowId) this.workflow.value = workflowId;
     this.dialog.showModal();
     this.task.focus();
   }

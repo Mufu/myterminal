@@ -1,6 +1,8 @@
 import type { AppState } from './app-state';
 import type { ThemeStore } from './theme';
 import { parseTheme } from './theme';
+import type { WorkflowEditorModel } from './workflow-editor-model';
+import { newWorkflowId } from './workflow-editor-model';
 import type { MyTerminalApi } from '../shared/api';
 import type { ConnectionProfile, SavedProfile } from '../shared/profile';
 import type { AgentKind } from '../shared/agent';
@@ -191,6 +193,104 @@ export class CancelWorkflowCommand implements ICommand {
   }
 }
 
+/**
+ * 「編輯」：打開畫布。手上還有沒存的東西就直接顯示，不要把它蓋掉。
+ */
+export class OpenEditorCommand implements ICommand {
+  constructor(
+    private readonly state: AppState,
+    private readonly model: WorkflowEditorModel,
+  ) {}
+  execute(): void {
+    if (!this.model.dirty) this.model.newWorkflow();
+    this.state.showEditor();
+  }
+}
+
+/** 「← 回終端機」：畫布上的東西留著，只是不顯示。*/
+export class CloseEditorCommand implements ICommand {
+  constructor(private readonly state: AppState) {}
+  execute(): void {
+    this.state.showTerminal();
+  }
+}
+
+/**
+ * 畫布的「儲存」：先在本地驗證一次 (錯誤直接顯示在畫布上，不用等 main 拒絕)，
+ * 內建範本一律另存成副本 —— main 那邊本來就不讓覆蓋，與其被拒絕不如直接給副本。
+ */
+export class SaveWorkflowCommand implements ICommand {
+  constructor(
+    private readonly api: MyTerminalApi,
+    private readonly model: WorkflowEditorModel,
+    private readonly showErrors: (messages: string[]) => void,
+    private readonly refresh: () => void | Promise<void>,
+  ) {}
+
+  async execute(): Promise<void> {
+    await this.run();
+  }
+
+  /** 回傳有沒有真的存進去；「儲存並執行」要靠它決定要不要開對話框。*/
+  async run(): Promise<boolean> {
+    const errors = this.model.validate();
+    if (errors.length > 0) {
+      this.showErrors(errors);
+      return false;
+    }
+
+    const current = this.model.definition;
+    const copy = this.model.source === 'builtin';
+    const definition = copy
+      ? { ...current, id: newWorkflowId(), name: `${current.name} (副本)` }
+      : current;
+
+    try {
+      await this.api.saveWorkflow(definition);
+    } catch (error) {
+      this.showErrors([errorText(error)]);
+      return false;
+    }
+
+    // 存成副本之後，接下來編輯的就是那份副本。
+    if (copy) this.model.load(definition, 'custom');
+    else this.model.markSaved();
+    this.showErrors([]);
+    await this.refresh();
+    return true;
+  }
+}
+
+/** 畫布的「刪除」：只有自訂工作流刪得掉，刪完畫布回到一張新的。*/
+export class DeleteWorkflowCommand implements ICommand {
+  constructor(
+    private readonly api: MyTerminalApi,
+    private readonly confirm: ConfirmPort,
+    private readonly model: WorkflowEditorModel,
+    private readonly refresh: () => void | Promise<void>,
+  ) {}
+  async execute(): Promise<void> {
+    const { id, name } = this.model.definition;
+    if (!this.confirm(`刪除工作流「${name}」？`)) return;
+    await this.api.deleteWorkflow(id);
+    this.model.newWorkflow();
+    await this.refresh();
+  }
+}
+
+/** 「儲存並執行」：存起來，再用既有的執行對話框跑它。*/
+export class SaveAndRunWorkflowCommand implements ICommand {
+  constructor(
+    private readonly save: SaveWorkflowCommand,
+    private readonly model: WorkflowEditorModel,
+    private readonly openRun: (workflowId: string) => void,
+  ) {}
+  async execute(): Promise<void> {
+    if (!(await this.save.run())) return;
+    this.openRun(this.model.definition.id);
+  }
+}
+
 /** 已儲存連線的 ✕：確認之後才刪除。*/
 export class RemoveProfileCommand implements ICommand {
   constructor(
@@ -202,4 +302,9 @@ export class RemoveProfileCommand implements ICommand {
     if (!this.confirm(`刪除連線設定「${this.name}」？`)) return;
     await this.api.removeProfile(this.name);
   }
+}
+
+/** IPC 丟回來的通常是 Error，但也可能是別的東西。*/
+function errorText(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
