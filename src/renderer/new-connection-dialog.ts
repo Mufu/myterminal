@@ -4,6 +4,7 @@ import type { AgentRole } from '../shared/roles';
 import { ROLES, findRole } from '../shared/roles';
 import { defaultStartupCommand } from '../shared/profile';
 import { validateProfile } from '../shared/validate-profile';
+import { parseArgs } from '../shared/parse-args';
 import type { DialogPort } from './ports';
 
 const $ = <T extends HTMLElement>(id: string): T => {
@@ -150,7 +151,7 @@ export class NewConnectionDialog implements DialogPort {
           name,
           cwd,
           file: value('f-file'),
-          args: value('f-args').split(/\s+/).filter(Boolean),
+          args: parseArgs(value('f-args')),
         };
 
       case 'powershell':
