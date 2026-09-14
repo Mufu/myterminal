@@ -13,6 +13,12 @@ mkdirSync(logDir, { recursive: true });
 const shot = (window: Page, name: string) =>
   window.screenshot({ path: join(root, 'test-results', `toolbar-${name}.png`) });
 
+/** 畫面上出現幾次。貼上時回顯會先到，輸出是之後才來的，所以要等到兩次。*/
+const countOn = async (window: Page, mark: string): Promise<number> => {
+  const text = await activeRows(window).innerText();
+  return text.match(new RegExp(mark, 'g'))?.length ?? 0;
+};
+
 /** 紀錄檔裡有一堆終端機控制碼，比對文字前先拿掉。*/
 const stripAnsi = (text: string): string =>
   // eslint-disable-next-line no-control-regex
@@ -53,8 +59,7 @@ test('輸入字：兩行一次送出，兩行的輸出都出現，標題顯示�
   // 送出後輸入區清空
   await expect(window.locator('#input-text')).toHaveValue('');
 
-  await expect(activeRows(window)).toContainText('LINE_ONE', { timeout: 20_000 });
-  await expect(activeRows(window)).toContainText('LINE_TWO', { timeout: 20_000 });
+  await expect.poll(() => countOn(window, 'LINE_TWO'), { timeout: 20_000 }).toBeGreaterThanOrEqual(2);
   await shot(window, 'input');
 
   const text = await activeRows(window).innerText();
@@ -97,7 +102,7 @@ test('貼上：多行的剪貼簿內容一次進去，按 Enter 三行都執行'
   await window.locator('.term-host:not([hidden]) .xterm-screen').click();
   await window.keyboard.press('Enter');
 
-  await expect(activeRows(window)).toContainText('PASTE_C', { timeout: 20_000 });
+  await expect.poll(() => countOn(window, 'PASTE_C'), { timeout: 20_000 }).toBeGreaterThanOrEqual(2);
   const text = await activeRows(window).innerText();
   const seen = `終端機畫面：\n${text}`;
   // 三行都真的「執行」過：回顯一次 + 輸出一次。
