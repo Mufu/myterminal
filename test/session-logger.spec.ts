@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SessionLogger } from '../src/main/session-logger';
+import { join } from 'node:path';
+import { SessionLogger, logTimestamp } from '../src/main/session-logger';
 import type { ILogSink } from '../src/main/session-logger';
 
 class FakeSink implements ILogSink {
@@ -26,20 +27,28 @@ beforeEach(() => {
       sinks.push(sink);
       return sink;
     },
-    () => new Date(Date.UTC(2026, 8, 8, 1, 2, 3)),
+    // 檔名用的是當地時間，所以測試給的也是當地時間。
+    () => new Date(2026, 8, 8, 1, 2, 3),
   );
+});
+
+describe('logTimestamp', () => {
+  it('是當地時間的 YYYYMMDD-HHmmss', () => {
+    expect(logTimestamp(new Date(2026, 8, 8, 1, 2, 3))).toBe('20260908-010203');
+    expect(logTimestamp(new Date(2026, 11, 31, 23, 59, 59))).toBe('20261231-235959');
+  });
 });
 
 describe('SessionLogger', () => {
   it('start 用 <目錄>/<名稱>-<時間戳>.log 開檔並回傳路徑', () => {
     const path = logger.start('s1', 'PowerShell 1');
-    expect(path).toBe('D:/logs/PowerShell 1-20260908-010203.log');
+    expect(path).toBe(join('D:/logs', 'PowerShell 1-20260908-010203.log'));
     expect(sinks[0].path).toBe(path);
   });
 
   it('檔名中不合法的字元會被換掉', () => {
     const path = logger.start('s1', 'ssh robert@a/b:c');
-    expect(path).toBe('D:/logs/ssh robert@a_b_c-20260908-010203.log');
+    expect(path).toBe(join('D:/logs', 'ssh robert@a_b_c-20260908-010203.log'));
   });
 
   it('只有正在記錄的工作階段會被寫入 (Decorator 只包住被選中的資料流)', () => {

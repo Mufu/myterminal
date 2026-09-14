@@ -20,7 +20,8 @@ let win: BrowserWindow | null = null;
 // 最後一道防線：主行程的未捕捉例外預設會跳出錯誤對話框，改成寫進 stderr。
 process.on('uncaughtException', (error) => console.error('[main] 未捕捉的例外', error));
 
-const logDir = defaultLogDir();
+// 紀錄檔的目錄；e2e 用 MYTERMINAL_LOG_DIR 指到自己的暫存目錄，不去碰使用者的。
+const logDir = process.env.MYTERMINAL_LOG_DIR?.trim() || defaultLogDir();
 ensureLogDir(logDir);
 
 // CLI 是用訂閱還是 API 金鑰登入：開機問一次就好，不擋啟動 (探測不出來也照跑)。

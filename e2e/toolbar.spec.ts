@@ -1,12 +1,14 @@
 import { test, expect } from '@playwright/test';
 import type { ElectronApplication, Page } from '@playwright/test';
-import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { homedir } from 'node:os';
+import { mkdirSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { activeRows, freshUserData, launchApp, root, runInTerminal } from './helpers';
 
 const userData = freshUserData('toolbar');
-const logDir = join(homedir(), 'myterminal-logs');
+/** 紀錄檔寫到 test-results 底下，不要碰使用者自己的 %USERPROFILE%\myterminal-logs。*/
+const logDir = join(root, 'test-results', 'toolbar-logs');
+rmSync(logDir, { recursive: true, force: true });
+mkdirSync(logDir, { recursive: true });
 
 const shot = (window: Page, name: string) =>
   window.screenshot({ path: join(root, 'test-results', `toolbar-${name}.png`) });
@@ -22,7 +24,7 @@ async function openWithSession(): Promise<{
   window: Page;
   dialogs: string[];
 }> {
-  const { app, window } = await launchApp(userData);
+  const { app, window } = await launchApp(userData, { MYTERMINAL_LOG_DIR: logDir });
   const dialogs: string[] = [];
   window.on('dialog', (dialog) => {
     dialogs.push(dialog.message());

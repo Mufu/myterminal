@@ -21,8 +21,17 @@ export interface LaunchedApp {
   window: Page;
 }
 
-export async function launchApp(userData: string): Promise<LaunchedApp> {
-  const app = await electron.launch({ args: ['.', `--user-data-dir=${userData}`], cwd: root });
+export async function launchApp(
+  userData: string,
+  /** 額外的環境變數，例如把紀錄檔目錄 (MYTERMINAL_LOG_DIR) 指到 test-results。*/
+  env?: Record<string, string>,
+): Promise<LaunchedApp> {
+  const app = await electron.launch({
+    args: ['.', `--user-data-dir=${userData}`],
+    cwd: root,
+    // process.env 的值可能是 undefined，Playwright 只收字串，所以先濾一次。
+    ...(env ? { env: { ...defined(process.env), ...env } } : {}),
+  });
   const window = await app.firstWindow();
   await window.waitForLoadState('domcontentloaded');
   return { app, window };
@@ -67,4 +76,11 @@ export async function expectAlive(app: ElectronApplication, window: Page): Promi
   // renderer 也要還能跑 JS。
   const title = await window.title();
   if (!title) throw new Error('renderer 沒有回應');
+}
+
+/** 把 process.env 裡沒有值的項目拿掉。*/
+function defined(env: NodeJS.ProcessEnv): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [key, value] of Object.entries(env)) if (value !== undefined) out[key] = value;
+  return out;
 }

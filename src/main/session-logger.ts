@@ -24,11 +24,12 @@ export const defaultSinkFactory: LogSinkFactory = (path) => {
 /** Windows 檔名不允許的字元。*/
 const ILLEGAL = /[\\/:*?"<>|]/g;
 
-function timestamp(now: Date): string {
+/** 檔名裡的時間戳。看檔名要對得上當時的時鐘，所以用當地時間而不是 UTC。*/
+export function logTimestamp(now: Date): string {
   const p = (n: number, width = 2) => String(n).padStart(width, '0');
   return (
-    `${now.getUTCFullYear()}${p(now.getUTCMonth() + 1)}${p(now.getUTCDate())}` +
-    `-${p(now.getUTCHours())}${p(now.getUTCMinutes())}${p(now.getUTCSeconds())}`
+    `${now.getFullYear()}${p(now.getMonth() + 1)}${p(now.getDate())}` +
+    `-${p(now.getHours())}${p(now.getMinutes())}${p(now.getSeconds())}`
   );
 }
 
@@ -53,7 +54,7 @@ export class SessionLogger {
     if (existing) return existing;
 
     const safeName = sessionName.replace(ILLEGAL, '_');
-    const path = `${this.dir}/${safeName}-${timestamp(this.now())}.log`;
+    const path = join(this.dir, `${safeName}-${logTimestamp(this.now())}.log`);
     this.sinks.set(sessionId, this.createSink(path));
     this.paths.set(sessionId, path);
     return path;
