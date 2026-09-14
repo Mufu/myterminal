@@ -200,6 +200,18 @@ describe('紀錄', () => {
     expect(api.startLog).not.toHaveBeenCalled();
   });
 
+  /** 已經結束的工作階段不會再有輸出，開下去只會留下一個 0 byte 的檔。*/
+  it('已結束的工作階段不開紀錄', async () => {
+    state.setSessions([session('s1', { state: 'exited' })]);
+    await new ToggleLogCommand(state, api).execute();
+    expect(api.startLog).not.toHaveBeenCalled();
+  });
+
+  it('已結束但還在紀錄的，停得下來', async () => {
+    state.setSessions([session('s1', { state: 'exited', logging: true })]);
+    await new ToggleLogCommand(state, api).execute();
+    expect(api.stopLog).toHaveBeenCalledWith('s1');
+  });
 });
 
 describe('清除畫面', () => {

@@ -69,7 +69,7 @@ export class PasteCommand implements ICommand {
   }
 }
 
-/** 紀錄 */
+/** 紀錄。已經結束的工作階段不會再有輸出，開紀錄只會留下一個 0 byte 的檔案。*/
 export class ToggleLogCommand implements ICommand {
   constructor(
     private readonly state: AppState,
@@ -79,7 +79,7 @@ export class ToggleLogCommand implements ICommand {
     const session = this.state.activeSession();
     if (!session) return;
     if (session.logging) await this.api.stopLog(session.id);
-    else await this.api.startLog(session.id);
+    else if (session.state === 'running') await this.api.startLog(session.id);
   }
 }
 

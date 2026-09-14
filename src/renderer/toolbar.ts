@@ -61,6 +61,8 @@ export class Toolbar {
   private render(): void {
     const session = this.state.activeSession();
     for (const button of this.needSession) button.disabled = session === null;
+    // 已經結束的工作階段不會再有輸出，開紀錄只會留下一個 0 byte 的檔案。
+    this.logButton.disabled = session === null || session.state !== 'running';
     this.logButton.classList.toggle('on', session?.logging === true);
     if (this.logLabel) this.logLabel.textContent = session?.logging ? '紀錄中' : '紀錄';
     $<HTMLButtonElement>('btn-input').classList.toggle('on', this.state.inputPanelVisible);
