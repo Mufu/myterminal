@@ -59,7 +59,14 @@ export class WorkflowStore {
   }
 }
 
-/** 手動編輯過的 JSON 也可能少欄位，形狀不對的項目直接忽略。*/
+const NODE_TYPES: readonly string[] = ['start', 'end', 'agent', 'condition', 'approval'];
+
+/**
+ * 手動編輯過的 JSON 也可能少欄位，形狀不對的項目直接忽略 ——
+ * 連節點裡面都要看，不然畫布畫到一半會在 node.position.x 上丟例外，畫出一片空白。
+ * 這裡只看「形狀對不對」，不跑 validateWorkflow ——
+ * 提示留白這種意義上的錯要還看得到、也改得了。
+ */
 function isWorkflowDefinition(value: unknown): value is WorkflowDefinition {
   if (typeof value !== 'object' || value === null) return false;
   const { version, id, name, nodes, edges } = value as Partial<WorkflowDefinition>;
@@ -68,8 +75,29 @@ function isWorkflowDefinition(value: unknown): value is WorkflowDefinition {
     typeof id === 'string' &&
     typeof name === 'string' &&
     Array.isArray(nodes) &&
-    Array.isArray(edges)
+    nodes.every(isNode) &&
+    Array.isArray(edges) &&
+    edges.every(isEdge)
   );
+}
+
+function isNode(value: unknown): boolean {
+  if (typeof value !== 'object' || value === null) return false;
+  const { id, type, label, position, config } = value as Record<string, unknown>;
+  if (typeof id !== 'string' || typeof label !== 'string') return false;
+  if (typeof type !== 'string' || !NODE_TYPES.includes(type)) return false;
+  if (typeof position !== 'object' || position === null) return false;
+  const { x, y } = position as Record<string, unknown>;
+  if (typeof x !== 'number' || typeof y !== 'number') return false;
+  // start / end 沒有 config，其餘三種一定要有一個物件。
+  if (type === 'start' || type === 'end') return true;
+  return typeof config === 'object' && config !== null;
+}
+
+function isEdge(value: unknown): boolean {
+  if (typeof value !== 'object' || value === null) return false;
+  const { from, to } = value as Record<string, unknown>;
+  return typeof from === 'string' && typeof to === 'string';
 }
 
 /** 正式環境：整份檔案一次讀進來、一次覆寫回去。*/

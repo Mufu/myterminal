@@ -58,6 +58,41 @@ describe('WorkflowStore 讀取', () => {
     expect(store.list().map((w) => w.id)).toEqual(['好的']);
   });
 
+  /** 畫布畫到一半在 node.position.x 上丟例外的話，整個編輯器是一片空白。*/
+  it('節點或連線的形狀不對也忽略', () => {
+    const broken = (over: Record<string, unknown>) => ({
+      ...minimalWorkflow('x'),
+      ...over,
+    });
+    file.content = JSON.stringify([
+      // 只有 id 的節點：沒有 type / label / position
+      broken({ nodes: [{ id: 'x' }] }),
+      // position 不是數字
+      broken({
+        nodes: [{ id: 'x', type: 'start', label: '開始', position: { x: '40', y: 0 } }],
+      }),
+      // 不認得的節點型別
+      broken({
+        nodes: [{ id: 'x', type: 'loop', label: 'x', position: { x: 0, y: 0 }, config: {} }],
+      }),
+      // agent 沒有 config
+      broken({ nodes: [{ id: 'x', type: 'agent', label: 'x', position: { x: 0, y: 0 } }] }),
+      // 連線的兩端不是字串
+      broken({ edges: [{ from: 1, to: 2 }] }),
+      minimalWorkflow('好的'),
+    ]);
+    expect(store.list().map((w) => w.id)).toEqual(['好的']);
+  });
+
+  /** 意義上的錯（提示留白）不能讓它消失 —— 使用者要看得到才改得了。*/
+  it('只是驗證不過的定義仍然列得出來', () => {
+    const blankPrompt = minimalWorkflow('沒提示');
+    const node = blankPrompt.nodes[1];
+    if (node.type === 'agent') node.config.prompt = '';
+    file.content = JSON.stringify([blankPrompt]);
+    expect(store.list().map((w) => w.id)).toEqual(['沒提示']);
+  });
+
   it('get 依 id 拿一份，沒有就是 undefined', () => {
     store.save(minimalWorkflow('a'));
     expect(store.get('a')?.id).toBe('a');
