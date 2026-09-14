@@ -4,7 +4,7 @@ import { parseTheme } from './theme';
 import type { WorkflowEditorModel } from './workflow-editor-model';
 import { newWorkflowId } from './workflow-editor-model';
 import type { MyTerminalApi } from '../shared/api';
-import type { ConnectionProfile, SavedProfile } from '../shared/profile';
+import type { ConnectionProfile, SavedProfile, SessionType } from '../shared/profile';
 import type { AgentKind } from '../shared/agent';
 import type { SessionInfo } from '../shared/session';
 import type {
@@ -88,6 +88,19 @@ export class ClearScreenCommand implements ICommand {
   }
 }
 
+/** 這幾種工作階段後面是 shell：一行就是一個指令。*/
+const SHELL_TYPES: readonly SessionType[] = ['powershell', 'wsl', 'ssh', 'custom'];
+
+/**
+ * 整段文字送進 pty 之前要怎麼換行。
+ * shell：LF 會被 PSReadLine 當成軟斷行，整段都不會執行，所以每一行都換成 CR (Enter)。
+ * claude / codex / agent：收的是一段多行提示，裡面的 LF 就是換行，最後才送一個 CR。
+ */
+export function inputPayload(text: string, type: SessionType | undefined): string {
+  const shell = type === undefined || SHELL_TYPES.includes(type);
+  return `${shell ? text.replace(/\r?\n/g, '\r') : text}\r`;
+}
+
 /** 輸入面板的「送出」：把整段內容一次送進工作階段。*/
 export class SendInputCommand implements ICommand {
   constructor(
@@ -96,11 +109,11 @@ export class SendInputCommand implements ICommand {
     private readonly panel: InputPanelPort,
   ) {}
   async execute(): Promise<void> {
-    const id = this.state.activeSessionId;
-    if (!id) return;
+    const session = this.state.activeSession();
+    if (!session) return;
     const text = this.panel.getText();
     if (!text.trim()) return;
-    await this.api.write(id, `${text}\r`);
+    await this.api.write(session.id, inputPayload(text, session.type));
     this.panel.clear();
   }
 }

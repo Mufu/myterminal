@@ -216,6 +216,38 @@ describe('送出 (輸入面板)', () => {
     expect(api.write).not.toHaveBeenCalled();
     expect(panel.cleared).toBe(0);
   });
+
+  /** shell 一行就是一個指令：LF 會被 PSReadLine 當成軟斷行，整段都不會執行。*/
+  it.each(['powershell', 'wsl', 'ssh', 'custom'] as const)(
+    '%s：多行的每一行都換成 CR，每一行都是 Enter',
+    async (type) => {
+      state.setSessions([session('s1', { type })]);
+      const panel = new FakeInputPanel();
+      panel.text = 'echo LINE_ONE\necho LINE_TWO';
+      await new SendInputCommand(state, api, panel).execute();
+      expect(api.write).toHaveBeenCalledWith('s1', 'echo LINE_ONE\recho LINE_TWO\r');
+    },
+  );
+
+  it('CRLF 的換行也算一行 (貼進來的文字可能帶 \\r\\n)', async () => {
+    state.setSessions([session('s1', { type: 'powershell' })]);
+    const panel = new FakeInputPanel();
+    panel.text = 'echo A\r\necho B';
+    await new SendInputCommand(state, api, panel).execute();
+    expect(api.write).toHaveBeenCalledWith('s1', 'echo A\recho B\r');
+  });
+
+  /** claude / codex / agent 收的是一段多行提示，裡面的 LF 就是換行 (Ctrl+J)。*/
+  it.each(['claude', 'codex', 'agent'] as const)(
+    '%s：保留段落裡的換行，最後才送一個 CR',
+    async (type) => {
+      state.setSessions([session('s1', { type })]);
+      const panel = new FakeInputPanel();
+      panel.text = '第一行\n第二行';
+      await new SendInputCommand(state, api, panel).execute();
+      expect(api.write).toHaveBeenCalledWith('s1', '第一行\n第二行\r');
+    },
+  );
 });
 
 describe('切換主題', () => {
