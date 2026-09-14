@@ -53,7 +53,7 @@ type WorkflowEdge = {
 | --- | --- |
 | `kind` | `'claude'` 或 `'codex'`，走的是 Agent 任務那條既有的 `IAgentRunner` |
 | `prompt` | 樣板，見下面的「樣板」 |
-| `cwd` | 也吃樣板；留空時用家目錄 |
+| `cwd` | 也吃樣板；不能留空（驗證會擋），而且執行前會檢查代入後的目錄真的存在 |
 | `allowEdits` | `false` 是 Claude 的 `plan`／Codex 的 `read-only`，`true` 才會動檔案 |
 | `role` | 角色 id，見下面的「角色」。省略就沒有前置指示 |
 | `resumeFrom` | 某個節點的 id：用那個節點的 CLI session 接續對話（`claude --resume`） |
@@ -143,12 +143,13 @@ type WorkflowEdge = {
 ```
 
 **沒有連線的出口就是「到此為止」**：上面 `implement` / `review` / `fix` 的 `fail`
-與 `approve` 的 `rejected` 都沒有連線，走到那裡整個執行就結束，而且因為沒有走到
-`end` 節點，狀態是「失敗」，原因寫在 `RunState.error` 裡。
+與 `approve` 的 `rejected` 都沒有連線，走到那裡整個執行就結束。因為沒有走到
+`end` 節點，狀態是「失敗」，原因寫在 `RunState.error` 裡 —— 只有 `rejected`
+（人按了「退回」）例外，那是「已退回」，不是壞掉，所以沒有 `error`。
 
 ### 驗證
 
-`validateWorkflow(def)` 回傳錯誤訊息陣列（空陣列代表合法），六條規則：
+`validateWorkflow(def)` 回傳錯誤訊息陣列（空陣列代表合法），十條規則：
 
 1. 剛好一個 `start` 節點
 2. 至少一個 `end` 節點
@@ -156,8 +157,20 @@ type WorkflowEdge = {
 4. 有出口的節點必須指定自己的出口；`start` / `end` 不能指定
 5. 同一個出口只能有一條連線
 6. 沒有從 `start` 走不到的節點
+7. `agent` 的 `prompt` 不能是空白 —— `節點 <id> 的提示不能是空的`
+8. `agent` 的 `cwd` 不能是空白 —— `節點 <id> 的工作目錄不能是空的`
+9. `condition` 的 `source` 必須是**存在的 `agent` 節點**（沒有輸出的節點看不出結果，
+   那個條件會永遠走「否」）—— `節點 <id> 的條件來源不存在：<source>`
+10. `condition` 的正規式編得起來 —— `節點 <id> 的正規式無效`
+
+角色不存在時另外報 `節點 <id> 的角色不存在：<role>`。
 
 `GraphCompiler.compile()` 第一件事就是跑它，不合法直接丟例外，不會編譯出半殘的圖。
+
+**執行前再檢查一次工作目錄**：`WorkflowService.start()` 看 `params.cwd` 存不存在，
+不存在就直接以 `工作目錄不存在：<path>` 拒絕，連一筆執行都不會建立 ——
+不然 CLI 只會回一句 `spawn claude ENOENT`，看不出是目錄的問題。
+執行對話框收到拒絕時會留在原地把訊息顯示出來。
 
 ### 自訂工作流的儲存
 
@@ -269,6 +282,24 @@ LangGraph 的 `Annotation` 有四個 channel（[`graph-compiler.ts`](../src/main
 | `attempts` | 合併 | `節點id -> 跑過幾次`，`maxAttempts` 看它 |
 | `lastPort` | 合併 | `節點id -> 走了哪個出口`，`addConditionalEdges` 的 router 只看它 |
 | `totalCostUsd` | 相加 | 這次執行累計的用量（訂閱帳號是估算，見下面的「用量與上限」） |
+
+一次執行的狀態（`RunStatus`）與每個節點的狀態（`RunNodeStatus`）：
+
+| `RunStatus` | 畫面上 | 什麼時候 |
+| --- | --- | --- |
+| `running` | 執行中 | 剛開始或批准之後接下去 |
+| `waiting_approval` | 等待批准 | 停在 `approval` 節點 |
+| `done` | 完成 | 走到 `end` 節點 |
+| `failed` | 失敗 | 節點失敗、重試用完、超出用量上限、沒走到 `end`；`error` 寫原因 |
+| `cancelled` | 已取消 | 人按了「取消」 |
+| `rejected` | 已退回 | 人按了「退回」。不是壞掉，所以徽章是中性色、也沒有 `error` |
+
+| `RunNodeStatus` | 狀態點 |
+| --- | --- |
+| `idle` / `running` / `done` / `failed` | 還沒輪到／執行中／完成／失敗 |
+| `waiting` | 等待批准（空心） |
+| `skipped` | 沒輪到就收尾了（只有外框） |
+| `cancelled` | 執行被取消時正在跑的那個（中性色，不是紅的失敗） |
 
 `WorkflowService` 另外維護給畫面看的 `RunState`（執行狀態、每個節點的狀態與
 **畫面上的** `sessionId`、累計費用）。兩者分開是刻意的：圖的狀態是編排用的，

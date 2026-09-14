@@ -339,7 +339,7 @@ main → renderer（`webContents.send`）：
 | 被測單元 | 注入的假物件 | 檔案 |
 | --- | --- | --- |
 | `ShellFactory` | 假的 `ExecutableResolver`（回傳 `RESOLVED(name)`） | `test/shell-factory.spec.ts` |
-| `SessionManager` | `FakePtySpawner` / `FakePty`，以及同步版的 `Scheduler` | `test/fakes/fake-pty.ts` |
+| `SessionManager` | `FakePtySpawner` / `FakePty`、同步版的 `Scheduler`，以及假的 `exists`（agent 任務的工作目錄存不存在） | `test/fakes/fake-pty.ts` |
 | `SessionLogger` | 假的 `LogSinkFactory` 與固定時鐘 | `test/session-logger.spec.ts` |
 | `ProfileStore` | 假的讀／寫函式（記憶體裡的一個字串） | `test/profile-store.spec.ts` |
 | `AppState` | 不需要（純資料） | `test/app-state.spec.ts` |
@@ -353,7 +353,7 @@ main → renderer（`webContents.send`）：
 | `validateWorkflow` | 不需要（純函式） | `test/workflow.spec.ts` |
 | `GraphCompiler` | `ScriptedRunner` / `FakeSessions` / `ManualTimers` + `MemorySaver` | `test/fakes/fake-workflow.ts` |
 | `JsonFileSaver` | 真的暫存目錄（`mkdtempSync`），另一半是注入的 `SaverFs` | `test/json-file-saver.spec.ts` |
-| `WorkflowService` | 同上三個 + 記憶體字串當 `workflow-runs.json` | `test/workflow-service.spec.ts` |
+| `WorkflowService` | 同上三個 + 記憶體字串當 `workflow-runs.json`，加上假的 `exists`（啟動參數的工作目錄） | `test/workflow-service.spec.ts` |
 | `WorkflowStore` | 假的讀／寫函式（記憶體裡的一個字串） | `test/workflow-store.spec.ts` |
 
 工作流這一層刻意**用真的 LangGraph 測**（`MemorySaver` 或真的 `JsonFileSaver`）：
