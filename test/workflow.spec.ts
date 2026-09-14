@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { validateWorkflow } from '../src/shared/workflow';
 import type { WorkflowDefinition, WorkflowEdge, WorkflowNode } from '../src/shared/workflow';
+import type { AgentRole } from '../src/shared/roles';
 
 const at = { x: 0, y: 0 };
 
@@ -102,6 +103,16 @@ describe('validateWorkflow', () => {
     const twice = minimal();
     twice.edges.push({ from: 'start', to: 'a' });
     expect(validateWorkflow(twice).join()).toContain('出口 (單一) 重複連線');
+  });
+
+  it('agent 節點的角色必須是內建的那五個之一', () => {
+    const ok = minimal();
+    (ok.nodes[1] as Extract<WorkflowNode, { type: 'agent' }>).config.role = 'reviewer';
+    expect(validateWorkflow(ok)).toEqual([]);
+
+    const bad = minimal();
+    (bad.nodes[1] as Extract<WorkflowNode, { type: 'agent' }>).config.role = 'boss' as AgentRole;
+    expect(validateWorkflow(bad)).toEqual(['節點 a 的角色不存在：boss']);
   });
 
   it('從開始節點走不到的節點是錯的', () => {

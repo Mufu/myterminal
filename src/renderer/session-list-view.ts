@@ -1,6 +1,7 @@
 import type { AppState } from './app-state';
 import type { SessionInfo } from '../shared/session';
 import { TYPE_LABELS } from '../shared/profile';
+import { findRole } from '../shared/roles';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -92,7 +93,18 @@ export class SessionListView {
         stateLabel.textContent = running ? '執行中' : `已結束 (${session.exitCode ?? 0})`;
       }
 
-      meta.append(tag, stateLabel);
+      meta.append(tag);
+
+      // 選了角色的 agent 任務多貼一個標籤，跟工作流節點那一列同一個樣子。
+      const role = session.role ? findRole(session.role) : undefined;
+      if (role) {
+        const roleTag = document.createElement('span');
+        roleTag.className = 'role-tag';
+        roleTag.textContent = role.label;
+        meta.appendChild(roleTag);
+      }
+
+      meta.appendChild(stateLabel);
 
       // 有 session id 才接得回去，所以 CLI 回報之前不顯示。
       if (session.agentSessionId) {

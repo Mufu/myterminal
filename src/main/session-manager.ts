@@ -3,6 +3,7 @@ import { homedir } from 'node:os';
 import type { AgentTaskProfile, ConnectionProfile } from '../shared/profile';
 import { TYPE_LABELS } from '../shared/profile';
 import type { AgentKind } from '../shared/agent';
+import { findRole } from '../shared/roles';
 import type { SessionInfo } from '../shared/session';
 import type { DataEvent, ExitEvent } from '../shared/ipc';
 import type { IPtyProcess, IPtySpawner } from './pty';
@@ -145,12 +146,14 @@ export class SessionManager extends EventEmitter<SessionEvents> {
     const cwd = profile.cwd?.trim() || homedir();
     info.cwd = cwd;
     info.agentKind = profile.kind;
+    info.role = profile.role;
 
     const run = this.agents(profile.kind).start({
       kind: profile.kind,
       prompt: profile.prompt,
       cwd,
       allowEdits: profile.allowEdits,
+      systemPrompt: profile.role ? findRole(profile.role)?.systemPrompt : undefined,
     });
     this.watchAgentSessionId(run, info);
     return new AgentRunPty(run, profile.kind, profile.prompt);

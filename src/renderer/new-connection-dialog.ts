@@ -1,5 +1,7 @@
 import type { ConnectionProfile, SessionType, BaseShell } from '../shared/profile';
 import type { AgentKind } from '../shared/agent';
+import type { AgentRole } from '../shared/roles';
+import { ROLES, findRole } from '../shared/roles';
 import { defaultStartupCommand } from '../shared/profile';
 import { validateProfile } from '../shared/validate-profile';
 import type { DialogPort } from './ports';
@@ -30,11 +32,30 @@ export class NewConnectionDialog implements DialogPort {
   private readonly typeSelect = $<HTMLSelectElement>('f-type');
   private readonly errors = $<HTMLParagraphElement>('f-errors');
   private readonly saveProfile = $<HTMLInputElement>('f-save');
+  private readonly roleSelect = $<HTMLSelectElement>('f-agent-role');
 
   constructor(private readonly onCreate: (profile: ConnectionProfile, save: boolean) => void) {
     this.typeSelect.addEventListener('change', () => this.syncFields());
+    this.fillRoles();
+    this.roleSelect.addEventListener('change', () => this.applyRoleDefault());
     $('f-ok').addEventListener('click', (event) => this.submit(event));
     this.syncFields();
+  }
+
+  /** 角色選項就是 ROLES，第一個是「無」(不套任何前置指示)。*/
+  private fillRoles(): void {
+    for (const { id, label } of [{ id: '', label: '無' }, ...ROLES]) {
+      const option = document.createElement('option');
+      option.value = id;
+      option.textContent = label;
+      this.roleSelect.appendChild(option);
+    }
+  }
+
+  /** 換角色時把「允許修改檔案」帶到那個角色的預設值；只在換的時候動它。*/
+  private applyRoleDefault(): void {
+    const role = findRole(this.roleSelect.value);
+    if (role) $<HTMLInputElement>('f-agent-edits').checked = role.defaultAllowEdits;
   }
 
   open(): void {
@@ -110,6 +131,7 @@ export class NewConnectionDialog implements DialogPort {
           kind: $<HTMLSelectElement>('f-agent-kind').value as AgentKind,
           prompt: $<HTMLTextAreaElement>('f-agent-prompt').value.trim(),
           allowEdits: $<HTMLInputElement>('f-agent-edits').checked,
+          role: (this.roleSelect.value as AgentRole) || undefined,
         };
 
       case 'custom':

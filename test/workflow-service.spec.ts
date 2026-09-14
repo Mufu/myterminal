@@ -111,6 +111,17 @@ describe('WorkflowService', () => {
     ]);
   });
 
+  it('節點狀態帶著角色，畫面才貼得出標籤', async () => {
+    const service = new WorkflowService(disk.deps());
+    const definition = linear();
+    (definition.nodes[1] as Extract<WorkflowNode, { type: 'agent' }>).config.role = 'coder';
+    service.start(definition, { task: '建立 hello.txt' });
+
+    const waiting = await waitFor(service, 'waiting_approval');
+    expect(waiting.nodes.impl.role).toBe('coder');
+    expect(waiting.nodes.ask.role).toBeUndefined();
+  });
+
   it('changed 事件跟 list() 是同一份內容', async () => {
     const service = new WorkflowService(disk.deps());
     const seen: RunState[][] = [];

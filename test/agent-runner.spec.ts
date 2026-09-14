@@ -55,6 +55,20 @@ describe('ClaudeCodeRunner 組出來的命令列', () => {
     expect(spawner.last().spec.args).toContain('acceptEdits');
     expect(spawner.last().spec.args.slice(-2)).toEqual(['--resume', 'abc-123']);
   });
+
+  it('角色的前置指示走 --append-system-prompt，排在 --resume 前面', () => {
+    new ClaudeCodeRunner(spawner).start(task({ systemPrompt: '你是審查者。', resumeId: 'abc-123' }));
+    expect(spawner.last().spec.args.slice(-4)).toEqual([
+      '--append-system-prompt',
+      '你是審查者。',
+      '--resume',
+      'abc-123',
+    ]);
+
+    // 沒有角色時什麼都不變。
+    new ClaudeCodeRunner(spawner).start(task());
+    expect(spawner.last().spec.args).not.toContain('--append-system-prompt');
+  });
 });
 
 describe('ClaudeCodeRunner 解析真實輸出', () => {
@@ -135,6 +149,16 @@ describe('CodexRunner 組出來的命令列', () => {
       '-c',
       'approval_policy="never"',
     ]);
+  });
+
+  it('codex 沒有對應的旗標，角色的前置指示接在提示前面一起走 stdin', () => {
+    new CodexRunner(spawner).start(task({ kind: 'codex', systemPrompt: '你是審查者。' }));
+    expect(spawner.last().spec.args).not.toContain('--append-system-prompt');
+    expect(spawner.last().spec.stdin).toBe('你是審查者。\n\n只回覆 AGENT_SPIKE_OK，不要做別的事');
+
+    // 沒有角色時 stdin 就是原本的提示。
+    new CodexRunner(spawner).start(task({ kind: 'codex' }));
+    expect(spawner.last().spec.stdin).toBe('只回覆 AGENT_SPIKE_OK，不要做別的事');
   });
 });
 

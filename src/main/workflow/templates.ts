@@ -21,6 +21,7 @@ const IMPLEMENT_REVIEW_APPROVE: WorkflowDefinition = {
         prompt: '{{params.task}}',
         cwd: '{{params.cwd}}',
         allowEdits: true,
+        role: 'coder',
       },
     },
     {
@@ -34,6 +35,7 @@ const IMPLEMENT_REVIEW_APPROVE: WorkflowDefinition = {
           '審查目前工作目錄的變更是否完成「{{params.task}}」，最後一行只輸出 PASS 或 FAIL',
         cwd: '{{params.cwd}}',
         allowEdits: false,
+        role: 'reviewer',
       },
     },
     {
@@ -60,6 +62,7 @@ const IMPLEMENT_REVIEW_APPROVE: WorkflowDefinition = {
         prompt: '審查意見如下，請修正：{{review.text}}',
         cwd: '{{params.cwd}}',
         allowEdits: true,
+        role: 'coder',
         resumeFrom: 'implement',
         maxAttempts: 3,
       },

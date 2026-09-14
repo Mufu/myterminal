@@ -1,4 +1,5 @@
 import type { ConnectionProfile } from './profile';
+import { findRole } from './roles';
 
 /**
  * 設定檔驗證：回傳錯誤訊息陣列，空陣列代表合法。
@@ -34,6 +35,9 @@ export function validateProfile(profile: ConnectionProfile, requireName = false)
     case 'agent':
       // 工作目錄可以留空 (SessionManager 會用家目錄)，但沒有任務就沒事可做。
       if (!profile.prompt.trim()) errors.push('請輸入任務內容');
+      if (profile.role !== undefined && !findRole(profile.role)) {
+        errors.push(`角色不存在：${profile.role}`);
+      }
       break;
 
     case 'powershell':

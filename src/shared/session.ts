@@ -1,5 +1,6 @@
 import type { SessionType } from './profile';
 import type { AgentKind } from './agent';
+import type { AgentRole } from './roles';
 
 export type SessionState = 'running' | 'exited';
 
@@ -19,4 +20,6 @@ export interface SessionInfo {
   agentKind?: AgentKind;
   /** CLI 回報的 session_id / thread_id，有了才能「接手」。*/
   agentSessionId?: string;
+  /** type === 'agent' 時選的角色，清單上貼一個標籤。*/
+  role?: AgentRole;
 }

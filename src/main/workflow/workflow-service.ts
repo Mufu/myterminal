@@ -78,7 +78,12 @@ export class WorkflowService extends EventEmitter<WorkflowEvents> {
         nodes: Object.fromEntries(
           definition.nodes.map((node) => [
             node.id,
-            { label: node.label, status: 'idle' as const, attempts: 0 },
+            {
+              label: node.label,
+              role: node.type === 'agent' ? node.config.role : undefined,
+              status: 'idle' as const,
+              attempts: 0,
+            },
           ]),
         ),
         totalCostUsd: 0,

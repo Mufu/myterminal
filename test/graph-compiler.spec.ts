@@ -3,6 +3,7 @@ import { Command, MemorySaver } from '@langchain/langgraph';
 import { compile, matches, render, runOutcome } from '../src/main/workflow/graph-compiler';
 import type { CompileDeps, NodeReport, RunGraphState } from '../src/main/workflow/graph-compiler';
 import type { WorkflowDefinition, WorkflowEdge, WorkflowNode } from '../src/shared/workflow';
+import { findRole } from '../src/shared/roles';
 import {
   FakeSessions,
   ManualTimers,
@@ -151,6 +152,27 @@ describe('compile', () => {
 
     expect(runner.tasks[0]).toMatchObject({ prompt: '建立 hello.txt', cwd: 'D:/tmp' });
     expect(runner.tasks[1]).toMatchObject({ prompt: '依照：做好了', resumeId: 'cli-0' });
+  });
+
+  it('角色會變成 CLI 的前置指示，沒選角色就沒有', async () => {
+    const runner = new ScriptedRunner(() => result());
+    const compiled = compile(
+      def(
+        [start(), agent('review', { role: 'reviewer' }), agent('plain'), end()],
+        [
+          { from: 'start', to: 'review' },
+          { from: 'review', to: 'plain', port: 'ok' },
+          { from: 'review', to: 'end', port: 'fail' },
+          { from: 'plain', to: 'end', port: 'ok' },
+          { from: 'plain', to: 'end', port: 'fail' },
+        ],
+      ),
+      deps({ runnerFactory: () => runner }),
+    );
+    await compiled.app.invoke({}, thread());
+
+    expect(runner.tasks[0].systemPrompt).toBe(findRole('reviewer')?.systemPrompt);
+    expect(runner.tasks[1].systemPrompt).toBeUndefined();
   });
 
   it('agent 失敗走 fail 出口；沒有連線的出口就收尾', async () => {

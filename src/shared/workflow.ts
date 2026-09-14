@@ -1,4 +1,6 @@
 import type { AgentKind } from './agent';
+import type { AgentRole } from './roles';
+import { findRole } from './roles';
 
 /**
  * 工作流定義 (version 1)：純 JSON，是唯一的真相來源 ——
@@ -30,6 +32,8 @@ export interface AgentNodeConfig {
   prompt: string;
   cwd?: string;
   allowEdits: boolean;
+  /** 角色：前置指示在 shared/roles.ts，這裡只存 id。*/
+  role?: AgentRole;
   /** 要接續哪個節點的 CLI 對話 (claude --resume <session_id>)。*/
   resumeFrom?: string;
   maxAttempts?: number;
@@ -95,6 +99,11 @@ export function validateWorkflow(def: WorkflowDefinition): string[] {
   if (starts.length !== 1) errors.push(`必須剛好有一個開始節點 (目前 ${starts.length} 個)`);
   if (!def.nodes.some((node) => node.type === 'end')) errors.push('必須至少有一個結束節點');
 
+  for (const node of def.nodes) {
+    if (node.type !== 'agent' || node.config.role === undefined) continue;
+    if (!findRole(node.config.role)) errors.push(`節點 ${node.id} 的角色不存在：${node.config.role}`);
+  }
+
   const taken = new Set<string>();
   for (const edge of def.edges) {
     const from = byId.get(edge.from);
@@ -145,6 +154,8 @@ export type RunNodeStatus = 'idle' | 'running' | 'done' | 'failed' | 'waiting' |
 export interface RunNodeState {
   /** 節點在定義裡的顯示名稱，複製一份過來讓 renderer 不必拿到整份定義。*/
   label: string;
+  /** agent 節點的角色，跟 label 一樣複製一份過來給 renderer 貼標籤。*/
+  role?: AgentRole;
   status: RunNodeStatus;
   /** 這個節點的 CLI 執行在畫面上對應的工作階段，點一下可以切過去看。*/
   sessionId?: string;

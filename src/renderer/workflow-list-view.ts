@@ -1,5 +1,6 @@
 import type { AppState } from './app-state';
 import type { RunNodeStatus, RunState, RunStatus } from '../shared/workflow';
+import { findRole } from '../shared/roles';
 
 /** 狀態徽章上的字。*/
 export function runStatusLabel(status: RunStatus): string {
@@ -126,6 +127,15 @@ export class WorkflowListView {
       label.textContent = node.label;
 
       row.append(dot, label);
+
+      // 有角色的節點在名字後面貼一個標籤，一眼看得出這一步是誰在做。
+      const role = node.role ? findRole(node.role) : undefined;
+      if (role) {
+        const tag = document.createElement('span');
+        tag.className = 'role-tag';
+        tag.textContent = role.label;
+        row.appendChild(tag);
+      }
 
       if (node.costUsd !== undefined) {
         const cost = document.createElement('span');

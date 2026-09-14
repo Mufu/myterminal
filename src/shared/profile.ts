@@ -1,4 +1,5 @@
 import type { AgentKind } from './agent';
+import type { AgentRole } from './roles';
 
 /**
  * 連線設定檔 (ConnectionProfile)：純資料，沒有任何行為。
@@ -60,6 +61,8 @@ export interface AgentTaskProfile extends ProfileBase {
   prompt: string;
   /** 預設 false：不讓 agent 改檔案。*/
   allowEdits: boolean;
+  /** 角色：前置指示在 shared/roles.ts，這裡只存 id。*/
+  role?: AgentRole;
 }
 
 export interface CustomProfile extends ProfileBase {

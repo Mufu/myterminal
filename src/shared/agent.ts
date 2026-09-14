@@ -14,6 +14,8 @@ export interface AgentTask {
   allowEdits: boolean;
   /** 接續前一次對話：claude 的 session_id 或 codex 的 thread_id。*/
   resumeId?: string;
+  /** 角色的前置指示。*/
+  systemPrompt?: string;
 }
 
 /** CLI 的 JSONL 事件正規化之後的樣子。*/

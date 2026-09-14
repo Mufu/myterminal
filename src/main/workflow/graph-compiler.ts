@@ -12,6 +12,7 @@ import {
   DEFAULT_TIMEOUT_SEC,
   validateWorkflow,
 } from '../../shared/workflow';
+import { findRole } from '../../shared/roles';
 import type { AdoptSpec } from '../session-manager';
 import type { IAgentRun, IAgentRunnerFactory } from '../agent-runner';
 import type { SessionInfo } from '../../shared/session';
@@ -248,6 +249,7 @@ async function runAgent(
     cwd,
     allowEdits: config.allowEdits,
     resumeId: config.resumeFrom ? state.outputs[config.resumeFrom]?.sessionId : undefined,
+    systemPrompt: config.role ? findRole(config.role)?.systemPrompt : undefined,
   });
   control.active = run;
 

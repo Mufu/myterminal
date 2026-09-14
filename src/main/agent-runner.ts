@@ -251,6 +251,7 @@ export class ClaudeCodeRunner implements IAgentRunner {
     const args = ['-p', '--output-format', 'stream-json', '--verbose'];
     // plan 模式仍然會讀檔與回答，只是不能寫；比 --tools "" 有用得多。
     args.push('--permission-mode', task.allowEdits ? 'acceptEdits' : 'plan');
+    if (task.systemPrompt) args.push('--append-system-prompt', task.systemPrompt);
     if (task.resumeId) args.push('--resume', task.resumeId);
     return new JsonlRun(
       this.spawner,
@@ -264,6 +265,7 @@ export class ClaudeCodeRunner implements IAgentRunner {
  * CodexRunner — 同上，但走 codex exec。
  * codex 是 .cmd shim，一定要透過 cmd.exe /c 才 spawn 得起來 (見 process-spawner.ts)。
  * exec resume 沒有 --sandbox，只能用 -c sandbox_mode 覆寫。
+ * 它也沒有 claude 的 --append-system-prompt，所以角色的前置指示只能接在提示前面。
  */
 export class CodexRunner implements IAgentRunner {
   constructor(private readonly spawner: IProcessSpawner = new NodeProcessSpawner()) {}
@@ -274,11 +276,8 @@ export class CodexRunner implements IAgentRunner {
     if (task.resumeId) args.push('resume', task.resumeId, '-c', `sandbox_mode="${sandbox}"`);
     else args.push('--sandbox', sandbox);
     args.push('--json', '--skip-git-repo-check', '-c', 'approval_policy="never"');
-    return new JsonlRun(
-      this.spawner,
-      { file: 'cmd.exe', args, cwd: task.cwd, stdin: task.prompt },
-      codexEvents,
-    );
+    const stdin = task.systemPrompt ? `${task.systemPrompt}\n\n${task.prompt}` : task.prompt;
+    return new JsonlRun(this.spawner, { file: 'cmd.exe', args, cwd: task.cwd, stdin }, codexEvents);
   }
 }
 

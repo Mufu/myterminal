@@ -5,6 +5,7 @@ import { FakePtySpawner } from './fakes/fake-pty';
 import { FakeAgentRunner } from './fakes/fake-agent';
 import type { DataEvent, ExitEvent } from '../src/shared/ipc';
 import type { SessionInfo } from '../src/shared/session';
+import { findRole } from '../src/shared/roles';
 import { homedir } from 'node:os';
 
 let spawner: FakePtySpawner;
@@ -187,6 +188,13 @@ describe('SessionManager 的 agent 任務', () => {
     expect(info.name).toBe('Agent 1');
     expect(info.agentKind).toBe('claude');
     expect(info.cwd).toBe('C:/work');
+  });
+
+  it('選了角色就把前置指示一起交給 CLI，並記在工作階段上', () => {
+    const info = manager.create({ ...task, role: 'reviewer' }, 80, 24);
+
+    expect(agents.tasks[0].systemPrompt).toBe(findRole('reviewer')?.systemPrompt);
+    expect(info.role).toBe('reviewer');
   });
 
   it('沒填工作目錄時用家目錄', () => {

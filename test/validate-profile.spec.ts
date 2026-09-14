@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { validateProfile } from '../src/shared/validate-profile';
+import type { AgentRole } from '../src/shared/roles';
 
 describe('validateProfile', () => {
   it('PowerShell 不需要額外欄位', () => {
@@ -76,5 +77,12 @@ describe('Agent 任務', () => {
 
   it('工作目錄可以留空 (由 SessionManager 補家目錄)', () => {
     expect(validateProfile({ ...task, prompt: '只回覆 OK' })).toEqual([]);
+  });
+
+  it('角色必須是內建的那五個之一', () => {
+    expect(validateProfile({ ...task, prompt: '只回覆 OK', role: 'reviewer' })).toEqual([]);
+    expect(validateProfile({ ...task, prompt: '只回覆 OK', role: 'boss' as AgentRole })).toEqual([
+      '角色不存在：boss',
+    ]);
   });
 });

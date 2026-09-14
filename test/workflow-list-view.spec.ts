@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { nodeDotClass, runStatusLabel } from '../src/renderer/workflow-list-view';
 import { validateRunParams } from '../src/renderer/workflow-run-dialog';
 import type { RunNodeStatus, RunStatus } from '../src/shared/workflow';
+import { ROLES, findRole } from '../src/shared/roles';
 
 describe('runStatusLabel', () => {
   it('每個狀態都有中文名稱', () => {
@@ -35,5 +36,31 @@ describe('validateRunParams', () => {
     expect(validateRunParams({ task: '  ', cwd: 'D:/tmp' })).toEqual(['請輸入任務內容']);
     expect(validateRunParams({ task: 'x', cwd: '' })).toEqual(['請輸入工作目錄']);
     expect(validateRunParams({ task: '', cwd: '' })).toEqual(['請輸入任務內容', '請輸入工作目錄']);
+  });
+});
+
+/** 節點列上的角色標籤就是 ROLES 的 label，所以測的是這一份清單。*/
+describe('ROLES', () => {
+  it('順序固定，每個角色都有中文標籤', () => {
+    expect(ROLES.map((role) => role.id)).toEqual(['pm', 'architect', 'coder', 'tester', 'reviewer']);
+    expect(ROLES.map((role) => role.label)).toEqual([
+      '產品經理',
+      '架構師',
+      '工程師',
+      '測試工程師',
+      '審查者',
+    ]);
+  });
+
+  it('只有要動手的角色預設允許修改檔案', () => {
+    expect(ROLES.filter((role) => role.defaultAllowEdits).map((role) => role.id)).toEqual([
+      'coder',
+      'tester',
+    ]);
+  });
+
+  it('findRole 找不到的角色是 undefined', () => {
+    expect(findRole('reviewer')?.systemPrompt).toContain('PASS 或 FAIL');
+    expect(findRole('boss')).toBeUndefined();
   });
 });
