@@ -63,6 +63,9 @@ function createWindow(): void {
   win = new BrowserWindow({
     width: 1280,
     height: 800,
+    // 再小工具列右邊的按鈕就被擠出畫面外，而且沒有捲軸可以捲過去。
+    minWidth: 900,
+    minHeight: 560,
     backgroundColor: '#111417',
     title: 'myterminal',
     show: false,
