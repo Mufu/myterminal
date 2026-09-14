@@ -14,7 +14,9 @@ describe('validateProfile', () => {
   });
 
   it('SSH 欄位齊全時通過', () => {
-    expect(validateProfile({ type: 'ssh', host: 'example.com', user: 'robert' })).toEqual([]);
+    expect(validateProfile({ type: 'ssh', host: 'example.com', user: 'robert', port: 22 })).toEqual(
+      [],
+    );
   });
 
   it('SSH 連接埠超出範圍時報錯', () => {
@@ -24,6 +26,16 @@ describe('validateProfile', () => {
     expect(validateProfile({ type: 'ssh', host: 'h', user: 'u', port: 70000 })).toContain(
       '連接埠必須介於 1 到 65535',
     );
+  });
+
+  /** 對話框把「空的」與「打了 abc」都收成 NaN，不能默默變成 22。*/
+  it('SSH 連接埠不是數字或沒填時報錯', () => {
+    expect(validateProfile({ type: 'ssh', host: 'h', user: 'u', port: Number.NaN })).toEqual([
+      '請輸入 1 到 65535 的連接埠',
+    ]);
+    expect(validateProfile({ type: 'ssh', host: 'h', user: 'u' })).toEqual([
+      '請輸入 1 到 65535 的連接埠',
+    ]);
   });
 
   it('自訂命令必須有執行檔', () => {
@@ -61,7 +73,7 @@ describe('validateProfile 要儲存設定檔時', () => {
   });
 
   it('名稱的錯誤與類型本身的錯誤會一起回報', () => {
-    expect(validateProfile({ type: 'ssh', host: '', user: 'u' }, true)).toEqual([
+    expect(validateProfile({ type: 'ssh', host: '', user: 'u', port: 22 }, true)).toEqual([
       '儲存設定時必須填名稱',
       '請輸入主機位址',
     ]);

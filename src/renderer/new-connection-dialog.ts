@@ -94,6 +94,16 @@ export class NewConnectionDialog implements DialogPort {
     this.onCreate(profile, save);
   }
 
+  /**
+   * 連接埠：留空、或打了不是數字的東西 (type=number 的 badInput，value 會是空字串)
+   * 都收成 NaN 交給 validateProfile 報錯 —— 不能默默變成 22。
+   */
+  private port(): number {
+    const input = $<HTMLInputElement>('f-port');
+    if (input.validity.badInput || !input.value.trim()) return Number.NaN;
+    return Number(input.value);
+  }
+
   private collect(): ConnectionProfile {
     const value = (id: string): string => $<HTMLInputElement>(id).value.trim();
     const name = value('f-name') || undefined;
@@ -110,7 +120,7 @@ export class NewConnectionDialog implements DialogPort {
           cwd,
           host: value('f-host'),
           user: value('f-user'),
-          port: Number(value('f-port')) || 22,
+          port: this.port(),
         };
 
       case 'claude':

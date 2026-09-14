@@ -15,7 +15,10 @@ export function validateProfile(profile: ConnectionProfile, requireName = false)
     case 'ssh':
       if (!profile.host.trim()) errors.push('請輸入主機位址');
       if (!profile.user.trim()) errors.push('請輸入使用者名稱');
-      if (profile.port !== undefined && (profile.port < 1 || profile.port > 65535)) {
+      // 沒填或不是數字 (對話框收成 NaN) 都要擋下來，不能默默用預設的 22。
+      if (profile.port === undefined || !Number.isFinite(profile.port)) {
+        errors.push('請輸入 1 到 65535 的連接埠');
+      } else if (profile.port < 1 || profile.port > 65535) {
         errors.push('連接埠必須介於 1 到 65535');
       }
       break;
