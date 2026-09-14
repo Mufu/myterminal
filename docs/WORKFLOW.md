@@ -43,7 +43,7 @@ type WorkflowEdge = {
 | --- | --- | --- |
 | `start` | — | 一條沒有名字的連線 |
 | `end` | — | 沒有出口 |
-| `agent` | `{ kind, prompt, cwd?, allowEdits, resumeFrom?, maxAttempts?, timeoutSec? }` | `ok` / `fail` |
+| `agent` | `{ kind, prompt, cwd?, allowEdits, role?, resumeFrom?, maxAttempts?, timeoutSec? }` | `ok` / `fail` |
 | `condition` | `{ source, rule }` | `yes` / `no` |
 | `approval` | `{ question }` | `approved` / `rejected` |
 
@@ -55,12 +55,41 @@ type WorkflowEdge = {
 | `prompt` | 樣板，見下面的「樣板」 |
 | `cwd` | 也吃樣板；留空時用家目錄 |
 | `allowEdits` | `false` 是 Claude 的 `plan`／Codex 的 `read-only`，`true` 才會動檔案 |
+| `role` | 角色 id，見下面的「角色」。省略就沒有前置指示 |
 | `resumeFrom` | 某個節點的 id：用那個節點的 CLI session 接續對話（`claude --resume`） |
 | `maxAttempts` | 這個節點最多跑幾次（迴圈用），預設 3。超過就把整個執行標成失敗並收尾 |
 | `timeoutSec` | 單一次執行的上限，預設 600。超過就取消 CLI，這個節點算失敗 |
 
 `condition.rule` 目前兩種：`{ type: 'lastLineEquals', value }`（只看 `source` 節點輸出的
 最後一行）與 `{ type: 'regex', pattern }`（整段比對）。
+
+### 角色
+
+角色是**一段可以重複用的系統提示前言**，加上一個預設的檔案修改權限。
+定義在 [`src/shared/roles.ts`](../src/shared/roles.ts)，就五個，改一次全部生效：
+
+| `role` | 名稱 | 做什麼 | `allowEdits` 預設 |
+| --- | --- | --- | --- |
+| `pm` | 產品經理 | 把需求拆成可驗收的工作項目，不寫程式 | 關 |
+| `architect` | 架構師 | 設計模組邊界與介面、說明取捨，不實作細節 | 關 |
+| `coder` | 工程師 | 依指示實作、跑測試，最後摘要改了哪些檔案 | **開** |
+| `tester` | 測試工程師 | 撰寫並執行測試，回報失敗的測試與原因 | **開** |
+| `reviewer` | 審查者 | 只審查不修改，最後一行輸出 `PASS` 或 `FAIL` | 關 |
+
+怎麼送給 CLI（[`agent-runner.ts`](../src/main/agent-runner.ts)）：
+
+- **claude**：多一組 `--append-system-prompt <前置指示>`，排在 `--resume` 前面。
+- **codex**：沒有對應的旗標，所以前置指示接在提示前面（`<前置指示>
+
+<提示>`）
+  一起走 stdin。
+
+`allowEdits` 的預設值只是**對話框上的方便**：在「Agent 任務」裡換角色時，
+「允許修改檔案」會跟著跳到那個角色的預設值，之後還是可以自己改。
+節點的 `allowEdits` 是定義裡寫死的，角色不會覆寫它。
+
+角色不存在時 `validateWorkflow` 會報 `節點 <id> 的角色不存在：<role>`。
+`RunNodeState` 也複製一份 `role`，右側清單才貼得出那個標籤。
 
 ### 樣板
 
