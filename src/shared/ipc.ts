@@ -24,6 +24,7 @@ export const IPC = {
   resumeWorkflow: 'workflow:resume',
   cancelWorkflow: 'workflow:cancel',
   workflowRuns: 'workflow:runs',
+  cliAuth: 'cli:auth',
 
   /** main -> renderer (send) */
   data: 'session:data',
@@ -69,6 +70,8 @@ export interface StartWorkflowRequest {
   workflowId: string;
   /** 工作流的啟動參數，樣板裡用 {{params.x}} 取用。*/
   params: Record<string, string>;
+  /** 這次執行的用量上限 (估算美元)；沒填就是不限制。*/
+  maxTotalCostUsd?: number;
 }
 
 export interface ResumeWorkflowRequest {

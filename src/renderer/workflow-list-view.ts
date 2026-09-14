@@ -1,5 +1,8 @@
 import type { AppState } from './app-state';
 import type { RunNodeStatus, RunState, RunStatus } from '../shared/workflow';
+import type { AgentKind } from '../shared/agent';
+import type { BillingMode, CliAuthStatus } from '../shared/cli-auth';
+import { usageLabel, usageTitle } from '../shared/cli-auth';
 import { findRole } from '../shared/roles';
 
 /** 狀態徽章上的字。*/
@@ -23,8 +26,13 @@ export function nodeDotClass(status: RunNodeStatus): string {
   return status === 'idle' ? 'session-dot' : `session-dot ${status}`;
 }
 
-/** 費用一律三位小數：一次 claude 呼叫大約 $0.09，兩位看不出差別。*/
-const money = (usd: number): string => `$${usd.toFixed(3)}`;
+/**
+ * 這個金額要照哪一支 CLI 的登入方式寫。節點知道自己是誰跑的，
+ * 執行總額 (沒有 kind) 就看 claude —— 混用兩支 CLI 的工作流很少見。
+ */
+export function usageMode(auth: CliAuthStatus | null, kind?: AgentKind): BillingMode {
+  return auth?.[kind ?? 'claude'].mode ?? 'unknown';
+}
 
 /**
  * WorkflowListView：右側「工作流」清單，一個執行一塊。
@@ -80,7 +88,9 @@ export class WorkflowListView {
     meta.className = 'workflow-meta';
     const cost = document.createElement('span');
     cost.className = 'workflow-cost';
-    cost.textContent = money(run.totalCostUsd);
+    const mode = usageMode(this.state.cliAuth);
+    cost.textContent = usageLabel(run.totalCostUsd, mode);
+    cost.title = usageTitle(mode);
     meta.appendChild(cost);
     if (run.error) {
       const error = document.createElement('span');
@@ -138,9 +148,11 @@ export class WorkflowListView {
       }
 
       if (node.costUsd !== undefined) {
+        const mode = usageMode(this.state.cliAuth, node.kind);
         const cost = document.createElement('span');
         cost.className = 'workflow-node-cost';
-        cost.textContent = money(node.costUsd);
+        cost.textContent = usageLabel(node.costUsd, mode);
+        cost.title = usageTitle(mode);
         row.appendChild(cost);
       }
 

@@ -86,7 +86,8 @@ export interface CompileDeps {
   runnerFactory: IAgentRunnerFactory;
   sessions: IWorkflowSessions;
   checkpointer: BaseCheckpointSaver;
-  budget: { maxTotalCostUsd: number };
+  /** 這次執行的用量上限 (估算美元)；沒有 maxTotalCostUsd 就是不限制。*/
+  budget: { maxTotalCostUsd?: number };
   /** 啟動參數，樣板裡用 {{params.x}} 取用。*/
   params: Record<string, string>;
   report?: NodeReport;
@@ -267,7 +268,8 @@ async function runAgent(
   control.active = undefined;
 
   const cost = outcome.costUsd ?? 0;
-  const overBudget = state.totalCostUsd + cost > deps.budget.maxTotalCostUsd;
+  const cap = deps.budget.maxTotalCostUsd;
+  const overBudget = cap !== undefined && state.totalCostUsd + cost > cap;
   const ok = outcome.ok && !overBudget;
   deps.report?.({
     nodeId: node.id,
@@ -280,7 +282,7 @@ async function runAgent(
   return {
     outputs: {
       [node.id]: {
-        text: overBudget ? `超出這次執行的預算上限 $${deps.budget.maxTotalCostUsd}` : outcome.text,
+        text: overBudget ? `超出這次執行的用量上限 (估算 $${cap})` : outcome.text,
         sessionId: outcome.sessionId,
         ok,
         costUsd: outcome.costUsd,

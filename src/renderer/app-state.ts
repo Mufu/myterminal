@@ -1,6 +1,7 @@
 import type { SessionInfo } from '../shared/session';
 import type { SavedProfile } from '../shared/profile';
 import type { RunState } from '../shared/workflow';
+import type { CliAuthStatus } from '../shared/cli-auth';
 
 type Listener = () => void;
 
@@ -18,6 +19,7 @@ export class AppState {
   private _inputPanelVisible = false;
   private _profiles: SavedProfile[] = [];
   private _runs: RunState[] = [];
+  private _cliAuth: CliAuthStatus | null = null;
   private _view: MainView = 'terminal';
 
   get sessions(): SessionInfo[] {
@@ -38,6 +40,11 @@ export class AppState {
 
   get runs(): RunState[] {
     return this._runs;
+  }
+
+  /** 兩支 CLI 的登入方式；探測回來之前是 null。*/
+  get cliAuth(): CliAuthStatus | null {
+    return this._cliAuth;
   }
 
   get view(): MainView {
@@ -76,6 +83,11 @@ export class AppState {
 
   setRuns(runs: RunState[]): void {
     this._runs = runs;
+    this.notify();
+  }
+
+  setCliAuth(status: CliAuthStatus): void {
+    this._cliAuth = status;
     this.notify();
   }
 

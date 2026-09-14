@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { AgentRunPty } from '../src/main/agent-run-pty';
+import type { BillingMode } from '../src/shared/cli-auth';
 import { FakeAgentRun } from './fakes/fake-agent';
 
 let run: FakeAgentRun;
@@ -9,8 +10,11 @@ beforeEach(() => {
 });
 
 /** 收下 AgentRunPty 寫出來的所有文字，並把 ANSI 色碼去掉方便斷言。*/
-function attach(prompt = '只回覆 AGENT_SPIKE_OK'): { lines: () => string[]; exits: number[] } {
-  const pty = new AgentRunPty(run, 'claude', prompt);
+function attach(
+  prompt = '只回覆 AGENT_SPIKE_OK',
+  mode: BillingMode = 'unknown',
+): { lines: () => string[]; exits: number[] } {
+  const pty = new AgentRunPty(run, 'claude', prompt, mode);
   const chunks: string[] = [];
   const exits: number[] = [];
   pty.onData((data) => chunks.push(data));
@@ -50,7 +54,7 @@ describe('AgentRunPty 把事件變成終端機看得懂的文字', () => {
     expect(out.lines().at(-1)).toBe('⚙ Read src/x.ts');
   });
 
-  it('成功結束時印出頁尾並帶著 exit code 結束', () => {
+  it('成功結束時印出頁尾並帶著 exit code 結束 (登入方式不明，金額標成估算)', () => {
     const out = attach();
     run.emit({ type: 'text', text: 'AGENT_SPIKE_OK' });
     run.emit({
@@ -63,8 +67,15 @@ describe('AgentRunPty 把事件變成終端機看得懂的文字', () => {
       exitCode: 0,
     });
 
-    expect(out.lines().at(-1)).toBe('✔ 完成 · 12.3 s · $0.004 · session a7c9c5c6…');
+    expect(out.lines().at(-1)).toBe('✔ 完成 · 12.3 s · ≈$0.004 · session a7c9c5c6…');
     expect(out.exits).toEqual([0]);
+  });
+
+  it('用 API 金鑰登入時金額就是真的費用，不加「≈」', () => {
+    const out = attach('只回覆 AGENT_SPIKE_OK', 'api');
+    run.emit({ type: 'result', ok: true, text: 'OK', durationMs: 2400, costUsd: 0.0908, exitCode: 0 });
+
+    expect(out.lines().at(-1)).toBe('✔ 完成 · 2.4 s · $0.091');
   });
 
   it('失敗時印出原因與離開碼', () => {

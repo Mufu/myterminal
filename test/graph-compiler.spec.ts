@@ -39,13 +39,26 @@ const deps = (over: Partial<CompileDeps> = {}): CompileDeps => ({
   runnerFactory: () => new ScriptedRunner(() => result()),
   sessions: new FakeSessions(),
   checkpointer: new MemorySaver(),
-  budget: { maxTotalCostUsd: 2 },
+  budget: {},
   params: {},
   timers: new ManualTimers(),
   ...over,
 });
 
 const thread = (id = 'run-1') => ({ configurable: { thread_id: id }, recursionLimit: 100 });
+
+/** 兩個接連跑的 agent；用量上限的兩個測試共用。*/
+const twoAgents = (): WorkflowDefinition =>
+  def(
+    [start(), agent('a'), agent('b'), end()],
+    [
+      { from: 'start', to: 'a' },
+      { from: 'a', to: 'b', port: 'ok' },
+      { from: 'a', to: 'end', port: 'fail' },
+      { from: 'b', to: 'end', port: 'ok' },
+      { from: 'b', to: 'end', port: 'fail' },
+    ],
+  );
 
 describe('render', () => {
   const state = { outputs: { review: { text: 'FAIL', ok: false } } } as unknown as RunGraphState;
@@ -262,7 +275,7 @@ describe('compile', () => {
         { from: 'fix', to: 'end', port: 'fail' },
       ],
     );
-    const compiled = compile(workflow, deps({ runnerFactory: () => runner, budget: { maxTotalCostUsd: 99 } }));
+    const compiled = compile(workflow, deps({ runnerFactory: () => runner }));
     const state = await compiled.app.invoke({}, thread());
 
     expect(state.attempts.fix).toBe(2);
@@ -270,24 +283,26 @@ describe('compile', () => {
     expect(runOutcome(workflow, state)).toEqual({ ok: false, error: 'fix：重試 2 次仍未通過' });
   });
 
-  it('超出預算的節點算失敗並收尾', async () => {
-    const workflow = def(
-      [start(), agent('a'), agent('b'), end()],
-      [
-        { from: 'start', to: 'a' },
-        { from: 'a', to: 'b', port: 'ok' },
-        { from: 'a', to: 'end', port: 'fail' },
-        { from: 'b', to: 'end', port: 'ok' },
-        { from: 'b', to: 'end', port: 'fail' },
-      ],
-    );
+  it('超出用量上限的節點算失敗並收尾', async () => {
+    const workflow = twoAgents();
     const compiled = compile(workflow, deps({ budget: { maxTotalCostUsd: 0.15 } }));
     const state = await compiled.app.invoke({}, thread());
 
     expect(state.outputs.a.ok).toBe(true);
     expect(state.outputs.b.ok).toBe(false);
     expect(state.lastPort.end).toBeUndefined();
-    expect(runOutcome(workflow, state).error).toContain('超出這次執行的預算上限 $0.15');
+    expect(runOutcome(workflow, state).error).toContain('超出這次執行的用量上限 (估算 $0.15)');
+  });
+
+  it('沒有設上限就不會因為金額收尾 (訂閱帳號的預設)', async () => {
+    const workflow = twoAgents();
+    const runner = new ScriptedRunner(() => result({ costUsd: 999 }));
+    const compiled = compile(workflow, deps({ runnerFactory: () => runner }));
+    const state = await compiled.app.invoke({}, thread());
+
+    expect(state.totalCostUsd).toBe(1998);
+    expect(state.outputs.b.ok).toBe(true);
+    expect(runOutcome(workflow, state)).toEqual({ ok: true });
   });
 
   it('逾時會取消 CLI 執行並算失敗', async () => {

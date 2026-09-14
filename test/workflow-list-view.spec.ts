@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { nodeDotClass, runStatusLabel } from '../src/renderer/workflow-list-view';
-import { validateRunParams } from '../src/renderer/workflow-run-dialog';
+import { nodeDotClass, runStatusLabel, usageMode } from '../src/renderer/workflow-list-view';
+import { parseBudget, validateRunParams } from '../src/renderer/workflow-run-dialog';
 import type { RunNodeStatus, RunStatus } from '../src/shared/workflow';
+import type { CliAuthStatus } from '../src/shared/cli-auth';
 import { ROLES, findRole } from '../src/shared/roles';
 
 describe('runStatusLabel', () => {
@@ -27,6 +28,39 @@ describe('nodeDotClass', () => {
   it('其他狀態各自加一個修飾類別', () => {
     const statuses: RunNodeStatus[] = ['running', 'done', 'failed', 'waiting', 'skipped'];
     for (const status of statuses) expect(nodeDotClass(status)).toBe(`session-dot ${status}`);
+  });
+});
+
+describe('usageMode', () => {
+  const auth: CliAuthStatus = {
+    claude: { loggedIn: true, mode: 'subscription', label: 'Max 訂閱' },
+    codex: { loggedIn: true, mode: 'api', label: 'API 金鑰' },
+  };
+
+  it('節點看自己那一支 CLI，執行總額看 claude', () => {
+    expect(usageMode(auth, 'claude')).toBe('subscription');
+    expect(usageMode(auth, 'codex')).toBe('api');
+    expect(usageMode(auth)).toBe('subscription');
+  });
+
+  it('還沒探測回來的時候一律當成不確定', () => {
+    expect(usageMode(null)).toBe('unknown');
+    expect(usageMode(null, 'codex')).toBe('unknown');
+  });
+});
+
+describe('parseBudget', () => {
+  it('留空、零或看不懂的字都是不限制', () => {
+    expect(parseBudget('')).toBeUndefined();
+    expect(parseBudget('  ')).toBeUndefined();
+    expect(parseBudget('0')).toBeUndefined();
+    expect(parseBudget('-1')).toBeUndefined();
+    expect(parseBudget('兩塊')).toBeUndefined();
+  });
+
+  it('填了正數就是上限', () => {
+    expect(parseBudget('2')).toBe(2);
+    expect(parseBudget(' 0.5 ')).toBe(0.5);
   });
 });
 

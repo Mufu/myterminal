@@ -140,6 +140,11 @@
           <button id="btn-workflow-run" type="button">執行工作流</button>
         </header>
         <ul id="workflow-list"></ul>
+
+        <footer id="cli-status">
+          <span id="cli-claude" class="cli-chip"></span>
+          <span id="cli-codex" class="cli-chip"></span>
+        </footer>
       </aside>
     </div>
 
@@ -246,6 +251,11 @@
 
         <label>
           工作目錄 <input id="w-cwd" type="text" placeholder="agent 會在這裡修改檔案" />
+        </label>
+
+        <label>
+          用量上限（估算美元）
+          <input id="w-budget" type="number" min="0" step="0.5" placeholder="留空不限制" />
         </label>
 
         <p id="w-errors" class="errors"></p>

@@ -8,6 +8,7 @@ import type {
   StartWorkflowRequest,
 } from '../shared/ipc';
 import type { SavedProfile } from '../shared/profile';
+import type { CliAuthStatus } from '../shared/cli-auth';
 import type { WorkflowDefinition } from '../shared/workflow';
 import type { SessionManager } from './session-manager';
 import type { SessionLogger } from './session-logger';
@@ -27,6 +28,7 @@ export function registerIpc(
   profiles: ProfileStore,
   workflows: WorkflowService,
   definitions: WorkflowStore,
+  cliAuth: Promise<CliAuthStatus>,
   getWebContents: () => WebContents | null,
 ): void {
   const send = (channel: string, payload: unknown): void => {
@@ -100,7 +102,7 @@ export function registerIpc(
   ipcMain.handle(IPC.startWorkflow, (_e, req: StartWorkflowRequest) => {
     const definition = findWorkflow(req.workflowId, definitions);
     if (!definition) throw new Error(`找不到工作流 ${req.workflowId}`);
-    return workflows.start(definition, req.params);
+    return workflows.start(definition, req.params, { maxTotalCostUsd: req.maxTotalCostUsd });
   });
 
   ipcMain.handle(IPC.resumeWorkflow, (_e, req: ResumeWorkflowRequest) =>
@@ -108,4 +110,6 @@ export function registerIpc(
   );
   ipcMain.handle(IPC.cancelWorkflow, (_e, runId: string) => workflows.cancel(runId));
   ipcMain.handle(IPC.workflowRuns, () => workflows.list());
+  // 探測是開機時就開始的，這裡等的是同一個 Promise。
+  ipcMain.handle(IPC.cliAuth, () => cliAuth);
 }

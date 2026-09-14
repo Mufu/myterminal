@@ -4,7 +4,6 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { Command } from '@langchain/langgraph';
 import type { BaseCheckpointSaver } from '@langchain/langgraph';
 import type { RunState, RunStatus, WorkflowDefinition } from '../../shared/workflow';
-import { DEFAULT_MAX_TOTAL_COST_USD } from '../../shared/workflow';
 import type { IAgentRunnerFactory } from '../agent-runner';
 import type { CompiledWorkflow, IWorkflowSessions, NodeReport, Timers } from './graph-compiler';
 import { compile, runOutcome } from './graph-compiler';
@@ -21,6 +20,8 @@ interface StoredRun {
   state: RunState;
   definition: WorkflowDefinition;
   params: Record<string, string>;
+  /** 這次執行的用量上限 (估算美元)；沒有就是不限制。*/
+  maxTotalCostUsd?: number;
 }
 
 export interface WorkflowServiceDeps {
@@ -29,7 +30,6 @@ export interface WorkflowServiceDeps {
   checkpointer: BaseCheckpointSaver;
   read: RunsReader;
   write: RunsWriter;
-  maxTotalCostUsd?: number;
   timers?: Timers;
   now?: () => number;
   newRunId?: () => string;
@@ -65,11 +65,17 @@ export class WorkflowService extends EventEmitter<WorkflowEvents> {
     return [...this.runs.values()].map((stored) => structuredClone(stored.state));
   }
 
-  start(definition: WorkflowDefinition, params: Record<string, string>): string {
+  /** options.maxTotalCostUsd 留空就是不限制這次執行的用量。*/
+  start(
+    definition: WorkflowDefinition,
+    params: Record<string, string>,
+    options: { maxTotalCostUsd?: number } = {},
+  ): string {
     const runId = (this.deps.newRunId ?? randomUUID)();
     const stored: StoredRun = {
       definition,
       params,
+      maxTotalCostUsd: options.maxTotalCostUsd,
       state: {
         runId,
         workflowId: definition.id,
@@ -81,6 +87,7 @@ export class WorkflowService extends EventEmitter<WorkflowEvents> {
             {
               label: node.label,
               role: node.type === 'agent' ? node.config.role : undefined,
+              kind: node.type === 'agent' ? node.config.kind : undefined,
               status: 'idle' as const,
               attempts: 0,
             },
@@ -163,7 +170,7 @@ export class WorkflowService extends EventEmitter<WorkflowEvents> {
       runnerFactory: this.deps.runnerFactory,
       sessions: this.deps.sessions,
       checkpointer: this.deps.checkpointer,
-      budget: { maxTotalCostUsd: this.deps.maxTotalCostUsd ?? DEFAULT_MAX_TOTAL_COST_USD },
+      budget: { maxTotalCostUsd: stored.maxTotalCostUsd },
       params: stored.params,
       timers: this.deps.timers,
       report: (event) => this.report(stored, event),

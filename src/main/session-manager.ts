@@ -3,6 +3,7 @@ import { homedir } from 'node:os';
 import type { AgentTaskProfile, ConnectionProfile } from '../shared/profile';
 import { TYPE_LABELS } from '../shared/profile';
 import type { AgentKind } from '../shared/agent';
+import type { BillingMode } from '../shared/cli-auth';
 import { findRole } from '../shared/roles';
 import type { SessionInfo } from '../shared/session';
 import type { DataEvent, ExitEvent } from '../shared/ipc';
@@ -56,6 +57,8 @@ export class SessionManager extends EventEmitter<SessionEvents> {
       setTimeout(fn, ms);
     },
     private readonly agents: IAgentRunnerFactory = defaultAgentRunners,
+    /** CLI 的登入方式；開機探測完才知道，所以注入的是一個取值函式。*/
+    private readonly billing: (kind: AgentKind) => BillingMode = () => 'unknown',
   ) {
     super();
   }
@@ -97,7 +100,7 @@ export class SessionManager extends EventEmitter<SessionEvents> {
       agentKind: spec.kind,
     };
     this.watchAgentSessionId(run, info);
-    this.register(info, new AgentRunPty(run, spec.kind, spec.prompt));
+    this.register(info, new AgentRunPty(run, spec.kind, spec.prompt, this.billing(spec.kind)));
     this.emit('created', info);
     return info;
   }
@@ -156,7 +159,7 @@ export class SessionManager extends EventEmitter<SessionEvents> {
       systemPrompt: profile.role ? findRole(profile.role)?.systemPrompt : undefined,
     });
     this.watchAgentSessionId(run, info);
-    return new AgentRunPty(run, profile.kind, profile.prompt);
+    return new AgentRunPty(run, profile.kind, profile.prompt, this.billing(profile.kind));
   }
 
   /** CLI 一開始就會報 session id，記下來右側清單才能顯示「接手」。*/

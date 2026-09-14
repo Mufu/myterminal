@@ -6,6 +6,10 @@ import { NodePtySpawner } from './node-pty-spawner';
 import { ShellFactory } from './shell-factory';
 import { fileProfileStore } from './profile-store';
 import { defaultAgentRunners } from './agent-runner';
+import { NodeProcessSpawner } from './process-spawner';
+import { probeCliAuth } from './cli-auth-probe';
+import type { AgentKind } from '../shared/agent';
+import type { BillingMode, CliAuthStatus } from '../shared/cli-auth';
 import { fileCheckpointSaver } from './workflow/json-file-saver';
 import { WorkflowService, fileRunStore } from './workflow/workflow-service';
 import { fileWorkflowStore } from './workflow/workflow-store';
@@ -19,8 +23,21 @@ process.on('uncaughtException', (error) => console.error('[main] 未捕捉的例
 const logDir = defaultLogDir();
 ensureLogDir(logDir);
 
+// CLI 是用訂閱還是 API 金鑰登入：開機問一次就好，不擋啟動 (探測不出來也照跑)。
+// 金額要不要標成估算看它，所以 agent 的結果行與 renderer 都拿同一份結果。
+const cliAuth = probeCliAuth(new NodeProcessSpawner());
+let auth: CliAuthStatus | null = null;
+void cliAuth.then((status) => (auth = status));
+const billingMode = (kind: AgentKind): BillingMode => auth?.[kind].mode ?? 'unknown';
+
 // 組裝：正式環境注入真的 node-pty spawner 與真的檔案 sink。
-const manager = new SessionManager(new NodePtySpawner(), new ShellFactory());
+const manager = new SessionManager(
+  new NodePtySpawner(),
+  new ShellFactory(),
+  undefined,
+  undefined,
+  billingMode,
+);
 const logger = new SessionLogger(logDir);
 const profiles = fileProfileStore(join(app.getPath('userData'), 'profiles.json'));
 
@@ -37,7 +54,7 @@ const workflows = new WorkflowService({
 const workflowDefinitions = fileWorkflowStore(join(app.getPath('userData'), 'workflows.json'));
 
 // 關窗之後 pty 的 exit 事件才可能送達，那時 webContents 已經被銷毀。
-registerIpc(manager, logger, profiles, workflows, workflowDefinitions, () =>
+registerIpc(manager, logger, profiles, workflows, workflowDefinitions, cliAuth, () =>
   win && !win.isDestroyed() ? win.webContents : null,
 );
 

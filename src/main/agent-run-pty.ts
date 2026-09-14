@@ -1,4 +1,6 @@
 import type { AgentEvent, AgentKind } from '../shared/agent';
+import type { BillingMode } from '../shared/cli-auth';
+import { usageLabel } from '../shared/cli-auth';
 import type { IAgentRun } from './agent-runner';
 import { oneLine } from './agent-runner';
 import type { IPtyProcess } from './pty';
@@ -26,6 +28,8 @@ export class AgentRunPty implements IPtyProcess {
     private readonly run: IAgentRun,
     kind: AgentKind,
     prompt: string,
+    /** CLI 的登入方式，決定結果那一行的金額要不要標成估算。*/
+    private readonly mode: BillingMode = 'unknown',
   ) {
     this.write_(`${DIM}[${kind}] 任務：${oneLine(prompt)}${RESET}`);
     this.run.onEvent((event) => this.render(event));
@@ -65,7 +69,7 @@ export class AgentRunPty implements IPtyProcess {
         return;
 
       case 'result':
-        this.write_(footer(event));
+        this.write_(footer(event, this.mode));
         this.exitListener?.({ exitCode: event.exitCode });
         return;
 
@@ -84,10 +88,10 @@ export class AgentRunPty implements IPtyProcess {
   }
 }
 
-function footer(event: Extract<AgentEvent, { type: 'result' }>): string {
+function footer(event: Extract<AgentEvent, { type: 'result' }>, mode: BillingMode): string {
   const parts: string[] = [];
   if (event.durationMs !== undefined) parts.push(`${(event.durationMs / 1000).toFixed(1)} s`);
-  if (event.costUsd !== undefined) parts.push(`$${event.costUsd.toFixed(3)}`);
+  if (event.costUsd !== undefined) parts.push(usageLabel(event.costUsd, mode));
   if (event.sessionId) parts.push(`session ${event.sessionId.slice(0, 8)}…`);
 
   if (event.ok) return `${GREEN}${['✔ 完成', ...parts].join(' · ')}${RESET}`;

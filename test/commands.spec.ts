@@ -319,16 +319,22 @@ describe('工作流的三個 Command', () => {
     api = fakeApi();
   });
 
-  it('StartWorkflowCommand 把範本與參數交給 main', async () => {
+  it('StartWorkflowCommand 把範本與參數交給 main，沒填上限就是不限制', async () => {
     await new StartWorkflowCommand(api, 'implement-review-approve', {
       task: '建立 hello.txt',
       cwd: 'D:/tmp',
     }).execute();
 
-    expect(api.startWorkflow).toHaveBeenCalledWith('implement-review-approve', {
-      task: '建立 hello.txt',
-      cwd: 'D:/tmp',
-    });
+    expect(api.startWorkflow).toHaveBeenCalledWith(
+      'implement-review-approve',
+      { task: '建立 hello.txt', cwd: 'D:/tmp' },
+      undefined,
+    );
+  });
+
+  it('StartWorkflowCommand 把用量上限一起送出去', async () => {
+    await new StartWorkflowCommand(api, 'implement-review-approve', {}, 2).execute();
+    expect(api.startWorkflow).toHaveBeenCalledWith('implement-review-approve', {}, 2);
   });
 
   it('ResumeWorkflowCommand 分別送出批准與退回', async () => {

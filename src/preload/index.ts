@@ -24,12 +24,13 @@ const api: MyTerminalApi = {
   getWorkflow: (id) => ipcRenderer.invoke(IPC.getWorkflow, id),
   saveWorkflow: (definition) => ipcRenderer.invoke(IPC.saveWorkflow, definition),
   deleteWorkflow: (id) => ipcRenderer.invoke(IPC.deleteWorkflow, id),
-  startWorkflow: (workflowId, params) =>
-    ipcRenderer.invoke(IPC.startWorkflow, { workflowId, params }),
+  startWorkflow: (workflowId, params, maxTotalCostUsd) =>
+    ipcRenderer.invoke(IPC.startWorkflow, { workflowId, params, maxTotalCostUsd }),
   resumeWorkflow: (runId, approved) =>
     ipcRenderer.invoke(IPC.resumeWorkflow, { runId, approved }),
   cancelWorkflow: (runId) => ipcRenderer.invoke(IPC.cancelWorkflow, runId),
   workflowRuns: () => ipcRenderer.invoke(IPC.workflowRuns),
+  cliAuth: () => ipcRenderer.invoke(IPC.cliAuth),
 
   onData: (listener) => void ipcRenderer.on(IPC.data, (_e, payload) => listener(payload)),
   onExit: (listener) => void ipcRenderer.on(IPC.exit, (_e, payload) => listener(payload)),

@@ -84,7 +84,10 @@ export interface WorkflowDefinition {
 
 export const DEFAULT_MAX_ATTEMPTS = 3;
 export const DEFAULT_TIMEOUT_SEC = 600;
-/** 一次執行的預設花費上限；超過就把執行標成失敗並收尾。*/
+/**
+ * 執行對話框的用量上限預設值，只在 CLI 是用 API 金鑰登入時才填進去 ——
+ * 訂閱帳號那個金額只是估算，沒有東西可以「超支」，所以預設不限制。
+ */
 export const DEFAULT_MAX_TOTAL_COST_USD = 2;
 
 /**
@@ -156,6 +159,8 @@ export interface RunNodeState {
   label: string;
   /** agent 節點的角色，跟 label 一樣複製一份過來給 renderer 貼標籤。*/
   role?: AgentRole;
+  /** agent 節點是哪一支 CLI；金額要標成估算還是費用看它。*/
+  kind?: AgentKind;
   status: RunNodeStatus;
   /** 這個節點的 CLI 執行在畫面上對應的工作階段，點一下可以切過去看。*/
   sessionId?: string;

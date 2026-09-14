@@ -6,6 +6,7 @@ import { TerminalView } from './terminal-view';
 import { SessionListView } from './session-list-view';
 import { ProfileListView } from './profile-list-view';
 import { WorkflowListView } from './workflow-list-view';
+import { CliStatusView } from './cli-status-view';
 import { NewConnectionDialog } from './new-connection-dialog';
 import { WorkflowRunDialog } from './workflow-run-dialog';
 import { InputPanel } from './input-panel';
@@ -213,8 +214,8 @@ new ProfileListView(
   (name) => void new RemoveProfileCommand(api, confirmRemove, name).execute(),
 );
 
-const workflowDialog = new WorkflowRunDialog((workflowId, params) => {
-  void new StartWorkflowCommand(api, workflowId, params).execute();
+const workflowDialog = new WorkflowRunDialog((workflowId, params, maxTotalCostUsd) => {
+  void new StartWorkflowCommand(api, workflowId, params, maxTotalCostUsd).execute();
 });
 $<HTMLButtonElement>('btn-workflow-run').addEventListener('click', () => workflowDialog.open());
 
@@ -281,6 +282,8 @@ new WorkflowListView(
   (sessionId) => state.setActive(sessionId),
 );
 
+new CliStatusView($<HTMLElement>('cli-claude'), $<HTMLElement>('cli-codex'), state);
+
 // 順序有意義：先把畫布收起來，syncTerminals 才量得到終端機的寬度。
 state.subscribe(syncView);
 state.subscribe(syncTerminals);
@@ -299,4 +302,9 @@ window.addEventListener('resize', () => activeTerminal()?.resize());
 void api.list().then((sessions) => state.setSessions(sessions));
 void api.listProfiles().then((profiles) => state.setProfiles(profiles));
 void api.workflowRuns().then((runs) => state.setRuns(runs));
+// 登入方式決定金額怎麼寫，以及執行對話框要不要先填一個用量上限。
+void api.cliAuth().then((auth) => {
+  state.setCliAuth(auth);
+  workflowDialog.setBillingMode(auth.claude.mode);
+});
 void refreshWorkflows();

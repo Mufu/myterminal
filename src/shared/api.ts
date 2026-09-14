@@ -2,6 +2,7 @@ import type { ConnectionProfile, SavedProfile } from './profile';
 import type { SessionInfo } from './session';
 import type { DataEvent, ExitEvent } from './ipc';
 import type { RunState, WorkflowDefinition, WorkflowInfo } from './workflow';
+import type { CliAuthStatus } from './cli-auth';
 
 /**
  * preload 透過 contextBridge 暴露到 window.myterminal 的介面。
@@ -25,10 +26,18 @@ export interface MyTerminalApi {
   /** 不合法的定義會以驗證訊息 reject。*/
   saveWorkflow(definition: WorkflowDefinition): Promise<void>;
   deleteWorkflow(id: string): Promise<void>;
-  startWorkflow(workflowId: string, params: Record<string, string>): Promise<string>;
+  /** maxTotalCostUsd 留空就是不限制這次執行的用量。*/
+  startWorkflow(
+    workflowId: string,
+    params: Record<string, string>,
+    maxTotalCostUsd?: number,
+  ): Promise<string>;
   resumeWorkflow(runId: string, approved: boolean): Promise<void>;
   cancelWorkflow(runId: string): Promise<void>;
   workflowRuns(): Promise<RunState[]>;
+
+  /** 兩支 CLI 的登入方式；開機探測一次，之後都是同一份結果。*/
+  cliAuth(): Promise<CliAuthStatus>;
 
   onData(listener: (event: DataEvent) => void): void;
   onExit(listener: (event: ExitEvent) => void): void;

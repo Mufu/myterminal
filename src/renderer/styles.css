@@ -1240,6 +1240,34 @@ html[data-theme='warm'] .session-item.active .session-dot {
   color: var(--primary-hover-fg);
 }
 
+/* ---- CLI 登入方式：右側面板最下面一行，一支 CLI 一個晶片 ---- */
+#cli-status {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: auto;
+  padding: 8px var(--head-pad-x);
+  border-top: 1px solid var(--border);
+}
+
+.cli-chip {
+  padding: var(--tag-pad);
+  border: var(--tag-border-width) solid var(--tag-border);
+  border-radius: var(--tag-radius);
+  background: var(--tag-bg);
+  color: var(--tag-fg);
+  font-family: var(--meta-font);
+  font-size: var(--tag-size);
+  letter-spacing: var(--tag-tracking);
+  white-space: nowrap;
+}
+
+/* 沒登入 (或判斷不出來) 的那一支再暗一階。*/
+.cli-chip.muted {
+  color: var(--dim);
+}
+
 /* ---- 對話框：新連接與執行範本共用同一套規則 ---- */
 #new-connection,
 #workflow-run {

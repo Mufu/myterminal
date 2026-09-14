@@ -111,15 +111,34 @@ describe('WorkflowService', () => {
     ]);
   });
 
-  it('節點狀態帶著角色，畫面才貼得出標籤', async () => {
+  it('節點狀態帶著角色與 CLI 種類，畫面才貼得出標籤與金額', async () => {
     const service = new WorkflowService(disk.deps());
     const definition = linear();
     (definition.nodes[1] as Extract<WorkflowNode, { type: 'agent' }>).config.role = 'coder';
     service.start(definition, { task: '建立 hello.txt' });
 
     const waiting = await waitFor(service, 'waiting_approval');
-    expect(waiting.nodes.impl.role).toBe('coder');
+    expect(waiting.nodes.impl).toMatchObject({ role: 'coder', kind: 'claude' });
     expect(waiting.nodes.ask.role).toBeUndefined();
+    expect(waiting.nodes.ask.kind).toBeUndefined();
+  });
+
+  it('start 給了用量上限，超過的那個節點就讓執行收尾', async () => {
+    const service = new WorkflowService(disk.deps());
+    service.start(linear(), {}, { maxTotalCostUsd: 0.05 });
+
+    const failed = await waitFor(service, 'failed');
+    expect(failed.error).toBe('實作：超出這次執行的用量上限 (估算 $0.05)');
+  });
+
+  it('沒給用量上限就不會因為金額中止 (訂閱帳號的預設)', async () => {
+    const runner = new ScriptedRunner(() => agentResult({ costUsd: 999 }));
+    const service = new WorkflowService(disk.deps({ runnerFactory: () => runner }));
+    service.start(linear(), {});
+
+    const waiting = await waitFor(service, 'waiting_approval');
+    expect(waiting.totalCostUsd).toBe(999);
+    expect(waiting.nodes.impl.status).toBe('done');
   });
 
   it('changed 事件跟 list() 是同一份內容', async () => {
@@ -219,7 +238,7 @@ describe('內建範本', () => {
       agentResult({ text: task.prompt.startsWith('審查') ? '看起來都好\nPASS' : '寫好了' }),
     );
     const service = new WorkflowService(
-      disk.deps({ runnerFactory: () => runner, maxTotalCostUsd: 99 }),
+      disk.deps({ runnerFactory: () => runner }),
     );
     service.start(definition, { task: '建立 hello.txt', cwd: 'D:/tmp' });
 
@@ -245,7 +264,7 @@ describe('內建範本', () => {
       return agentResult({ text: reviews === 1 ? '少了一行\nFAIL' : '這次好了\nPASS' });
     });
     const service = new WorkflowService(
-      disk.deps({ runnerFactory: () => runner, maxTotalCostUsd: 99 }),
+      disk.deps({ runnerFactory: () => runner }),
     );
     service.start(definition, { task: '建立 hello.txt', cwd: 'D:/tmp' });
 

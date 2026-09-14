@@ -162,9 +162,11 @@ export class StartWorkflowCommand implements ICommand {
     private readonly api: MyTerminalApi,
     private readonly workflowId: string,
     private readonly params: Record<string, string>,
+    /** 留空就是不限制這次執行的用量。*/
+    private readonly maxTotalCostUsd?: number,
   ) {}
   async execute(): Promise<void> {
-    await this.api.startWorkflow(this.workflowId, this.params);
+    await this.api.startWorkflow(this.workflowId, this.params, this.maxTotalCostUsd);
   }
 }
 

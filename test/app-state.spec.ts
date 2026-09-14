@@ -3,6 +3,7 @@ import { AppState } from '../src/renderer/app-state';
 import type { SessionInfo } from '../src/shared/session';
 import type { SavedProfile } from '../src/shared/profile';
 import type { RunState } from '../src/shared/workflow';
+import type { CliAuthStatus } from '../src/shared/cli-auth';
 
 const session = (id: string, over: Partial<SessionInfo> = {}): SessionInfo => ({
   id,
@@ -142,6 +143,25 @@ describe('AppState 已儲存連線', () => {
     state.setSessions([session('a')]);
     expect(state.profiles).toEqual([profile]);
     expect(state.activeSessionId).toBe('a');
+  });
+});
+
+describe('AppState CLI 登入方式', () => {
+  const status: CliAuthStatus = {
+    claude: { loggedIn: true, mode: 'subscription', plan: 'max', label: 'Max 訂閱' },
+    codex: { loggedIn: false, mode: 'unknown', label: '未登入' },
+  };
+
+  it('探測回來之前是 null', () => {
+    expect(state.cliAuth).toBeNull();
+  });
+
+  it('setCliAuth 存下來並通知訂閱者 (Observer)', () => {
+    let notified = 0;
+    state.subscribe(() => (notified += 1));
+    state.setCliAuth(status);
+    expect(state.cliAuth).toEqual(status);
+    expect(notified).toBe(1);
   });
 });
 
