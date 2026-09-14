@@ -142,7 +142,19 @@ export class SessionManager extends EventEmitter<SessionEvents> {
   ): { pty: IPtyProcess; startupCommand?: string } {
     if (profile.type !== 'agent') {
       const spec = this.factory.create(profile);
-      return { pty: this.spawner.spawn(spec, cols, rows), startupCommand: spec.startupCommand };
+      // node-pty 對這兩種情況只會回「error code: 267」或「File not found: 」，
+      // 使用者看不出是自己的哪一欄填錯了。
+      if (spec.cwd && !this.exists(spec.cwd)) throw new Error(`工作目錄不存在：${spec.cwd}`);
+      if (!spec.file.trim()) throw new Error('請輸入執行檔');
+      if (/[\\/]/.test(spec.file) && !this.exists(spec.file)) {
+        throw new Error(`找不到執行檔：${spec.file}`);
+      }
+      try {
+        return { pty: this.spawner.spawn(spec, cols, rows), startupCommand: spec.startupCommand };
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : String(error);
+        throw new Error(`無法啟動 ${spec.file}：${reason}`);
+      }
     }
     return { pty: this.startAgent(profile, info) };
   }

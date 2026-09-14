@@ -316,7 +316,14 @@ export class RemoveProfileCommand implements ICommand {
   }
 }
 
-/** IPC 丟回來的通常是 Error，但也可能是別的東西。*/
-function errorText(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+/**
+ * IPC 丟回來的通常是 Error，但也可能是別的東西。
+ * Electron 還會把 main 丟的例外包成
+ * `Error invoking remote method 'session:create': Error: <原因>`，
+ * 使用者只需要看到最裡面那句原因。
+ */
+export function errorText(error: unknown): string {
+  const raw = error instanceof Error ? error.message : String(error);
+  const unwrapped = raw.replace(/^Error invoking remote method '[^']*':\s*/, '');
+  return unwrapped.replace(/^(?:Error:\s*)+/, '').trim() || raw;
 }

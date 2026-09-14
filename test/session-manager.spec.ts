@@ -70,6 +70,49 @@ describe('SessionManager 建立工作階段', () => {
   });
 });
 
+describe('SessionManager 開不起來的工作階段', () => {
+  /** node-pty 只會回「error code: 267」，看不出是哪一欄填錯了。*/
+  it('工作目錄不存在時不 spawn，直接說是哪個目錄', () => {
+    const missing = new SessionManager(
+      spawner,
+      new ShellFactory((name) => name),
+      (fn) => fn(),
+      () => agents,
+      undefined,
+      () => false,
+    );
+    expect(() => missing.create({ type: 'powershell', cwd: 'D:/no-such-dir' }, 80, 24)).toThrow(
+      '工作目錄不存在：D:/no-such-dir',
+    );
+    expect(spawner.spawned).toEqual([]);
+  });
+
+  it('自訂命令的執行檔不存在時，訊息裡有那個檔名', () => {
+    const missing = new SessionManager(
+      spawner,
+      new ShellFactory((name) => name),
+      (fn) => fn(),
+      () => agents,
+      undefined,
+      () => false,
+    );
+    expect(() => missing.create({ type: 'custom', file: 'D:/nope/tool.exe' }, 80, 24)).toThrow(
+      '找不到執行檔：D:/nope/tool.exe',
+    );
+  });
+
+  it('執行檔欄位是空的時說要填，不是一句 File not found', () => {
+    expect(() => manager.create({ type: 'custom', file: '  ' }, 80, 24)).toThrow('請輸入執行檔');
+  });
+
+  it('spawn 自己丟的例外會帶上執行檔的名字', () => {
+    spawner.failNext = new Error('Cannot create process, error code: 267');
+    expect(() => manager.create({ type: 'powershell' }, 80, 24)).toThrow(
+      '無法啟動 powershell.exe：Cannot create process, error code: 267',
+    );
+  });
+});
+
 describe('SessionManager 轉送與控制', () => {
   it('把 pty 的輸出以 data 事件轉出去 (Observer)', () => {
     const events: DataEvent[] = [];

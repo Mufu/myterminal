@@ -49,8 +49,15 @@ export class FakePty implements IPtyProcess {
 
 export class FakePtySpawner implements IPtySpawner {
   readonly spawned: FakePty[] = [];
+  /** 下一次 spawn 要丟的例外 (node-pty 在 Windows 上是同步丟的)。*/
+  failNext?: Error;
 
   spawn(spec: SpawnSpec, cols: number, rows: number): IPtyProcess {
+    if (this.failNext) {
+      const error = this.failNext;
+      this.failNext = undefined;
+      throw error;
+    }
     const pty = new FakePty(spec, cols, rows);
     this.spawned.push(pty);
     return pty;

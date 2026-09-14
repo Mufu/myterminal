@@ -21,6 +21,7 @@ import {
   SaveWorkflowCommand,
   DeleteWorkflowCommand,
   SaveAndRunWorkflowCommand,
+  errorText,
 } from '../src/renderer/commands';
 import { WorkflowEditorModel } from '../src/renderer/workflow-editor-model';
 import { ThemeStore } from '../src/renderer/theme';
@@ -527,5 +528,23 @@ describe('畫布編輯器的 Command', () => {
     const opened: string[] = [];
     await new SaveAndRunWorkflowCommand(save(), model, (id) => opened.push(id)).execute();
     expect(opened).toEqual([]);
+  });
+});
+
+describe('errorText', () => {
+  it('把 Electron 包在外面的 IPC 外殼剥掉', () => {
+    const raw = new Error(
+      "Error invoking remote method 'session:create': Error: 工作目錄不存在：D:/nope",
+    );
+    expect(errorText(raw)).toBe('工作目錄不存在：D:/nope');
+  });
+
+  it('一般的 Error 就是它的訊息', () => {
+    expect(errorText(new Error('不能覆蓋內建範本'))).toBe('不能覆蓋內建範本');
+  });
+
+  it('不是 Error 的東西也變成字串', () => {
+    expect(errorText('壞掉了')).toBe('壞掉了');
+    expect(errorText(undefined)).toBe('undefined');
   });
 });

@@ -31,6 +31,7 @@ import {
   SaveWorkflowCommand,
   DeleteWorkflowCommand,
   SaveAndRunWorkflowCommand,
+  errorText,
 } from './commands';
 import { WorkflowEditorModel } from './workflow-editor-model';
 import { WorkflowEditorView } from './workflow-editor-view';
@@ -115,10 +116,12 @@ async function createSession(profile: ConnectionProfile): Promise<void> {
       state.setSessions([...state.sessions, info]);
     }
     state.setActive(info.id);
+    // 在畫布上開的新連接也要看得到；畫布上沒存的東西留著，只是不顯示。
+    state.showTerminal();
     syncTerminals();
   } catch (error) {
     view.dispose();
-    alert(`建立工作階段失敗：${String(error)}`);
+    alert(`建立工作階段失敗：${errorText(error)}`);
   } finally {
     pendingCreates -= 1;
     syncTerminals();
@@ -171,7 +174,12 @@ const confirmRemove: ConfirmPort = (message) => window.confirm(message);
 
 const dialog = new NewConnectionDialog((profile, save) => {
   // 勾了儲存時 validateProfile 已經確保名稱不是空的，所以這裡的轉型是安全的。
-  if (save) void api.saveProfile(profile as SavedProfile);
+  // 存不進去 (例如目錄唯讀) 要讓使用者知道，不能默默失敗。
+  if (save) {
+    void api
+      .saveProfile(profile as SavedProfile)
+      .catch((error: unknown) => alert(`儲存連線設定失敗：${errorText(error)}`));
+  }
   void createSession(profile);
 });
 
