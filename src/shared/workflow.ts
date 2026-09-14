@@ -98,6 +98,8 @@ export function validateWorkflow(def: WorkflowDefinition): string[] {
   const errors: string[] = [];
   const byId = new Map(def.nodes.map((node) => [node.id, node]));
 
+  if (!def.name.trim()) errors.push('工作流名稱不能是空的');
+
   const starts = def.nodes.filter((node) => node.type === 'start');
   if (starts.length !== 1) errors.push(`必須剛好有一個開始節點 (目前 ${starts.length} 個)`);
   if (!def.nodes.some((node) => node.type === 'end')) errors.push('必須至少有一個結束節點');

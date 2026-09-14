@@ -68,6 +68,12 @@ describe('validateWorkflow', () => {
     expect(validateWorkflow(two).join()).toContain('剛好有一個開始節點');
   });
 
+  it('工作流名稱不能是空的', () => {
+    const blank = minimal();
+    blank.name = '  ';
+    expect(validateWorkflow(blank)).toEqual(['工作流名稱不能是空的']);
+  });
+
   it('至少要有一個結束節點', () => {
     const d = def([start(), agent('a')], [{ from: 'start', to: 'a' }]);
     expect(validateWorkflow(d).join()).toContain('至少有一個結束節點');
