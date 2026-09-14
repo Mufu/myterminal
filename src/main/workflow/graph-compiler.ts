@@ -357,19 +357,20 @@ export function matches(rule: ConditionRule, text: string): boolean {
 
 /**
  * 這次執行算不算成功：有走到 end 節點就是成功，
- * 其他情況 (退回、節點失敗、重試用完、超出預算、取消) 都要給一句原因。
+ * 人按了「退回」是 rejected (不是壞掉，所以沒有原因)，
+ * 其他情況 (節點失敗、重試用完、超出預算、取消) 都要給一句原因。
  */
 export function runOutcome(
   def: WorkflowDefinition,
   state: RunGraphState,
-): { ok: boolean; error?: string } {
+): { ok: boolean; rejected?: boolean; error?: string } {
   if (def.nodes.some((node) => node.type === 'end' && state.lastPort[node.id] !== undefined)) {
     return { ok: true };
   }
   const rejected = def.nodes.find(
     (node) => node.type === 'approval' && state.lastPort[node.id] === 'rejected',
   );
-  if (rejected) return { ok: false, error: `${rejected.label}：已退回` };
+  if (rejected) return { ok: false, rejected: true };
 
   const failed = def.nodes.filter((node) => state.outputs[node.id]?.ok === false).at(-1);
   if (failed) return { ok: false, error: `${failed.label}：${state.outputs[failed.id].text}` };

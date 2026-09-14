@@ -45,7 +45,7 @@ type WorkflowEvents = { changed: [RunState[]] };
  */
 const RECURSION_LIMIT = 100;
 
-const TERMINAL: readonly RunStatus[] = ['done', 'failed', 'cancelled'];
+const TERMINAL: readonly RunStatus[] = ['done', 'failed', 'cancelled', 'rejected'];
 
 /**
  * WorkflowService — Observer，跟 SessionManager 同一個寫法。
@@ -143,7 +143,8 @@ export class WorkflowService extends EventEmitter<WorkflowEvents> {
       }
 
       const outcome = runOutcome(stored.definition, result);
-      this.settle(stored, outcome.ok ? 'done' : 'failed', outcome.error);
+      const status: RunStatus = outcome.ok ? 'done' : outcome.rejected ? 'rejected' : 'failed';
+      this.settle(stored, status, outcome.error);
     } catch (error) {
       this.settle(stored, 'failed', String(error));
     }
@@ -160,10 +161,12 @@ export class WorkflowService extends EventEmitter<WorkflowEvents> {
     stored.state.finishedAt = this.now();
     stored.state.question = undefined;
     if (error) stored.state.error = error;
+    // 正在跑的那個隨著執行一起收掉：被取消的不是失敗，別標成紅色。
+    const interrupted = status === 'cancelled' ? 'cancelled' : 'failed';
     for (const node of Object.values(stored.state.nodes)) {
-      // 沒輪到的節點是「略過」，正在跑的那個隨著執行一起收掉。
+      // 沒輪到的節點是「略過」。
       if (node.status === 'idle') node.status = 'skipped';
-      else if (node.status === 'running' || node.status === 'waiting') node.status = 'failed';
+      else if (node.status === 'running' || node.status === 'waiting') node.status = interrupted;
     }
     this.graphs.delete(stored.state.runId);
     this.changed();

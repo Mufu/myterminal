@@ -13,6 +13,7 @@ describe('runStatusLabel', () => {
       done: '完成',
       failed: '失敗',
       cancelled: '已取消',
+      rejected: '已退回',
     };
     for (const [status, label] of Object.entries(labels)) {
       expect(runStatusLabel(status as RunStatus)).toBe(label);
@@ -26,7 +27,14 @@ describe('nodeDotClass', () => {
   });
 
   it('其他狀態各自加一個修飾類別', () => {
-    const statuses: RunNodeStatus[] = ['running', 'done', 'failed', 'waiting', 'skipped'];
+    const statuses: RunNodeStatus[] = [
+      'running',
+      'done',
+      'failed',
+      'waiting',
+      'skipped',
+      'cancelled',
+    ];
     for (const status of statuses) expect(nodeDotClass(status)).toBe(`session-dot ${status}`);
   });
 });

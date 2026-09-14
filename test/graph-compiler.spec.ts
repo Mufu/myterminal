@@ -372,7 +372,7 @@ describe('compile', () => {
     expect(runOutcome(workflow, resumed)).toEqual({ ok: true });
   });
 
-  it('退回 (rejected) 沒有連線，執行算失敗並說明原因', async () => {
+  it('退回 (rejected) 沒有連線，執行收在「已退回」', async () => {
     const workflow = def(
       [
         start(),
@@ -389,7 +389,7 @@ describe('compile', () => {
     const state = await compiled.app.invoke(new Command({ resume: { approved: false } }), thread());
 
     expect(state.lastPort.ask).toBe('rejected');
-    expect(runOutcome(workflow, state)).toEqual({ ok: false, error: '批准：已退回' });
+    expect(runOutcome(workflow, state)).toEqual({ ok: false, rejected: true });
   });
 
   it('cancel 會砍掉正在跑的執行，後面的節點直接收尾', async () => {

@@ -172,10 +172,26 @@ function unreachable(def: WorkflowDefinition, start: WorkflowNode | undefined): 
   return def.nodes.filter((node) => !seen.has(node.id));
 }
 
-/** 一次執行的狀態，main 推給 renderer 畫清單用。*/
-export type RunStatus = 'running' | 'waiting_approval' | 'done' | 'failed' | 'cancelled';
+/**
+ * 一次執行的狀態，main 推給 renderer 畫清單用。
+ * 'rejected' 是人按了「退回」：流程就這樣收掉，不是壞掉，所以跟 'failed' 分開。
+ */
+export type RunStatus =
+  | 'running'
+  | 'waiting_approval'
+  | 'done'
+  | 'failed'
+  | 'cancelled'
+  | 'rejected';
 
-export type RunNodeStatus = 'idle' | 'running' | 'done' | 'failed' | 'waiting' | 'skipped';
+export type RunNodeStatus =
+  | 'idle'
+  | 'running'
+  | 'done'
+  | 'failed'
+  | 'waiting'
+  | 'skipped'
+  | 'cancelled';
 
 export interface RunNodeState {
   /** 節點在定義裡的顯示名稱，複製一份過來讓 renderer 不必拿到整份定義。*/

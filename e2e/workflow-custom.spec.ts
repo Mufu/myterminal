@@ -247,8 +247,9 @@ test('A：條件成立後停在批准，按退回收尾而檔案留著', async (
     await window.screenshot({ path: join(root, 'test-results', 'wf-a-waiting.png') });
 
     await run(window).locator('.workflow-reject').click();
-    await expect(status(window)).toHaveText('失敗', { timeout: 60_000 });
-    await expect(run(window).locator('.workflow-error')).toContainText('退回');
+    await expect(status(window)).toHaveText('已退回', { timeout: 60_000 });
+    // 退回是人做的決定，不是壞掉，所以沒有錯誤訊息。
+    await expect(run(window).locator('.workflow-error')).toHaveCount(0);
     // 沒有走到結束節點。
     await expect(node(window, 'end').locator('.session-dot')).toHaveClass(/skipped/);
 

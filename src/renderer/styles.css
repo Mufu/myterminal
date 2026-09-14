@@ -1113,6 +1113,11 @@ html[data-theme='warm'] .session-item.active .session-dot {
   color: var(--recording);
 }
 
+/* 退回是人做的決定，不是壞掉，所以用中性的字色而不是紅的。*/
+.workflow-status.rejected {
+  color: var(--muted);
+}
+
 .workflow-meta {
   display: flex;
   align-items: baseline;
@@ -1194,6 +1199,11 @@ html[data-theme='warm'] .session-item.active .session-dot {
 .session-dot.skipped {
   background: transparent;
   box-shadow: inset 0 0 0 1px var(--exited);
+}
+
+/* 被取消的節點跟已結束的工作階段一樣是中性的，不是紅色的失敗。*/
+.session-dot.cancelled {
+  background: var(--exited);
 }
 
 .workflow-question {

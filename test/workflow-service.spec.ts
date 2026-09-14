@@ -182,14 +182,18 @@ describe('WorkflowService', () => {
     expect(done.error).toBeUndefined();
   });
 
-  it('退回之後算失敗，並說明原因', async () => {
+  /** 退回是人做的決定，不是壞掉，所以不標成失敗也沒有錯誤訊息。*/
+  it('退回之後是「已退回」，沒有錯誤訊息', async () => {
     const service = new WorkflowService(disk.deps());
     service.start(linear(), {});
     await waitFor(service, 'waiting_approval');
 
     service.resume('run-1', { approved: false });
-    const failed = await waitFor(service, 'failed');
-    expect(failed.error).toBe('批准：已退回');
+    const rejected = await waitFor(service, 'rejected');
+    expect(rejected.error).toBeUndefined();
+    expect(rejected.nodes.ask.status).toBe('done');
+    expect(rejected.nodes.end.status).toBe('skipped');
+    expect(rejected.finishedAt).toBe(1_000);
   });
 
   it('等待批准的執行，換一個全新的 service 實例仍然接得回去', async () => {
@@ -229,6 +233,9 @@ describe('WorkflowService', () => {
     service.cancel('run-1');
     expect(runner.runs[0].cancelled).toBe(true);
     expect(service.list()[0]).toMatchObject({ status: 'cancelled', finishedAt: 1_000 });
+    // 取消不是失敗：正在跑的那個節點標成已取消，沒輪到的還是略過。
+    expect(service.list()[0].nodes.impl.status).toBe('cancelled');
+    expect(service.list()[0].nodes.skipme.status).toBe('skipped');
 
     // CLI 事後才回報取消，不能把狀態改回去。
     runner.runs[0].emit({ type: 'error', message: '已取消' });

@@ -18,6 +18,8 @@ export function runStatusLabel(status: RunStatus): string {
       return '失敗';
     case 'cancelled':
       return '已取消';
+    case 'rejected':
+      return '已退回';
   }
 }
 
