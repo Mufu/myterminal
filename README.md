@@ -294,12 +294,15 @@ npm install      # 安裝相依套件
 npm run dev      # 開發模式（electron-vite，支援熱更新）
 npm test         # 單元測試（Vitest）
 npm run build    # 建置到 out/
-npm run e2e      # 先 build 再跑 Playwright 端到端測試（冒煙、設定檔、主題、畫布編輯器），截圖寫到 test-results/
+npm run e2e      # 先 build 再跑 Playwright 端到端測試（工作階段、工具列、對話框、畫布、主題、穩定性、打包版），截圖寫到 test-results/
+npm run test:coverage # 單元測試覆蓋率（v8），報告在 coverage/
 npm run e2e:ssh  # SSH 端到端測試，要先開好本機 sshd，見「本機 SSH 測試環境」
-npm run e2e:agent # Agent 任務端到端測試，會真的呼叫 claude / codex（要登入、會花錢）
-npm run e2e:workflow # 工作流範本端到端測試，會真的呼叫 claude（要登入、會花錢）
+npm run e2e:agent # Agent 任務端到端測試，會真的呼叫 claude / codex（要登入；訂閱帳號只用額度）
+npm run e2e:workflow # 工作流範本端到端測試，會真的呼叫 claude（要登入；訂閱帳號只用額度）
 npm run dist     # 打包成 Windows 執行檔（electron-builder）
 ```
+
+測試分層、隔離原則、各 spec 涵蓋什麼，以及 2026-09-14 測試回合找到並修掉的問題，見 [`docs/TESTING.md`](docs/TESTING.md)。
 
 ## 打包成執行檔
 
