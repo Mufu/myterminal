@@ -35,10 +35,6 @@ export function validateProfile(profile: ConnectionProfile, requireName = false)
       if (profile.startupCommand !== undefined && !profile.startupCommand.trim()) {
         errors.push('請輸入啟動指令');
       }
-      // Muse Code 只有 Linux 版，裝在 WSL 裡；PowerShell 起不來。
-      if (profile.type === 'muse' && profile.baseShell !== 'wsl') {
-        errors.push('Muse 只能在 WSL 裡執行');
-      }
       break;
 
     case 'agent':

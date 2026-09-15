@@ -43,6 +43,8 @@ describe('usageMode', () => {
   const auth: CliAuthStatus = {
     claude: { loggedIn: true, mode: 'subscription', label: 'Max 訂閱' },
     codex: { loggedIn: true, mode: 'api', label: 'API 金鑰' },
+    muse: { loggedIn: false, mode: 'unknown', label: '未登入' },
+    opencode: { loggedIn: false, mode: 'unknown', label: '未登入' },
   };
 
   it('節點看自己那一支 CLI，執行總額看 claude', () => {

@@ -150,6 +150,8 @@ describe('AppState CLI 登入方式', () => {
   const status: CliAuthStatus = {
     claude: { loggedIn: true, mode: 'subscription', plan: 'max', label: 'Max 訂閱' },
     codex: { loggedIn: false, mode: 'unknown', label: '未登入' },
+    muse: { loggedIn: false, mode: 'unknown', label: '未登入' },
+    opencode: { loggedIn: false, mode: 'unknown', label: '未登入' },
   };
 
   it('探測回來之前是 null', () => {

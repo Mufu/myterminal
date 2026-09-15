@@ -100,14 +100,9 @@ describe('Agent 任務', () => {
 });
 
 describe('Muse / OpenCode', () => {
-  it('Muse 在 WSL 上合法', () => {
+  it('Muse 兩種基礎 shell 都可以 (Windows 上有原生安裝)', () => {
+    expect(validateProfile({ type: 'muse', baseShell: 'powershell' })).toEqual([]);
     expect(validateProfile({ type: 'muse', baseShell: 'wsl' })).toEqual([]);
-  });
-
-  it('Muse 選 PowerShell 時擋下來 —— Muse Code 只有 Linux 版', () => {
-    expect(validateProfile({ type: 'muse', baseShell: 'powershell' })).toEqual([
-      'Muse 只能在 WSL 裡執行',
-    ]);
   });
 
   it('OpenCode 兩種基礎 shell 都可以', () => {

@@ -79,24 +79,7 @@ export class NewConnectionDialog implements DialogPort {
     }
     if (isCliType(this.type)) {
       $<HTMLInputElement>('f-startup').value = defaultStartupCommand(this.type);
-      this.syncBaseShell();
     }
-  }
-
-  /**
-   * Muse Code 只有 Linux 版：PowerShell 那個選項關掉並強制選 WSL，
-   * 換回其他 CLI 時再把它放回來 (並且回到預設的 PowerShell)。
-   */
-  private syncBaseShell(): void {
-    const select = $<HTMLSelectElement>('f-base-shell');
-    const powershell = select.querySelector<HTMLOptionElement>('option[value="powershell"]');
-    if (!powershell) return;
-    const museOnly = this.type === 'muse';
-    const wasMuseOnly = powershell.disabled;
-    powershell.disabled = museOnly;
-    powershell.hidden = museOnly;
-    if (museOnly) select.value = 'wsl';
-    else if (wasMuseOnly) select.value = 'powershell';
   }
 
   private submit(event: Event): void {

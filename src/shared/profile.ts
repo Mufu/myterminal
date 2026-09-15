@@ -55,7 +55,7 @@ export interface SshProfile extends ProfileBase {
 
 export interface AgentProfile extends ProfileBase {
   type: CliSessionType;
-  /** 要在哪個 shell 裡執行 agent。Muse 只有 Linux 版，一定是 wsl。*/
+  /** 要在哪個 shell 裡執行 agent。*/
   baseShell: BaseShell;
   /** spawn 之後立刻寫進 pty 的啟動指令，預設就是 CLI 的名字，使用者可改。*/
   startupCommand?: string;

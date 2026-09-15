@@ -1,9 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import {
+  loginProfile,
   parseClaudeAuth,
   parseCodexAuth,
+  parseMuseAuth,
+  parseOpencodeAuth,
   usageLabel,
   usageTitle,
+  validateCliSetting,
 } from '../src/shared/cli-auth';
 import { chipLabel } from '../src/renderer/cli-status-view';
 
@@ -106,5 +110,106 @@ describe('chipLabel', () => {
     expect(chipLabel('Claude', parseClaudeAuth(MAX_LOGIN))).toBe('Claude · Max 訂閱');
     expect(chipLabel('Codex', parseCodexAuth('Not logged in'))).toBe('Codex · 未登入');
     expect(chipLabel('Codex', undefined)).toBe('Codex · 檢查中…');
+  });
+});
+
+describe('parseMuseAuth', () => {
+  it('憑證檔不存在 (從沒登入過) 是未登入', () => {
+    expect(parseMuseAuth(null)).toEqual({ loggedIn: false, mode: 'unknown', label: '未登入' });
+  });
+
+  it('muse logout 之後 providers 是空的，檔案還在也算未登入', () => {
+    expect(parseMuseAuth('{"schema_version":1,"providers":{}}')).toMatchObject({
+      loggedIn: false,
+      label: '未登入',
+    });
+  });
+
+  it('muse auth set 存的是 api_key，算成 API 金鑰', () => {
+    const file = '{"schema_version":1,"providers":{"meta":{"api_key":"祕密"}}}';
+    expect(parseMuseAuth(file)).toEqual({ loggedIn: true, mode: 'api', label: 'API 金鑰' });
+  });
+
+  it('muse login 存的不是 api_key，算成 Meta 帳號', () => {
+    const file = '{"schema_version":1,"providers":{"meta":{"refresh_token":"x"}}}';
+    expect(parseMuseAuth(file)).toMatchObject({ mode: 'subscription', label: 'Meta 帳號' });
+  });
+
+  it('壞掉的檔案只能說無法判斷', () => {
+    expect(parseMuseAuth('{ 不是 JSON')).toMatchObject({ label: '無法判斷' });
+  });
+});
+
+describe('parseOpencodeAuth', () => {
+  /** `opencode auth list` 的輸出前面有顏色跳脫序列。*/
+  const NONE = '\u001b[90m└\u001b[39m  0 credentials\n';
+
+  it('0 credentials 是未登入', () => {
+    expect(parseOpencodeAuth(NONE)).toMatchObject({ loggedIn: false, label: '未登入' });
+  });
+
+  it('有憑證就是 API 金鑰', () => {
+    expect(parseOpencodeAuth('3 credentials')).toEqual({
+      loggedIn: true,
+      mode: 'api',
+      label: 'API 金鑰',
+    });
+  });
+
+  it('opencode 自己沒憑證，但 app 存了金鑰一樣跑得起來', () => {
+    expect(parseOpencodeAuth(NONE, true)).toMatchObject({ mode: 'api' });
+  });
+
+  it('看不懂的輸出是無法判斷', () => {
+    expect(parseOpencodeAuth('???')).toMatchObject({ label: '無法判斷' });
+  });
+});
+
+describe('loginProfile', () => {
+  it('三支有登入流程的 CLI 各自開一個互動式工作階段', () => {
+    expect(loginProfile('claude')).toMatchObject({
+      type: 'claude',
+      baseShell: 'powershell',
+      startupCommand: 'claude auth login',
+    });
+    expect(loginProfile('codex')).toMatchObject({ startupCommand: 'codex login' });
+    // Muse 在 Windows 上有原生安裝，登入不必進 WSL。
+    expect(loginProfile('muse')).toMatchObject({
+      baseShell: 'powershell',
+      startupCommand: 'muse login',
+    });
+  });
+
+  it('OpenCode 沒有登入流程', () => {
+    expect(() => loginProfile('opencode')).toThrow('OpenCode 只能使用 API 金鑰');
+  });
+});
+
+describe('validateCliSetting', () => {
+  it('選了登入就不必填金鑰', () => {
+    expect(validateCliSetting({ id: 'claude', mode: 'login' }, false)).toEqual([]);
+  });
+
+  it('選了 API 金鑰但沒填也沒存過', () => {
+    expect(validateCliSetting({ id: 'claude', mode: 'apiKey' }, false)).toEqual(['請輸入 API 金鑰']);
+  });
+
+  it('已經存過就可以不重打', () => {
+    expect(validateCliSetting({ id: 'claude', mode: 'apiKey' }, true)).toEqual([]);
+  });
+
+  it('OpenCode 不能選登入', () => {
+    expect(
+      validateCliSetting({ id: 'opencode', mode: 'login' }, true),
+    ).toContain('OpenCode 只能使用 API 金鑰');
+  });
+
+  it('OpenCode 一定要選供應商 —— 金鑰要放進哪一個環境變數看它', () => {
+    expect(validateCliSetting({ id: 'opencode', mode: 'apiKey', apiKey: 'k' }, false)).toEqual([
+      '請選擇供應商',
+    ]);
+    expect(
+      validateCliSetting({ id: 'opencode', mode: 'apiKey', apiKey: 'k', provider: 'google' }, false),
+    ).toEqual([]);
   });
 });
