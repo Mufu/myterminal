@@ -5,7 +5,7 @@ import { SessionLogger, defaultLogDir, ensureLogDir } from './session-logger';
 import { NodePtySpawner } from './node-pty-spawner';
 import { ShellFactory } from './shell-factory';
 import { fileProfileStore } from './profile-store';
-import { defaultAgentRunners } from './agent-runner';
+import { agentRunners } from './agent-runner';
 import { NodeProcessSpawner } from './process-spawner';
 import { probeCliAuth } from './cli-auth-probe';
 import { fileCliAuthStore } from './cli-auth-store';
@@ -41,12 +41,15 @@ void cliAuth.then(remember);
 const billingMode = (kind: AgentKind): BillingMode => auth?.[kind].mode ?? 'unknown';
 
 // 組裝：正式環境注入真的 node-pty spawner 與真的檔案 sink。
-// ShellFactory 多拿一條金鑰縫線，選了 API 金鑰的 CLI 才會被注入環境變數。
+// ShellFactory 與 agent runner 共用同一條金鑰縫線，所以選了 API 金鑰的 CLI
+// 在互動式工作階段、Agent 任務、工作流節點三邊都拿得到金鑰。
+const secrets = cliSecrets(cliStore);
+const runners = agentRunners(secrets);
 const manager = new SessionManager(
   new NodePtySpawner(),
-  new ShellFactory(undefined, cliSecrets(cliStore)),
+  new ShellFactory(undefined, secrets),
   undefined,
-  undefined,
+  runners,
   billingMode,
 );
 const logger = new SessionLogger(logDir);
@@ -55,7 +58,7 @@ const profiles = fileProfileStore(join(app.getPath('userData'), 'profiles.json')
 // 工作流：圖的 checkpoint 一個執行一個檔，清單摘要則是一份 JSON。
 // 節點的 CLI 執行透過 SessionManager.adoptAgentRun 變成畫面上的工作階段。
 const workflows = new WorkflowService({
-  runnerFactory: defaultAgentRunners,
+  runnerFactory: runners,
   sessions: manager,
   checkpointer: fileCheckpointSaver(join(app.getPath('userData'), 'workflow-runs')),
   ...fileRunStore(join(app.getPath('userData'), 'workflow-runs.json')),

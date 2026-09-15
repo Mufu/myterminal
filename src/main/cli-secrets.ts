@@ -52,10 +52,12 @@ export function cliInjection(
 
     case 'opencode': {
       const { provider } = setting;
-      const model = setting.model?.trim();
+      const name = setting.model?.trim();
+      const model = provider && name ? `${provider}/${name}` : undefined;
       return {
         env: secret && provider ? { [PROVIDER_ENV[provider]]: secret } : {},
-        startupCommand: provider && model ? `opencode -m ${provider}/${model}` : undefined,
+        startupCommand: model ? `opencode -m ${model}` : undefined,
+        model,
       };
     }
   }

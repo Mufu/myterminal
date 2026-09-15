@@ -7,6 +7,8 @@ export interface ProcessSpec {
   cwd: string;
   /** 寫進 stdin 之後立刻關閉；提示走 stdin 就不必處理引號與換行。*/
   stdin?: string;
+  /** 疊在 process.env 上的環境變數 (「CLI 設定」選了 API 金鑰時才有東西)。*/
+  env?: Record<string, string>;
 }
 
 export interface IChildProcess {
@@ -34,7 +36,12 @@ export interface IProcessSpawner {
  */
 export class NodeProcessSpawner implements IProcessSpawner {
   spawn(spec: ProcessSpec): IChildProcess {
-    const child = spawn(spec.file, spec.args, { cwd: spec.cwd, windowsHide: true });
+    const child = spawn(spec.file, spec.args, {
+      cwd: spec.cwd,
+      windowsHide: true,
+      // 沒有要注入就不傳 env，讓子行程原封不動繼承這個行程的環境。
+      env: spec.env ? { ...process.env, ...spec.env } : undefined,
+    });
     child.stdout.setEncoding('utf8');
     child.stderr.setEncoding('utf8');
     child.stdin.end(spec.stdin ?? '', 'utf8');

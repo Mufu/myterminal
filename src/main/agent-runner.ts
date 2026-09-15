@@ -1,6 +1,14 @@
+import { randomUUID } from 'node:crypto';
+import { rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import type { AgentEvent, AgentKind, AgentTask } from '../shared/agent';
 import type { IChildProcess, IProcessSpawner, ProcessSpec } from './process-spawner';
 import { NodeProcessSpawner } from './process-spawner';
+import type { CliSecrets } from './shell-factory';
+
+/** 沒有注入任何金鑰的預設縫線 (單元測試與 defaultAgentRunners 用)。*/
+const NO_SECRETS: CliSecrets = () => ({ env: {} });
 
 export interface IAgentRun {
   onEvent(listener: (event: AgentEvent) => void): void;
@@ -46,6 +54,8 @@ class JsonlRun implements IAgentRun {
     spawner: IProcessSpawner,
     spec: ProcessSpec,
     private readonly map: EventMapper,
+    /** 行程結束之後要收的尾；目前只有 Muse 的提示暫存檔要刪。*/
+    private readonly cleanup?: () => void,
   ) {
     this.child = spawner.spawn(spec);
     this.child.onStdout((chunk) => this.consume(chunk));
@@ -102,6 +112,7 @@ class JsonlRun implements IAgentRun {
   private finish(exitCode: number): void {
     if (this.finished) return;
     this.finished = true;
+    this.cleanup?.();
     this.handleLine(this.buffer);
     this.buffer = '';
 
@@ -127,7 +138,16 @@ class JsonlRun implements IAgentRun {
 }
 
 /** 工具事件的一行摘要：挑輸入裡最能說明「動了什麼」的那個欄位。*/
-const SUMMARY_KEYS = ['file_path', 'command', 'pattern', 'url', 'path', 'description'];
+const SUMMARY_KEYS = [
+  'file_path',
+  // opencode 的工具輸入是小駝峰。
+  'filePath',
+  'command',
+  'pattern',
+  'url',
+  'path',
+  'description',
+];
 
 function toolSummary(input: unknown): string {
   const record = obj(input);
@@ -240,12 +260,136 @@ export const codexEvents: EventMapper = (line) => {
   }
 };
 
+
+/**
+ * muse exec --json 的事件。每一行都是一筆記錄：型別在 payload_type、內容在
+ * payload，session id 則掛在 stream 上 (kind === 'session')。
+ *
+ * 只有 echo provider 的輸出是實際抓下來的 (test/fixtures/muse-echo-exec.jsonl)，
+ * 真的 meta provider 需要 Meta 登入，這台機器沒有 —— 所以工具呼叫長什麼樣子、
+ * 有沒有用量欄位都還沒看過，這裡一律防禦性地解析，認不得的就忽略。
+ */
+export const museEvents: EventMapper = (line) => {
+  const type = str(line.payload_type);
+  const payload = obj(line.payload);
+  if (!type || !payload) return [];
+
+  // 每一行都帶著 session，但 runtime.command.accepted 一次執行只有一筆。
+  if (type === 'runtime.command.accepted') {
+    const stream = obj(line.stream);
+    const sessionId = stream?.kind === 'session' ? str(stream.id) : undefined;
+    return sessionId ? [{ type: 'init', sessionId }] : [];
+  }
+
+  // 終端事件的 payload_type 是 run.terminal.<結果>，成敗看 terminal 這個欄位。
+  if (type.startsWith('run.terminal.')) {
+    const ok = payload.terminal === 'completed';
+    const text = str(payload.text) ?? '';
+    return [{ type: 'result', ok, text: ok ? text : (str(payload.reason) ?? text), exitCode: 0 }];
+  }
+
+  switch (type) {
+    case 'run.output.delta': {
+      const text = str(payload.text)?.trim();
+      return text ? [{ type: 'text', text }] : [];
+    }
+
+    case 'task.lifecycle.proposed': {
+      // model.* 只是模型自己的回合，內容已經以文字出現過了，再印一次是雜訊。
+      const kind = str(obj(payload.event)?.task_kind);
+      return kind && !kind.startsWith('model.')
+        ? [{ type: 'tool', name: kind, summary: '' }]
+        : [];
+    }
+
+    case 'task.lifecycle.failed': {
+      // 單一任務失敗不等於整次執行失敗 (echo provider 的 verify-reminder 必定失敗)，
+      // 成敗一律以 run.terminal.* 為準，這裡只把原因顯示出來。
+      const reason = str(obj(payload.event)?.reason);
+      return reason ? [{ type: 'tool', name: 'task.failed', summary: oneLine(reason) }] : [];
+    }
+
+    default:
+      return [];
+  }
+};
+
+/**
+ * opencode run --format json 的事件。
+ *
+ * 它沒有「這次跑完了」那種事件 —— 串流結束就是結束 —— 所以結果是在每個
+ * step_finish 上重新湊一份，最後留下來的那筆就是最終結果。費用要跨 step 累加、
+ * 結果文字要把每段回覆接起來，所以這個 mapper 有狀態，一次執行配一個
+ * (claude / codex 的沒有狀態，是模組常數)。
+ */
+export function opencodeEvents(): EventMapper {
+  let started = false;
+  let costUsd = 0;
+  const texts: string[] = [];
+
+  return (line) => {
+    const events: AgentEvent[] = [];
+    const sessionId = str(line.sessionID);
+    // sessionID 每一行都有，第一次看到就當作 init。
+    if (!started && sessionId) {
+      started = true;
+      events.push({ type: 'init', sessionId });
+    }
+    const part = obj(line.part);
+
+    switch (line.type) {
+      case 'text': {
+        const text = str(part?.text)?.trim();
+        if (text) {
+          texts.push(text);
+          events.push({ type: 'text', text });
+        }
+        break;
+      }
+
+      case 'tool_use':
+        events.push({
+          type: 'tool',
+          name: str(part?.tool) ?? 'tool',
+          summary: toolSummary(obj(part?.state)?.input),
+        });
+        break;
+
+      case 'step_finish':
+        costUsd += num(part?.cost) ?? 0;
+        events.push({
+          type: 'result',
+          // reason 是 stop (講完了) 或 tool-calls (還要再跑一輪)；error 才是真的壞了。
+          ok: str(part?.reason) !== 'error',
+          text: texts.join('\n\n'),
+          sessionId,
+          // 免費模型的 cost 是 0，這時不要在頁尾寫一個 $0.000。
+          costUsd: costUsd > 0 ? costUsd : undefined,
+          exitCode: 0,
+        });
+        break;
+
+      case 'error': {
+        const error = obj(line.error);
+        const message = str(obj(error?.data)?.message) ?? str(error?.name) ?? '';
+        events.push({ type: 'result', ok: false, text: message, sessionId, exitCode: 0 });
+        break;
+      }
+    }
+
+    return events;
+  };
+}
+
 /**
  * ClaudeCodeRunner — Adapter，把 AgentTask 變成一次 claude -p 執行。
  * stream-json 在 print 模式下一定要配 --verbose，否則 claude 直接拒絕啟動。
  */
 export class ClaudeCodeRunner implements IAgentRunner {
-  constructor(private readonly spawner: IProcessSpawner = new NodeProcessSpawner()) {}
+  constructor(
+    private readonly spawner: IProcessSpawner = new NodeProcessSpawner(),
+    private readonly secrets: CliSecrets = NO_SECRETS,
+  ) {}
 
   start(task: AgentTask): IAgentRun {
     const args = ['-p', '--output-format', 'stream-json', '--verbose'];
@@ -255,7 +399,13 @@ export class ClaudeCodeRunner implements IAgentRunner {
     if (task.resumeId) args.push('--resume', task.resumeId);
     return new JsonlRun(
       this.spawner,
-      { file: 'claude', args, cwd: task.cwd, stdin: task.prompt },
+      {
+        file: 'claude',
+        args,
+        cwd: task.cwd,
+        stdin: task.prompt,
+        env: this.secrets('claude', 'powershell').env,
+      },
       claudeEvents,
     );
   }
@@ -268,7 +418,10 @@ export class ClaudeCodeRunner implements IAgentRunner {
  * 它也沒有 claude 的 --append-system-prompt，所以角色的前置指示只能接在提示前面。
  */
 export class CodexRunner implements IAgentRunner {
-  constructor(private readonly spawner: IProcessSpawner = new NodeProcessSpawner()) {}
+  constructor(
+    private readonly spawner: IProcessSpawner = new NodeProcessSpawner(),
+    private readonly secrets: CliSecrets = NO_SECRETS,
+  ) {}
 
   start(task: AgentTask): IAgentRun {
     const sandbox = task.allowEdits ? 'workspace-write' : 'read-only';
@@ -276,10 +429,116 @@ export class CodexRunner implements IAgentRunner {
     if (task.resumeId) args.push('resume', task.resumeId, '-c', `sandbox_mode="${sandbox}"`);
     else args.push('--sandbox', sandbox);
     args.push('--json', '--skip-git-repo-check', '-c', 'approval_policy="never"');
-    const stdin = task.systemPrompt ? `${task.systemPrompt}\n\n${task.prompt}` : task.prompt;
-    return new JsonlRun(this.spawner, { file: 'cmd.exe', args, cwd: task.cwd, stdin }, codexEvents);
+    return new JsonlRun(
+      this.spawner,
+      {
+        file: 'cmd.exe',
+        args,
+        cwd: task.cwd,
+        stdin: withSystemPrompt(task),
+        env: this.secrets('codex', 'powershell').env,
+      },
+      codexEvents,
+    );
   }
 }
 
-export const defaultAgentRunners: IAgentRunnerFactory = (kind) =>
-  kind === 'claude' ? new ClaudeCodeRunner() : new CodexRunner();
+/**
+ * MuseRunner — muse exec。muse 是 %LOCALAPPDATA%\Programs\muse\muse.cmd 這個
+ * shim，跟 codex 一樣要走 cmd.exe /c。提示一律寫成暫存檔再用 --prompt-file 讀，
+ * 不放進命令列 (換行與引號在 cmd.exe 上一定會出事)，行程結束就刪掉。
+ * muse 沒有 claude 的 --append-system-prompt，角色的前置指示只能接在提示前面。
+ *
+ * 核准模式 (都用 --provider echo 實測過，不會卡住)：
+ *   - untrusted：要授權的工具被政策直接擋掉，不是停下來問人；再加
+ *     --disable-write 關掉非 shell 的寫檔，等價於 codex 的 read-only。
+ *   - never：永遠不問，也就是全部放行 —— 允許修改檔案時用這個。
+ * 預設的 on-request 真的有工具要授權時會停下來等人，無介面不能用。
+ */
+export class MuseRunner implements IAgentRunner {
+  constructor(
+    private readonly spawner: IProcessSpawner = new NodeProcessSpawner(),
+    private readonly secrets: CliSecrets = NO_SECRETS,
+  ) {}
+
+  start(task: AgentTask): IAgentRun {
+    const file = join(tmpdir(), `myterminal-muse-${randomUUID()}.txt`);
+    writeFileSync(file, withSystemPrompt(task), 'utf8');
+
+    const args = ['/c', 'muse', 'exec', '--json', '--prompt-file', file];
+    if (task.allowEdits) args.push('--approval-mode', 'never');
+    else args.push('--approval-mode', 'untrusted', '--disable-write');
+    // muse exec 沒有 resume 子命令，接續是「指定同一個 session id」。
+    if (task.resumeId) args.push('--session-id', task.resumeId);
+
+    return new JsonlRun(
+      this.spawner,
+      { file: 'cmd.exe', args, cwd: task.cwd, env: this.secrets('muse', 'powershell').env },
+      museEvents,
+      () => rmSync(file, { force: true }),
+    );
+  }
+}
+
+/**
+ * OpenCodeRunner — opencode run。它是 %APPDATA%\npm\opencode.cmd，一樣走
+ * cmd.exe /c；訊息可以直接從 stdin 讀 (實測過)，所以提示跟 claude 一樣不碰引號。
+ *
+ * 它沒有「唯讀」旗標 —— `opencode run` 預設就直接寫檔，不問也不擋 ——
+ * 但內建的 plan agent 權限是 edit: deny，效果等同 claude 的 plan 模式，
+ * 所以不允許修改檔案時就換成它 (實測：模型寫不了檔，也不會卡住)。
+ */
+export class OpenCodeRunner implements IAgentRunner {
+  constructor(
+    private readonly spawner: IProcessSpawner = new NodeProcessSpawner(),
+    private readonly secrets: CliSecrets = NO_SECRETS,
+  ) {}
+
+  start(task: AgentTask): IAgentRun {
+    const { env, model } = this.secrets('opencode', 'powershell');
+    const args = ['/c', 'opencode', 'run', '--format', 'json', '--dir', task.cwd];
+    // 「CLI 設定」選了型號就用它，沒選就讓 opencode 用自己的預設。
+    // MYTERMINAL_OPENCODE_MODEL 是 e2e 的後門：不用金鑰的免費模型
+    // (opencode/mimo-v2.5-free) 的供應商不在「CLI 設定」那張清單裡。
+    const chosen = process.env.MYTERMINAL_OPENCODE_MODEL?.trim() || model;
+    if (chosen) args.push('-m', chosen);
+    if (task.resumeId) args.push('--session', task.resumeId);
+    if (!task.allowEdits) args.push('--agent', 'plan');
+
+    return new JsonlRun(
+      this.spawner,
+      { file: 'cmd.exe', args, cwd: task.cwd, stdin: withSystemPrompt(task), env },
+      opencodeEvents(),
+    );
+  }
+}
+
+/** 沒有 --append-system-prompt 的 CLI：角色的前置指示只能接在提示前面。*/
+function withSystemPrompt(task: AgentTask): string {
+  return task.systemPrompt ? `${task.systemPrompt}\n\n${task.prompt}` : task.prompt;
+}
+
+/**
+ * 正式環境的 runner 工廠。四支 CLI 的無介面執行跟互動式工作階段拿同一份
+ * 「CLI 設定」注入 —— 選了 API 金鑰的那支，Agent 任務與工作流節點才有金鑰可用。
+ * 無介面一律在 Windows 上原生執行，所以 baseShell 固定是 powershell。
+ */
+export function agentRunners(
+  secrets: CliSecrets = NO_SECRETS,
+  spawner: IProcessSpawner = new NodeProcessSpawner(),
+): IAgentRunnerFactory {
+  return (kind) => {
+    switch (kind) {
+      case 'claude':
+        return new ClaudeCodeRunner(spawner, secrets);
+      case 'codex':
+        return new CodexRunner(spawner, secrets);
+      case 'muse':
+        return new MuseRunner(spawner, secrets);
+      case 'opencode':
+        return new OpenCodeRunner(spawner, secrets);
+    }
+  };
+}
+
+export const defaultAgentRunners: IAgentRunnerFactory = agentRunners();

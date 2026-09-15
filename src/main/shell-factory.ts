@@ -25,6 +25,8 @@ export interface CliInjection {
   env: Record<string, string>;
   /** 使用者沒改啟動指令時要用的那一條；目前只有 OpenCode 的 -m 會用到。*/
   startupCommand?: string;
+  /** OpenCode 的 provider/model；無介面執行要拿它組 `opencode run -m …`。*/
+  model?: string;
 }
 
 /**
