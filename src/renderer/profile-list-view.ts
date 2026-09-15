@@ -12,6 +12,8 @@ export function profileMeta(profile: SavedProfile): string {
       return profile.distro ?? '';
     case 'claude':
     case 'codex':
+    case 'muse':
+    case 'opencode':
       return profile.startupCommand ?? defaultStartupCommand(profile.type);
     case 'agent':
       return profile.prompt;

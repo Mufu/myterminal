@@ -65,6 +65,18 @@ describe('ShellFactory', () => {
     expect(spec.startupCommand).toBe('codex --model o3');
   });
 
+  it('Muse 一定跑在 WSL 上，啟動指令就是 muse (wsl.exe 開的是登入 shell，找得到 ~/.local/bin)', () => {
+    const spec = factory.create({ type: 'muse', baseShell: 'wsl' });
+    expect(spec.file).toBe('RESOLVED(wsl.exe)');
+    expect(spec.startupCommand).toBe('muse');
+  });
+
+  it('OpenCode 預設跑在 PowerShell 上', () => {
+    const spec = factory.create({ type: 'opencode', baseShell: 'powershell' });
+    expect(spec.file).toBe('RESOLVED(powershell.exe)');
+    expect(spec.startupCommand).toBe('opencode');
+  });
+
   it('自訂命令原樣傳出', () => {
     const spec = factory.create({ type: 'custom', file: 'cmd.exe', args: ['/k', 'dir'] });
     expect(spec.file).toBe('RESOLVED(cmd.exe)');

@@ -29,9 +29,15 @@ export function validateProfile(profile: ConnectionProfile, requireName = false)
 
     case 'claude':
     case 'codex':
-      // 省略代表用預設值 (claude / codex)；填了但只有空白才是錯的。
+    case 'muse':
+    case 'opencode':
+      // 省略代表用預設值 (就是 CLI 的名字)；填了但只有空白才是錯的。
       if (profile.startupCommand !== undefined && !profile.startupCommand.trim()) {
         errors.push('請輸入啟動指令');
+      }
+      // Muse Code 只有 Linux 版，裝在 WSL 裡；PowerShell 起不來。
+      if (profile.type === 'muse' && profile.baseShell !== 'wsl') {
+        errors.push('Muse 只能在 WSL 裡執行');
       }
       break;
 

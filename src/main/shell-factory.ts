@@ -64,7 +64,9 @@ export class ShellFactory {
         };
 
       case 'claude':
-      case 'codex': {
+      case 'codex':
+      case 'muse':
+      case 'opencode': {
         const base = this.baseShell(profile.baseShell, profile.cwd);
         return {
           ...base,

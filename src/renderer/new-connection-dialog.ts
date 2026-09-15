@@ -2,7 +2,7 @@ import type { ConnectionProfile, SessionType, BaseShell } from '../shared/profil
 import type { AgentKind } from '../shared/agent';
 import type { AgentRole } from '../shared/roles';
 import { ROLES, findRole } from '../shared/roles';
-import { defaultStartupCommand } from '../shared/profile';
+import { defaultStartupCommand, isCliType } from '../shared/profile';
 import { validateProfile } from '../shared/validate-profile';
 import { parseArgs } from '../shared/parse-args';
 import type { DialogPort } from './ports';
@@ -20,6 +20,8 @@ const GROUP_FOR: Record<SessionType, string | null> = {
   ssh: 'ssh',
   claude: 'agent',
   codex: 'agent',
+  muse: 'agent',
+  opencode: 'agent',
   custom: 'custom',
   agent: 'agent-task',
 };
@@ -75,9 +77,26 @@ export class NewConnectionDialog implements DialogPort {
     for (const group of document.querySelectorAll<HTMLElement>('.field-group')) {
       group.hidden = group.dataset.for !== wanted;
     }
-    if (this.type === 'claude' || this.type === 'codex') {
+    if (isCliType(this.type)) {
       $<HTMLInputElement>('f-startup').value = defaultStartupCommand(this.type);
+      this.syncBaseShell();
     }
+  }
+
+  /**
+   * Muse Code 只有 Linux 版：PowerShell 那個選項關掉並強制選 WSL，
+   * 換回其他 CLI 時再把它放回來 (並且回到預設的 PowerShell)。
+   */
+  private syncBaseShell(): void {
+    const select = $<HTMLSelectElement>('f-base-shell');
+    const powershell = select.querySelector<HTMLOptionElement>('option[value="powershell"]');
+    if (!powershell) return;
+    const museOnly = this.type === 'muse';
+    const wasMuseOnly = powershell.disabled;
+    powershell.disabled = museOnly;
+    powershell.hidden = museOnly;
+    if (museOnly) select.value = 'wsl';
+    else if (wasMuseOnly) select.value = 'powershell';
   }
 
   private submit(event: Event): void {
@@ -126,6 +145,8 @@ export class NewConnectionDialog implements DialogPort {
 
       case 'claude':
       case 'codex':
+      case 'muse':
+      case 'opencode':
         return {
           type: this.type,
           name,

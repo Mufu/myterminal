@@ -13,8 +13,18 @@ export type SessionType =
   | 'ssh'
   | 'claude'
   | 'codex'
+  | 'muse'
+  | 'opencode'
   | 'custom'
   | 'agent';
+
+/** 開一個互動式 CLI 的工作階段型別；也是「CLI 設定」那一頁的四個列。*/
+export type CliSessionType = 'claude' | 'codex' | 'muse' | 'opencode';
+
+export const CLI_TYPES: readonly CliSessionType[] = ['claude', 'codex', 'muse', 'opencode'];
+
+export const isCliType = (type: SessionType): type is CliSessionType =>
+  (CLI_TYPES as readonly SessionType[]).includes(type);
 
 /** Claude / Codex 這類 agent 工作階段所依附的基礎 shell。*/
 export type BaseShell = 'powershell' | 'wsl';
@@ -44,10 +54,10 @@ export interface SshProfile extends ProfileBase {
 }
 
 export interface AgentProfile extends ProfileBase {
-  type: 'claude' | 'codex';
-  /** 要在哪個 shell 裡執行 agent。*/
+  type: CliSessionType;
+  /** 要在哪個 shell 裡執行 agent。Muse 只有 Linux 版，一定是 wsl。*/
   baseShell: BaseShell;
-  /** spawn 之後立刻寫進 pty 的啟動指令，預設是 "claude" / "codex"，使用者可改。*/
+  /** spawn 之後立刻寫進 pty 的啟動指令，預設就是 CLI 的名字，使用者可改。*/
   startupCommand?: string;
 }
 
@@ -89,12 +99,14 @@ export const TYPE_LABELS: Record<SessionType, string> = {
   ssh: 'SSH',
   claude: 'Claude',
   codex: 'Codex',
+  muse: 'Muse',
+  opencode: 'OpenCode',
   custom: '自訂',
   agent: 'Agent',
 };
 
 export const DEFAULT_SSH_PORT = 22;
 
-export function defaultStartupCommand(type: 'claude' | 'codex'): string {
+export function defaultStartupCommand(type: CliSessionType): string {
   return type;
 }
