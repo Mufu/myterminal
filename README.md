@@ -1,7 +1,7 @@
 # myterminal
 
 一個 Windows 桌面終端機管理員：在同一個視窗裡管理多個工作階段
-（PowerShell、WSL、SSH、以及跑 `claude` / `codex` CLI 的 shell）。
+（PowerShell、WSL、SSH、以及跑 `claude` / `codex` / `muse` / `opencode` CLI 的 shell）。
 
 介面見 [`docs/UI.png`](docs/UI.png)：
 深色工作台風格，上方工具列、中間終端機、右側工作階段清單，一次只顯示一個終端機（沒有分割視窗）。
@@ -26,8 +26,9 @@
 
 右側 session 清單每一列是一個工作階段：名稱、類型標籤、執行中／已結束狀態、✕ 關閉。
 點擊該列即可切換顯示的終端機。清單下方是「已儲存連線」與「工作流」，見下面的
-[已儲存連線](#已儲存連線)與[工作流](#工作流)。面板最下面一行是兩支 CLI 現在的
-登入方式（例如 `Claude · Max 訂閱`、`Codex · ChatGPT 訂閱`），app 啟動時問一次。
+[已儲存連線](#已儲存連線)與[工作流](#工作流)。面板最下面一行是四支 CLI 現在的
+登入方式（例如 `Claude · Max 訂閱`、`Codex · ChatGPT 訂閱`），app 啟動時問一次；
+點那一行（或右邊的 ⚙）會打開「CLI 設定」，見下面的 [CLI 設定](#cli-設定)。
 
 紀錄檔會寫到 `%USERPROFILE%\myterminal-logs\<工作階段名稱>-<時間戳>.log`
 （時間戳是**當地時間**的 `YYYYMMDD-HHmmss`）。
@@ -194,6 +195,50 @@ agent 節點可以指定**角色**（產品經理／架構師／工程師／測�
 - Codex 的節點走的是同一條 `IAgentRunner`；2026-09-14 用 ChatGPT 訂閱實測可以跑，
   見 [`docs/AGENT-SPIKE.md`](docs/AGENT-SPIKE.md) 的「2026-09-14 更新」。
 
+## CLI 設定
+
+右側面板最下面那一行（或它右邊的 ⚙）打開「CLI 設定」，一支 CLI 一列，
+每一列選**登入**或 **API 金鑰**：
+
+| CLI | 登入 | API 金鑰（環境變數） |
+| --- | --- | --- |
+| Claude | `claude auth login` | `ANTHROPIC_API_KEY` |
+| Codex | `codex login` | `OPENAI_API_KEY` |
+| Muse | `muse login` | `META_API_KEY` |
+| OpenCode | 沒有 | 依供應商：`ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GOOGLE_GENERATIVE_AI_API_KEY` / `OPENROUTER_API_KEY` |
+
+- **登入**：按那一列的「登入」會開一個普通的工作階段跑上面那條指令，
+  瀏覽器那一段由你自己在裡面走完。工作階段結束時 app 會重新探一次登入狀態，
+  晶片上的字跟著換。這個模式下 app **不會**注入任何環境變數。
+- **API 金鑰**：金鑰只在存的當下送進 main，之後就留在本機，
+  只以環境變數注入**那一支 CLI** 的工作階段，不會給別支、也不會回到畫面上
+  （欄位只顯示「已儲存」）。晶片上會直接寫「API 金鑰」——
+  工作階段本來就是拿那把金鑰在跑。
+
+**OpenCode 只有 API 金鑰**：它自己沒有登入流程（`opencode auth list` 只認憑證）。
+那一列多了「供應商」與「型號」；填了型號，啟動指令就變成
+`opencode -m <供應商>/<型號>`。型號可以用 `opencode models <供應商>` 查。
+
+### 金鑰存在哪裡
+
+`%APPDATA%\myterminal\cli-auth.json`（Electron 的 `userData`）。
+金鑰經過 Electron `safeStorage.encryptString` 加密之後才以 base64 寫進去 ——
+在 Windows 上底層就是 **DPAPI**，只有這台機器的這個使用者解得開，
+把檔案複製到別台機器也還原不出來（app 會把它當成「沒有金鑰」）。
+檔案本身仍是可讀的 JSON，但裡面看不到明文金鑰，log 也不會印。
+
+### 幾個要注意的地方
+
+- **Codex**：`codex` 確實直接讀 `OPENAI_API_KEY`，但 `~/.codex/auth.json`
+  裡的 ChatGPT 登入優先。要真的用金鑰，先在終端機跑一次 `codex logout`。
+- **Muse**：`META_API_KEY` 的優先度**高過** `muse login` 的帳號登入。
+  所以選了「登入」時 app 一定不會設這個變數，免得你以為在用訂閱、其實在刷 API 帳單。
+  Muse 跑在 WSL 基礎 shell 上時，app 會把 `META_API_KEY/u` **併進**（不是覆寫）
+  `WSLENV`，變數才過得去；Windows 原生執行則不必。
+- Muse 的登入憑證存在 `%USERPROFILE%\.config\muse\auth.json`
+  （WSL 裡是 `~/.config/muse/auth.json`）。`muse logout` 之後檔案還在、
+  `providers` 會變成空的，所以 app 判斷「有沒有登入」看的是內容而不是檔案存不存在。
+
 ## 支援的工作階段類型
 
 | 類型 | 實際執行 |
@@ -203,10 +248,13 @@ agent 節點可以指定**角色**（產品經理／架構師／工程師／測�
 | SSH (plink) | `plink.exe -ssh -no-antispoof -P <port> <user>@<host>`，見下面的「SSH 連線」 |
 | Claude | 基礎 shell（PowerShell 或 WSL）開起來後送出 `claude` |
 | Codex | 基礎 shell 開起來後送出 `codex` |
+| Muse | 基礎 shell 開起來後送出 `muse`（Meta Muse Code） |
+| OpenCode | 基礎 shell 開起來後送出 `opencode`；「CLI 設定」裡填了型號就是 `opencode -m <供應商>/<型號>` |
 | 自訂命令 | 自行指定執行檔與參數（參數以空白分隔，雙引號裡的空白會保留，`\"` 是一個引號） |
 | Agent 任務 | `claude -p --output-format stream-json` 或 `codex exec --json` 跑一次，見上面的「Agent 任務」 |
 
-Claude / Codex 的啟動指令可以在對話框裡改（例如加參數）。
+這四支 CLI 的啟動指令都可以在對話框裡改（例如加參數）。改過之後 OpenCode 的型號設定
+就不再套用 —— 以你自己打的那一條為準。
 
 ## SSH 連線
 
@@ -283,6 +331,13 @@ wsl.exe -u root -e bash scripts/wsl-sshd-teardown.sh --purge    # 連 openssh-se
   - SSH：[PuTTY](https://www.putty.org/) 的 `plink.exe`
     （會找 `C:\Program Files\PuTTY\plink.exe`，找不到就改走 PATH）
   - Claude / Codex：`claude` 或 `codex` 要在 PATH 上
+  - Muse：Meta Muse Code，Windows 有官方安裝程式，在 PowerShell 裡跑
+    `irm https://dev.meta.ai/install.ps1 | iex`
+    （裝到 `%LOCALAPPDATA%\Programs\muse`，安裝程式會把它加進使用者 PATH）
+  - OpenCode：`npm i -g opencode-ai`
+
+> 裝完新的 CLI 之後要**重開 myterminal**：工作階段繼承的是 app 啟動當下的 PATH，
+> 開著的 app 不會看到安裝程式剛加進去的路徑。
 
 `node-pty` 內附 `win32-x64` 的預先建置檔，搭配本專案釘住的 `electron@44.2.0`
 不需要 `electron-rebuild`。
@@ -346,7 +401,7 @@ npm run dist
 架構刻意把「類型知識」集中在少數幾個地方，加一種新類型只要動這五處：
 
 1. `src/shared/profile.ts`：在 `ConnectionProfile` 判別聯集加一個成員，
-   並在 `TYPE_LABELS` 補上顯示名稱。
+   並在 `TYPE_LABELS` 補上顯示名稱（互動式 CLI 再加進 `CLI_TYPES`）。
 2. `src/main/shell-factory.ts`：在 `create()` 的 `switch` 加一個 `case`，
    回傳 `{ file, args, cwd, env, startupCommand? }`。TypeScript 會強迫你補齊。
 3. `src/shared/validate-profile.ts`：如果有必填欄位就加驗證規則。

@@ -27,6 +27,8 @@ flowchart TB
     AppState -. 訂閱通知 .-> CliStatusView
     WorkflowEditorModel -. 訂閱通知 .-> WorkflowEditorView
     NewConnectionDialog --> Commands
+    CliSettingsDialog --> Commands
+    AppState -. 訂閱通知 .-> CliSettingsDialog
     InputPanel --> Commands
   end
 
@@ -37,6 +39,7 @@ flowchart TB
   subgraph main["main (Node)"]
     IPCLayer["ipc.ts"] --> SessionManager
     IPCLayer --> CliAuthProbe["cli-auth-probe.ts"]
+    IPCLayer --> CliAuthStore
     IPCLayer --> SessionLogger
     IPCLayer --> ProfileStore
     IPCLayer --> WorkflowService
@@ -46,11 +49,14 @@ flowchart TB
     GraphCompiler --> SessionManager
     WorkflowService --> JsonFileSaver
     SessionManager --> ShellFactory
+    ShellFactory --> CliSecrets["cli-secrets.ts"]
+    CliSecrets --> CliAuthStore
+    CliAuthStore --> SafeStorage["safeStorage (DPAPI)"]
     SessionManager --> IPtySpawner
     SessionManager --> IAgentRunner
     IPtySpawner --> NodePty["node-pty (conpty)"]
     IAgentRunner --> AgentCli["claude -p / codex exec"]
-    CliAuthProbe --> AuthCli["claude auth status /<br/>codex login status"]
+    CliAuthProbe --> AuthCli["claude auth status / codex login status /<br/>muse --version + ~/.config/muse/auth.json /<br/>opencode auth list"]
   end
 
   subgraph shared["shared (三方共用型別)"]
@@ -81,7 +87,7 @@ renderer 拿不到 `ipcRenderer` 也拿不到 Node，只看得到 `preload` 白�
 | **Observer** | `SessionManager`（typed `EventEmitter`）、`AppState`（`subscribe`） | main 端 pty 的輸出是推送式的；renderer 端多個 View 要對同一份狀態反應。兩邊都用訂閱而不是互相持有參考。 |
 | **Decorator / Observer** | `main/session-logger.ts` | 紀錄功能掛在 `SessionManager` 的 `data` 事件上，不改變資料流本身，也不需要 `SessionManager` 知道紀錄這回事。 |
 | **Builder / Interpreter** | `main/workflow/graph-compiler.ts` | 「定義」與「執行」分成兩件事：JSON 是資料，`compile()` 把它翻譯成 LangGraph 的 `StateGraph`。加一種節點型別只要在一個 `switch` 加一個 `case`，跟 `ShellFactory` 是同一個手法。畫布編輯器只動資料那一半，執行這一半完全不用改。 |
-| **Repository** | `main/profile-store.ts` | 已儲存的連線設定就是一份 JSON，`list` / `save` / `remove` 三個方法把「存在哪、怎麼序列化、檔案壞了怎麼辦」包在裡面。IPC 與 renderer 只看得到 `SavedProfile[]`，換成別的儲存方式不會影響到它們。 |
+| **Repository** | `main/profile-store.ts`、`main/cli-auth-store.ts` | 已儲存的連線設定就是一份 JSON，`list` / `save` / `remove` 三個方法把「存在哪、怎麼序列化、檔案壞了怎麼辦」包在裡面。IPC 與 renderer 只看得到 `SavedProfile[]`，換成別的儲存方式不會影響到它們。 |
 | **Command** | `renderer/commands.ts` | 工具列七個按鈕各是一個 `ICommand`。按鈕只負責「按下去就 `execute()`」，行為本身不碰 DOM，可以單獨測試。畫布編輯器的開啟／關閉／儲存／刪除／儲存並執行也是同一套。 |
 
 刻意**沒有**引入的東西：設定系統、外掛架構、狀態管理框架、UI 框架。
@@ -142,6 +148,80 @@ renderer 端沒有第二份狀態：`AppState` 多存一份 `profiles`，
 `SessionListView` 一樣訂閱同一個 `AppState` 重畫。
 點一列時走的是 `main.ts` 裡同一個 `createSession()`，
 所以「先量 cols/rows 再 spawn」的順序對兩個入口都成立。
+
+## CLI 設定 (CliAuthStore + 金鑰縫線)
+
+四支互動式 CLI（Claude / Codex / Muse / OpenCode）各自可以選「登入」或
+「API 金鑰」。使用者怎麼選、以及加密後的金鑰，存在
+`join(app.getPath('userData'), 'cli-auth.json')`。
+
+`CliAuthStore` 跟 `ProfileStore` 是同一個手法的 Repository：整份讀進來、
+整份覆寫回去，讀寫是建構子注入的兩個函式，對壞資料很寬容。多的只有第三個
+縫線 `Cipher`：
+
+```ts
+export interface Cipher {
+  encrypt(plain: string): string;
+  decrypt(secret: string): string;
+}
+```
+
+正式環境是 `safe-storage-cipher.ts`（Electron `safeStorage`，Windows 上是
+DPAPI，加密結果轉成 base64 才落地），測試注入假的，所以
+`test/cli-auth-store.spec.ts` 既不碰檔案系統也不需要 Electron 跑起來。
+`safeStorage` 只在那一個檔案裡出現 —— 其他地方 import `electron` 會讓
+Vitest 載不動。
+
+金鑰只在 `secretFor(id)` 被解開，而且只有選了「API 金鑰」的那一支才給；
+解不開（設定檔被搬到別台機器）就當成沒有金鑰，而不是讓工作階段開不起來。
+`settings()` 回傳的 `CliAuthSetting` 只有 `hasKey: boolean`，
+所以金鑰永遠不會經過 IPC 到 renderer。
+
+### 注入是另一條縫線
+
+`ShellFactory` 不知道金鑰存在哪裡，它只拿到一個函式：
+
+```ts
+export type CliSecrets = (id: CliId, baseShell: BaseShell) => CliInjection;
+```
+
+`cli-secrets.ts` 的 `cliInjection()` 是純函式（CLI → 環境變數名稱的對應表，
+以及 OpenCode 的 `opencode -m <供應商>/<型號>`），`cliSecrets(store)` 只是
+把它接上 `CliAuthStore`。`index.ts` 是唯一把兩者組起來的地方。
+
+`ShellFactory.env()` 疊上這些變數時只有一個特例：`WSLENV` 是用冒號分隔的
+清單，直接覆寫會蓋掉使用者自己設的項目，所以走 `mergeWslenv()` 合併。
+Muse 跑在 WSL 基礎 shell 上時要靠它把 `META_API_KEY` 帶進 Linux 那一側。
+
+### 登入流程
+
+`cli:login` 不是什麼特別的機制：`ipc.ts` 用 `loginProfile(id)` 組出一個普通的
+`ConnectionProfile`（例如 type `codex` + 啟動指令 `codex login`），交給
+`SessionManager.create()`，回傳工作階段 id。它就出現在右側清單裡，
+使用者在裡面把瀏覽器流程走完。
+
+`ipc.ts` 記著哪些工作階段是登入用的；那一個結束時重跑一次
+`probeCliAuth()`，把新的 `CliAuthStatus` 用 `cli:auth-changed` 推給 renderer。
+
+### 探測四支 CLI
+
+`probeCliAuth()` 仍然走 `IProcessSpawner`，四個行程同時問、任何一邊失敗只是
+那一邊變成「無法判斷」。兩個新的比較特別：
+
+- **Muse** 沒有「看登入狀態」的指令，所以是 `cmd.exe /c muse --version`
+  先確認裝了沒有，再讀 `~/.config/muse/auth.json`（Windows 與 WSL 同一條
+  相對路徑）判斷是帳號登入還是 API 金鑰。讀檔是另一條注入進來的
+  `FileReader` 縫線 —— 為了讀一個檔案再開一個行程沒有意義。
+  `muse logout` 之後檔案還在、`providers` 會變成空的，所以不能只看檔案在不在。
+- **OpenCode** 看 `opencode auth list` 印的「N credentials」。它自己沒有憑證
+  但 app 有替它存金鑰時一樣算「能用」——工作階段本來就會被注入那把金鑰。
+
+### 畫面上以哪一個為準
+
+晶片（與對話框裡那一列的狀態）在「選了 API 金鑰而且金鑰存得住」時一律寫
+「API 金鑰」，其餘時候才用探測結果。理由是工作階段本來就是拿那把金鑰在跑，
+CLI 自己的登入狀態不是實際會用的那一個。這段判斷是
+`cli-status-view.ts` 的 `statusLabel()` / `statusUsable()`，兩個純函式。
 
 ## Agent 任務 (spike)
 
@@ -296,7 +376,11 @@ renderer → main（`ipcMain.handle`，全部回傳 Promise）：
 | `workflow:resume` | `{ runId, approved }` | — |
 | `workflow:cancel` | `runId` | — |
 | `workflow:runs` | — | `RunState[]` |
-| `cli:auth` | — | `CliAuthStatus`（開機探測一次的結果，之後都回同一份） |
+| `cli:auth` | — | `CliAuthStatus`（開機探測一次；登入流程跑完會換成新的一份） |
+| `cli:settings` | — | `Record<CliId, CliAuthSetting>`（只有 `hasKey`，沒有金鑰） |
+| `cli:save-setting` | `{ id, mode, apiKey?, provider?, model? }` | 更新後的整份設定（不合法就 reject） |
+| `cli:clear-key` | `CliId` | 更新後的整份設定 |
+| `cli:login` | `CliId` | 跑登入指令那個工作階段的 id（OpenCode 會 reject） |
 
 main → renderer（`webContents.send`）：
 
@@ -307,6 +391,7 @@ main → renderer（`webContents.send`）：
 | `session:changed` | `SessionInfo[]` | 建立、關閉、結束、紀錄狀態改變、agent 回報 session id |
 | `profiles:changed` | `SavedProfile[]` | 儲存或刪除設定檔之後 |
 | `workflow:changed` | `RunState[]` | 執行開始／節點進度／等待批准／收尾 |
+| `cli:auth-changed` | `CliAuthStatus` | 登入用的工作階段結束、重探完之後 |
 
 `ipc.ts` 只做轉接，沒有商業邏輯；所以「IPC 沒被測試」不代表邏輯沒被測試。
 
@@ -338,18 +423,20 @@ main → renderer（`webContents.send`）：
 
 | 被測單元 | 注入的假物件 | 檔案 |
 | --- | --- | --- |
-| `ShellFactory` | 假的 `ExecutableResolver`（回傳 `RESOLVED(name)`） | `test/shell-factory.spec.ts` |
+| `ShellFactory` | 假的 `ExecutableResolver`（回傳 `RESOLVED(name)`）與假的 `CliSecrets` | `test/shell-factory.spec.ts`、`test/cli-secrets.spec.ts` |
 | `SessionManager` | `FakePtySpawner` / `FakePty`、同步版的 `Scheduler`，以及假的 `exists`（agent 任務的工作目錄存不存在） | `test/fakes/fake-pty.ts` |
 | `SessionLogger` | 假的 `LogSinkFactory` 與固定時鐘 | `test/session-logger.spec.ts` |
 | `ProfileStore` | 假的讀／寫函式（記憶體裡的一個字串） | `test/profile-store.spec.ts` |
+| `CliAuthStore` | 同上，再加一個假的 `Cipher`（不必真的呼叫 `safeStorage`） | `test/cli-auth-store.spec.ts` |
+| `cliInjection` / `mergeWslenv` | 不需要（純函式） | `test/cli-secrets.spec.ts` |
 | `AppState` | 不需要（純資料） | `test/app-state.spec.ts` |
 | `ThemeStore` | 假的 `Storage`（兩個方法）與假的 `apply` | `test/theme.spec.ts` |
 | 各 `Command` | `FakeTerminal` / `FakeClipboard` / `FakeInputPanel` + `vi.fn()` 的 api | `test/commands.spec.ts` |
 | `validateProfile` | 不需要（純函式） | `test/validate-profile.spec.ts` |
 | `ClaudeCodeRunner` / `CodexRunner` | `FakeProcessSpawner` + `test/fixtures/*.jsonl`（真的跑出來的輸出） | `test/agent-runner.spec.ts` |
 | `AgentRunPty` | `FakeAgentRun` | `test/agent-run-pty.spec.ts` |
-| `parseClaudeAuth` / `parseCodexAuth` / `usageLabel` | 不需要（純函式，餵真的 CLI 輸出） | `test/cli-auth.spec.ts` |
-| `probeCliAuth` | `FakeProcessSpawner` + `vi.useFakeTimers()`（逾時那條） | `test/cli-auth-probe.spec.ts` |
+| `parseClaudeAuth` / `parseCodexAuth` / `parseMuseAuth` / `parseOpencodeAuth` / `validateCliSetting` / `usageLabel` | 不需要（純函式，餵真的 CLI 輸出） | `test/cli-auth.spec.ts` |
+| `probeCliAuth` | `FakeProcessSpawner` + 假的 `FileReader`（Muse 的憑證檔）+ `vi.useFakeTimers()`（逾時那條） | `test/cli-auth-probe.spec.ts` |
 | `validateWorkflow` | 不需要（純函式） | `test/workflow.spec.ts` |
 | `GraphCompiler` | `ScriptedRunner` / `FakeSessions` / `ManualTimers` + `MemorySaver` | `test/fakes/fake-workflow.ts` |
 | `JsonFileSaver` | 真的暫存目錄（`mkdtempSync`），另一半是注入的 `SaverFs` | `test/json-file-saver.spec.ts` |
