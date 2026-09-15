@@ -51,14 +51,26 @@ type WorkflowEdge = {
 
 | 欄位 | 說明 |
 | --- | --- |
-| `kind` | `'claude'` 或 `'codex'`，走的是 Agent 任務那條既有的 `IAgentRunner` |
+| `kind` | 四支 CLI 之一，走的是 Agent 任務那條既有的 `IAgentRunner`（見下面的表） |
 | `prompt` | 樣板，見下面的「樣板」 |
 | `cwd` | 也吃樣板；不能留空（驗證會擋），而且執行前會檢查代入後的目錄真的存在 |
-| `allowEdits` | `false` 是 Claude 的 `plan`／Codex 的 `read-only`，`true` 才會動檔案 |
+| `allowEdits` | `false` 是每支 CLI 最嚴格但仍會回答的模式（見下表），`true` 才會動檔案 |
 | `role` | 角色 id，見下面的「角色」。省略就沒有前置指示 |
-| `resumeFrom` | 某個節點的 id：用那個節點的 CLI session 接續對話（`claude --resume`） |
+| `resumeFrom` | 某個節點的 id：用那個節點的 CLI session 接續對話（見下表的「接續」） |
 | `maxAttempts` | 這個節點最多跑幾次（迴圈用），預設 3。超過就把整個執行標成失敗並收尾 |
 | `timeoutSec` | 單一次執行的上限，預設 600。超過就取消 CLI，這個節點算失敗 |
+
+`kind` 可以是四支 CLI 的任何一支，`allowEdits` 與 `resumeFrom` 在各家的對應：
+
+| `kind` | `allowEdits: false` | `allowEdits: true` | 接續 | 接手（互動式） |
+| --- | --- | --- | --- | --- |
+| `claude` | `--permission-mode plan` | `--permission-mode acceptEdits` | `--resume <id>` | `claude --resume <id>` |
+| `codex` | `--sandbox read-only` | `--sandbox workspace-write` | `exec resume <id>` | `codex resume <id>` |
+| `muse` | `--approval-mode untrusted --disable-write` | `--approval-mode never` | `--session-id <uuid>` | `muse resume <uuid>` |
+| `opencode` | `--agent plan`（內建的唯讀 agent） | 不帶 `--agent`（預設 `build`） | `--session <id>` | `opencode --session <id>` |
+
+四支的實測記錄（命令、事件形狀、哪些驗過哪些沒有）在
+[`AGENT-SPIKE.md`](AGENT-SPIKE.md)。
 
 `condition.rule` 目前兩種：`{ type: 'lastLineEquals', value }`（只看 `source` 節點輸出的
 最後一行）與 `{ type: 'regex', pattern }`（整段比對）。

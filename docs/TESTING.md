@@ -40,7 +40,7 @@ myterminal 的自動測試分四層，由便宜到昂貴。前三層不需要任
 | `editor.spec.ts` | 1 | 無 | 畫布拉一個流程、接線、存檔、出現在執行對話框 |
 | `editor-deep.spec.ts` | 13 | 無 | 範本另存副本與刪除、換線、刪節點連帶清參照、Delete 在輸入框不刪節點、條件 / 批准屬性重啟後還在、驗證錯誤、儲存並執行、回終端機、未儲存確認、執行對話框驗證、工作目錄不存在的錯誤 |
 | `ssh.spec.ts` | 1 | `MYTERMINAL_SSH_E2E` | 登入本機 sshd、執行指令、離線 |
-| `agent.spec.ts` | 2 | `MYTERMINAL_AGENT_E2E`（codex 另需 `_CODEX`） | Agent 任務跑完可以接手 |
+| `agent.spec.ts` | 4 | `MYTERMINAL_AGENT_E2E`（codex／opencode／muse 另需 `_CODEX`／`_OPENCODE`／`_MUSE`） | 四支 CLI 各跑一次 Agent 任務；claude／codex 還會接手。opencode 那個只要網路不要金鑰，muse 那個在開發機上跑不了（沒有 Meta 憑證） |
 | `workflow.spec.ts` | 2 | `MYTERMINAL_WORKFLOW_E2E` | 範本跑到批准後完成；重啟後仍可批准 |
 | `workflow-custom.spec.ts` | 6 | `MYTERMINAL_WORKFLOW_E2E` | 條件 + 批准退回、5 秒逾時且子行程被砍、取消、Codex 節點、角色進 CLI（節點與 Agent 任務） |
 

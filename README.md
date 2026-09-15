@@ -81,7 +81,7 @@
 
 ## Agent 任務（spike）
 
-「新連接」選 **Agent 任務**，填一段任務給 `claude` 或 `codex`，
+「新連接」選 **Agent 任務**，填一段任務給 `claude`／`codex`／`muse`／`opencode`，
 它會用**無介面模式**跑一次，跑完就結束 —— 不是開一個可以打字的 CLI，
 而是「送出一個任務，看它做完」。畫面上它就是一個普通的工作階段：
 
@@ -96,11 +96,11 @@ AGENT_E2E_OK
 
 | 欄位 | 說明 |
 | --- | --- |
-| 執行者 | Claude 或 Codex |
-| 角色 | 產品經理／架構師／工程師／測試工程師／審查者，選了就在任務前面加一段前置指示（Claude 走 `--append-system-prompt`，Codex 接在提示前面）。換角色時「允許修改檔案」會跟著跳到那個角色的預設值。留「無」就沒有 |
-| 任務 | 要它做什麼（多行沒問題，是用 stdin 送進去的） |
+| 執行者 | Claude／Codex／Muse／OpenCode |
+| 角色 | 產品經理／架構師／工程師／測試工程師／審查者，選了就在任務前面加一段前置指示（只有 Claude 有 `--append-system-prompt`，其他三支是接在提示前面）。換角色時「允許修改檔案」會跟著跳到那個角色的預設值。留「無」就沒有 |
+| 任務 | 要它做什麼（多行沒問題：Claude／Codex／OpenCode 走 stdin，Muse 寫成暫存檔用 `--prompt-file` 讀，都不碰命令列引號） |
 | 工作目錄 | 留空的話用家目錄 |
-| 允許修改檔案 | **預設關閉**。關著是 Claude 的 `plan` 模式／Codex 的 `read-only` 沙箱（會讀、會回答，但不能寫）；打開才是 `acceptEdits`／`workspace-write` |
+| 允許修改檔案 | **預設關閉**。關著是每支 CLI 最嚴格但仍會回答的模式（會讀、會回答，但不能寫）：Claude 的 `plan`、Codex 的 `read-only` 沙箱、Muse 的 `--approval-mode untrusted --disable-write`、OpenCode 內建的唯讀 `plan` agent。打開才會動檔案 |
 
 注意事項：
 
@@ -111,13 +111,17 @@ AGENT_E2E_OK
   用量估算的 **API 等值金額**，不另外收費，只算進方案的用量上限 —— 所以畫面上寫成
   `≈$0.091`。用 API 金鑰登入才是真的帳單，那時就直接寫 `$0.091`。
   金額滑過去有一句說明。
-- **要先登入**：`claude` 用 `claude` 自己的登入，`codex` 用 `codex login`。
+- **要先登入**：四支都在「CLI 設定」那一頁設（見下面的 [CLI 設定](#cli-設定)）。
   沒登入就會在終端機裡看到 `✘ 失敗：…`。右側面板最下面那一行就是 app 開機時
-  問出來的結果（`claude auth status` 與 `codex login status`），
-  沒登入或找不到指令也會寫在那裡。
+  問出來的結果，沒登入或找不到指令也會寫在那裡。
+  在那裡存的 API 金鑰**無介面執行也吃得到**，跟互動式工作階段是同一份設定。
+  唯一的例外是 OpenCode 的免費模型（例如 `opencode/mimo-v2.5-free`）：
+  它不必金鑰，但那家供應商不在「CLI 設定」的清單裡，要用環境變數
+  `MYTERMINAL_OPENCODE_MODEL` 指定（它的優先度高於「CLI 設定」的型號）。
 - **接手**：任務跑起來之後，右側那一列滑過去會出現「接手」。
-  按下去會開一個**真的互動式**工作階段（PowerShell 裡跑 `claude --resume <id>`，
-  Codex 是 `codex resume <id>`），接著同一段對話繼續問下去。
+  按下去會開一個**真的互動式**工作階段（PowerShell 裡跑 `claude --resume <id>`、
+  `codex resume <id>`、`muse resume <uuid>` 或 `opencode --session <id>`），
+  接著同一段對話繼續問下去。
   app 裡的 agent 任務本身不能追問，追問就是用接手。
 - 這一頁的任務也可以像其他類型一樣勾「儲存此連線設定」存起來重複用。
 
@@ -251,7 +255,7 @@ agent 節點可以指定**角色**（產品經理／架構師／工程師／測�
 | Muse | 基礎 shell 開起來後送出 `muse`（Meta Muse Code） |
 | OpenCode | 基礎 shell 開起來後送出 `opencode`；「CLI 設定」裡填了型號就是 `opencode -m <供應商>/<型號>` |
 | 自訂命令 | 自行指定執行檔與參數（參數以空白分隔，雙引號裡的空白會保留，`\"` 是一個引號） |
-| Agent 任務 | `claude -p --output-format stream-json` 或 `codex exec --json` 跑一次，見上面的「Agent 任務」 |
+| Agent 任務 | 四支 CLI 的無介面模式跑一次（`claude -p`／`codex exec`／`muse exec`／`opencode run`），見上面的「Agent 任務」 |
 
 這四支 CLI 的啟動指令都可以在對話框裡改（例如加參數）。改過之後 OpenCode 的型號設定
 就不再套用 —— 以你自己打的那一條為準。
@@ -352,7 +356,7 @@ npm run build    # 建置到 out/
 npm run e2e      # 先 build 再跑 Playwright 端到端測試（工作階段、工具列、對話框、畫布、主題、穩定性、打包版），截圖寫到 test-results/
 npm run test:coverage # 單元測試覆蓋率（v8），報告在 coverage/
 npm run e2e:ssh  # SSH 端到端測試，要先開好本機 sshd，見「本機 SSH 測試環境」
-npm run e2e:agent # Agent 任務端到端測試，會真的呼叫 claude / codex（要登入；訂閱帳號只用額度）
+npm run e2e:agent # Agent 任務端到端測試，會真的呼叫 CLI（要登入；訂閱帳號只用額度）
 npm run e2e:workflow # 工作流範本端到端測試，會真的呼叫 claude（要登入；訂閱帳號只用額度）
 npm run dist     # 打包成 Windows 執行檔（electron-builder）
 ```

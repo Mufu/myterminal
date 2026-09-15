@@ -243,3 +243,181 @@ app 因此在開機時探測一次登入方式（[`../src/main/cli-auth-probe.ts
 `Claude · Max 訂閱` / `Codex · ChatGPT 訂閱`，估算的金額一律寫成 `≈$0.091`。
 第 9 節說的「先把費用釘死」也因此換了做法：**不再有寫死的預算上限**，
 用量上限變成執行對話框上的選填欄位，只有 API 金鑰登入才預先填 $2。
+
+## 2026-09-15 更新：Muse 與 OpenCode 也能當無介面 agent
+
+`AgentKind` 從兩支變成四支：`claude` | `codex` | `muse` | `opencode`。
+「Agent 任務」的執行者、工作流 agent 節點的 `kind`、右側清單的標籤與「接手」
+全部跟著變成四選一。
+
+實測日期 2026-09-15，同一台 Windows 11 Enterprise LTSC 2024 (26100)：
+Muse Code 1.3.0 (1.3.0-R3057.1)、`%LOCALAPPDATA%\Programs\muse\muse.cmd`；
+`opencode` **1.18.31**、`%APPDATA%\npm\opencode.cmd`。兩支都是 `.cmd` shim，
+所以跟 codex 一樣要走 `cmd.exe /c`。
+
+### 命令
+
+| 情境 | 命令 |
+| --- | --- |
+| Muse，不給改檔案 | `cmd.exe /c muse exec --json --prompt-file <tmp> --approval-mode untrusted --disable-write` |
+| Muse，允許改檔案 | 同上，`--approval-mode never`（沒有 `--disable-write`） |
+| Muse，接續 | 同上再加 `--session-id <session-uuid>` |
+| OpenCode，不給改檔案 | `cmd.exe /c opencode run --format json --dir <cwd> [-m <provider/model>] --agent plan` |
+| OpenCode，允許改檔案 | 同上，拿掉 `--agent plan` |
+| OpenCode，接續 | 同上再加 `--session <ses_…>` |
+| 人接手（互動式） | `muse resume <session-uuid>` ／ `opencode --session <ses_…>` |
+
+提示的送法兩支不一樣：
+
+- **Muse** 沒有 stdin 這條路，所以提示寫成一個暫存檔（`%TEMP%\myterminal-muse-<uuid>.txt`）
+  再用 `--prompt-file` 讀，行程結束就刪。**絕對不要把提示放進 `cmd.exe` 的命令列** ——
+  換行與引號一定會出事。（順帶一提：muse 是原封不動讀那個檔的，用 PowerShell 的
+  `Set-Content -Encoding utf8` 寫會連 BOM 一起餵進去，變成 `嚜瞥ello…`。程式裡是
+  Node 的 `writeFileSync(…, 'utf8')`，沒有 BOM。）
+- **OpenCode** 的 `opencode run` **會從 stdin 讀訊息**（實測：不給任何 positional，
+  把訊息 pipe 進去就照跑），所以跟 claude 一樣完全不必碰引號。
+
+兩支都沒有 claude 的 `--append-system-prompt`，所以角色的前置指示跟 codex 一樣
+接在提示前面（`<systemPrompt>\n\n<prompt>`）。
+
+### 「不給改檔案」要用什麼
+
+**Muse** 的 `--approval-mode` 有三個值，用 `--provider echo` 各跑過一次：
+
+| 模式 | 無介面的行為 |
+| --- | --- |
+| `untrusted` | 要授權的工具被政策**直接擋掉**（stderr 印 `Agent delegation: auto unavailable: workspace is untrusted`），不是停下來問人。exit 0，不會卡住 |
+| `on-request`（預設） | echo provider 不會叫工具，所以這次也是 exit 0；但它的語意就是「停下來問」，真的有工具要授權時無介面沒人可以回答 |
+| `never` | 永遠不問 = 全部放行。exit 0 |
+
+所以：`allowEdits=false` → `untrusted` 再加 `--disable-write`（關掉非 shell 的寫檔，
+等價於 codex 的 `read-only`）；`allowEdits=true` → `never`。
+**沒有驗證到的**：echo provider 根本不會發出工具呼叫，所以「untrusted 遇到真的
+工具呼叫時是擋掉還是卡住」這件事只是照文件與那行 stderr 推的，沒有實測。
+
+**OpenCode** 比較意外：`opencode run` **預設就直接寫檔，不問也不擋**。
+叫它建一個檔案，`write` 工具 `status: "completed"`、`output: "Wrote file successfully."`，
+檔案真的出現了 —— 而且沒有帶任何權限旗標。`--auto`（1.18 版取代了舊的
+`--dangerously-skip-permissions`）只是「自動核准沒有被明確拒絕的權限」，
+**不是**唯讀開關。真正的唯讀開關是內建的 **`plan` agent**：
+`opencode agent list` 看得到它的權限是 `edit: *  deny`（只放行 plan 的 `.md`）。
+實測 `--agent plan` 之下同一個提示回的是 `BLOCKED`，檔案沒有被建立，exit 0，不卡住。
+所以 `allowEdits=false` → `--agent plan`，`allowEdits=true` → 不帶 `--agent`（預設是 `build`）。
+
+### 接續（resume）
+
+- **Muse**：`muse exec` **沒有** resume 子命令，只有 `--session-id <UUID>`（「use a
+  specific session id」）。實測用同一個 uuid 跑第二次：stderr 印
+  `warning: session <uuid> does not record a usable model for provider echo`
+  （代表它真的把舊 session 讀出來了），而且事件的 `sequence` 從上一次的結尾
+  **27 接到 28**，不是從 1 重來。所以接續就是「指定同一個 session id」。
+  人接手用的是互動式的 `muse resume <session-uuid>`（`muse resume --help` 確認過，
+  另有 `--last`）。
+- **OpenCode**：`opencode run --session <ses_…>` 實測**記得上下文** ——
+  第一輪告訴它一個暗號、第二輪問它，答得出來。
+  人接手是頂層的 `opencode --session <id>`（`opencode --help` 確認過，TUI）。
+
+### 事件形狀
+
+**Muse `exec --json`**：一行一筆記錄，型別在 `payload_type`、內容在 `payload`、
+session 掛在 `stream` 上（`stream.kind === 'session'` 時 `stream.id` 就是 session id）。
+樣本：[`../test/fixtures/muse-echo-exec.jsonl`](../test/fixtures/muse-echo-exec.jsonl)
+（`--provider echo` 抓的，27 行）。
+
+| `payload_type` | 對應的 `AgentEvent` |
+| --- | --- |
+| `runtime.command.accepted` | `init`（一次執行只有一筆，所以拿它當 init） |
+| `run.output.delta` | `text`（`payload.text`） |
+| `task.lifecycle.proposed` | `tool`，名字是 `payload.event.task_kind`；`model.*` 濾掉（那只是模型自己的回合） |
+| `task.lifecycle.failed` | `tool`，摘要是 `payload.event.reason` |
+| `run.terminal.*` | `result`，成敗看 `payload.terminal === 'completed'`，文字取 `payload.text`，失敗時取 `payload.reason` |
+
+**子任務失敗不等於整次執行失敗**：echo provider 的 `verify-reminder` 一定會丟
+`invalid run configuration: provider does not support base instructions`，
+但同一次執行的 `run.terminal.completed` 仍然是成功的。所以成敗一律看終端事件。
+
+**OpenCode `run --format json`**：`{"type":…, "sessionID":…, "part":{…}}`。
+樣本：[`../test/fixtures/opencode-run-json.jsonl`](../test/fixtures/opencode-run-json.jsonl)。
+
+| `type` | 對應的 `AgentEvent` |
+| --- | --- |
+| （任何一行的 `sessionID`） | 第一次看到就發 `init` |
+| `text` | `text`（`part.text`） |
+| `tool_use` | `tool`，名字是 `part.tool`，摘要取 `part.state.input` 裡的 `filePath`／`command`／… |
+| `step_finish` | `result`：`part.cost` 累加、`part.reason` 是 `stop`／`tool-calls`／`error` |
+| `error`（頂層） | 失敗的 `result`，訊息取 `error.data.message` |
+
+`tool_use` 的實際樣子（叫它列目錄）：
+
+```json
+{"type":"tool_use","sessionID":"ses_…","part":{"type":"tool","tool":"read",
+ "callID":"call_…","state":{"status":"completed",
+ "input":{"filePath":"C:\…\ws"},"output":"<path>…</path>\n<type>directory</type>…"}}}
+```
+
+注意 `filePath` 是**小駝峰**，跟 claude 的 `file_path` 不一樣，
+所以 `SUMMARY_KEYS` 兩種都收。
+
+OpenCode **沒有「這次跑完了」那種事件** —— 串流結束就是結束。所以結果是在每個
+`step_finish` 上重新湊一份，最後留下來的那筆就是最終結果；費用要跨 step 累加、
+回覆文字要把每段接起來，因此 `opencodeEvents()` 是一個**工廠**（有狀態，一次執行配一個），
+不像 `claudeEvents` / `codexEvents` 是無狀態的模組常數。
+
+`step_finish` 也帶 `part.tokens {total,input,output,reasoning,cache{write,read}}`，
+但 `AgentEvent` 沒有放 token 數的欄位，所以目前只取 `cost`。
+免費模型的 `cost` 是 `0`，這時不寫 `costUsd`（不然頁尾會出現一個 `$0.000`）。
+
+失敗長這樣（指定一個這把金鑰拿不到的型號）：
+
+```json
+{"type":"error","sessionID":"ses_…","error":{"name":"APIError",
+ "data":{"message":"key not allowed to access model. This key can only access models=[…]",
+ "statusCode":403}}}
+```
+
+### 用免費模型驗到的（OpenCode）
+
+`opencode/mimo-v2.5-free` **不需要任何金鑰**，只要有網路。上面 OpenCode 那幾段
+（stdin、工具呼叫的 JSON、沒有旗標就寫檔、`--agent plan` 擋得住、`--session` 接得回去、
+錯誤的形狀）全部是用它跑出來的，不是推的。
+
+整條路徑也跑過一次 e2e：
+
+```
+MYTERMINAL_AGENT_E2E=1 MYTERMINAL_AGENT_E2E_OPENCODE=1 npx playwright test e2e/agent.spec.ts -g opencode
+```
+
+app → `cmd.exe /c opencode run --format json` → 事件解析 → 畫面上出現
+`OPENCODE_E2E_OK` 與 `✔ 完成`，清單上有「接手」按鈕。約 1.6 分鐘，綠的。
+
+**這台機器的 `opencode` 預設型號是內網 LiteLLM proxy 的 `litellm/claude-opus-4-8`，
+那把金鑰拿不到它（403）**，所以不指定 `-m` 會直接失敗。正式路徑的型號來自
+「CLI 設定」（`provider` + `model` → `-m <provider>/<model>`），但那張供應商清單只有
+Anthropic／OpenAI／Google／OpenRouter 四家，寫不出 `opencode/mimo-v2.5-free`。
+因此 `OpenCodeRunner` 多讀一個環境變數 **`MYTERMINAL_OPENCODE_MODEL`**（優先於
+「CLI 設定」），e2e 就是靠它把免費模型帶進去的。`OPENCODE_MODEL` 沒有用（試過，
+opencode 不讀）。
+
+### Muse 沒有驗到的
+
+這台機器**既沒有 `muse login` 也沒有 `META_API_KEY`**，所以 meta provider 一次都沒跑過。
+以下全部是未知，解析器對這些一律防禦性處理（認不得的行就忽略）：
+
+- **真正的工具呼叫長什麼樣子**。echo provider 不會叫工具，所以 `task_kind` 除了
+  `reminder.agent.*` 與 `model.unknown.response` 之外會出現什麼、`tool` 事件的摘要
+  該從哪個欄位取，都沒看過。目前只拿 `task.lifecycle.proposed` 的 `task_kind` 當名字。
+- **有沒有用量／費用欄位**。echo 的事件裡完全沒有 token 或金額，所以 Muse 的 `result`
+  目前不帶 `costUsd`，頁尾也就不會有金額那一段。
+- **失敗時 `run.terminal.*` 的實際型別與 `reason`**。只看過 `run.terminal.completed`
+  （`terminal: "completed"`, `reason: null`）。失敗路徑的單元測試用的是手寫的
+  `run.terminal.failed`，不是抓下來的。
+- `e2e/agent.spec.ts` 的 muse 那個測試因此**從來沒有真的跑過**，
+  要 `MYTERMINAL_AGENT_E2E_MUSE=1` 才會跑，skip 訊息裡有寫。
+
+### 金鑰注入
+
+以前只有互動式工作階段吃得到「CLI 設定」的金鑰（`ShellFactory` 拿 `CliSecrets`）。
+現在 runner 工廠也拿同一條縫線（`agentRunners(secrets)`），所以 `META_API_KEY`／
+`ANTHROPIC_API_KEY`／… 在 **Agent 任務與工作流節點**也會被注入。
+`ProcessSpec` 因此多了一個 `env`，`NodeProcessSpawner` 把它疊在 `process.env` 上。
+無介面一律在 Windows 原生跑，所以 `baseShell` 固定傳 `powershell`（不會有 WSLENV 那段）。
