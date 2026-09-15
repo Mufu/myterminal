@@ -87,14 +87,11 @@ export interface RunOverlayHandlers {
 const OVERLAY_PARTS = '.wf-run, .wf-run-actions';
 
 export class RunOverlay {
-  private readonly strip: HTMLElement;
-
   constructor(
     private readonly handlers: RunOverlayHandlers,
-    strip: HTMLElement,
-  ) {
-    this.strip = strip;
-  }
+    /** 編輯列上那條執行摘要 (#editor-run)。*/
+    private readonly strip: HTMLElement,
+  ) {}
 
   /** 編輯列上那條執行摘要；沒有執行就收起來。*/
   paintStrip(run: RunState | null, auth: CliAuthStatus | null): void {
@@ -126,7 +123,12 @@ export class RunOverlay {
   }
 
   /** 一張卡片的執行狀態；沒有就把上一次畫的收乾淨。*/
-  paintCard(card: HTMLElement, nodeId: string, run: RunState | null, auth: CliAuthStatus | null): void {
+  paintCard(
+    card: HTMLElement,
+    nodeId: string,
+    run: RunState | null,
+    auth: CliAuthStatus | null,
+  ): void {
     for (const part of Array.from(card.querySelectorAll(OVERLAY_PARTS))) part.remove();
 
     const overlay = cardOverlay(run, nodeId, auth);
