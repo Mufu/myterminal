@@ -5,3 +5,6 @@ test-results/
 playwright-report/
 *.log
 coverage/
+
+# 放在根目錄方便啟動的執行檔，不進版本庫
+/*.exe
