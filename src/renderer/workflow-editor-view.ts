@@ -9,6 +9,8 @@ import type {
   WorkflowPort,
 } from '../shared/workflow';
 import { NODE_PORTS } from '../shared/workflow';
+import type { AgentKind } from '../shared/agent';
+import { CLI_TYPES, TYPE_LABELS as CLI_LABELS } from '../shared/profile';
 import { ROLES, findRole } from '../shared/roles';
 import type { WorkflowEditorModel } from './workflow-editor-model';
 import { NODE_HEADER, NODE_WIDTH, PORT_LABELS, PORT_ROW } from './workflow-editor-model';
@@ -35,6 +37,9 @@ export const TYPE_LABELS: Record<WorkflowNodeType, string> = {
   condition: '條件',
   approval: '批准',
 };
+
+/** 屬性面板的「執行者」下拉：四支 CLI，跟新連接對話框同一組。*/
+const KIND_OPTIONS = CLI_TYPES.map((cli) => [cli, CLI_LABELS[cli]] as [string, string]);
 
 /**
  * 連線是一條立方貝茲：兩端都先水平拉出去，看起來才像接線而不是折線。
@@ -476,12 +481,9 @@ export class WorkflowEditorView {
 
   private agentProps(id: string, config: AgentNodeConfig): void {
     const kind = select(
-      [
-        ['claude', 'Claude'],
-        ['codex', 'Codex'],
-      ],
+      KIND_OPTIONS,
       config.kind,
-      (value) => this.model.updateNode(id, { config: { kind: value as 'claude' | 'codex' } }),
+      (value) => this.model.updateNode(id, { config: { kind: value as AgentKind } }),
       'props-kind',
     );
 

@@ -8,7 +8,7 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 /** 清單上那一列的類型標籤；agent 任務要看得出是哪個 CLI 在跑。*/
 export function sessionTag(session: SessionInfo): string {
   if (session.type !== 'agent') return TYPE_LABELS[session.type];
-  return session.agentKind === 'codex' ? 'Codex 任務' : 'Claude 任務';
+  return `${TYPE_LABELS[session.agentKind ?? 'claude']} 任務`;
 }
 
 /** 接手：把這次 agent 執行接到真的終端機裡繼續。*/

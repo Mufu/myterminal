@@ -43,13 +43,15 @@ describe('usageMode', () => {
   const auth: CliAuthStatus = {
     claude: { loggedIn: true, mode: 'subscription', label: 'Max 訂閱' },
     codex: { loggedIn: true, mode: 'api', label: 'API 金鑰' },
-    muse: { loggedIn: false, mode: 'unknown', label: '未登入' },
-    opencode: { loggedIn: false, mode: 'unknown', label: '未登入' },
+    muse: { loggedIn: true, mode: 'subscription', label: 'Meta 帳號' },
+    opencode: { loggedIn: true, mode: 'api', label: 'API 金鑰' },
   };
 
   it('節點看自己那一支 CLI，執行總額看 claude', () => {
     expect(usageMode(auth, 'claude')).toBe('subscription');
     expect(usageMode(auth, 'codex')).toBe('api');
+    expect(usageMode(auth, 'muse')).toBe('subscription');
+    expect(usageMode(auth, 'opencode')).toBe('api');
     expect(usageMode(auth)).toBe('subscription');
   });
 

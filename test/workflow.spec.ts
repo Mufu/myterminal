@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { validateWorkflow } from '../src/shared/workflow';
+import { CLI_TYPES } from '../src/shared/profile';
 import type {
   ConditionRule,
   WorkflowDefinition,
@@ -57,6 +58,15 @@ const minimal = (): WorkflowDefinition =>
 describe('validateWorkflow', () => {
   it('合法的定義沒有錯誤', () => {
     expect(validateWorkflow(minimal())).toEqual([]);
+  });
+
+  it('agent 節點的四支 CLI 都收', () => {
+    for (const kind of CLI_TYPES) {
+      const one = minimal();
+      const node = one.nodes.find((n) => n.type === 'agent');
+      if (node?.type === 'agent') node.config.kind = kind;
+      expect(validateWorkflow(one)).toEqual([]);
+    }
   });
 
   it('開始節點必須剛好一個', () => {

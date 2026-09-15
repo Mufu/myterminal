@@ -140,9 +140,19 @@ export class ConnectFromProfileCommand implements ICommand {
   }
 }
 
-/** 在真的終端機裡接續同一段對話的指令。*/
+/** 在真的終端機裡接續同一段對話的指令。四支 CLI 都有自己的形式。*/
 export function resumeCommand(kind: AgentKind, sessionId: string): string {
-  return kind === 'claude' ? `claude --resume ${sessionId}` : `codex resume ${sessionId}`;
+  switch (kind) {
+    case 'claude':
+      return `claude --resume ${sessionId}`;
+    case 'codex':
+      return `codex resume ${sessionId}`;
+    case 'muse':
+      return `muse resume ${sessionId}`;
+    // opencode 沒有 resume 子命令，TUI 是用 --session 開回同一段對話。
+    case 'opencode':
+      return `opencode --session ${sessionId}`;
+  }
 }
 
 /**

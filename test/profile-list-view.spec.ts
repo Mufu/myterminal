@@ -62,5 +62,7 @@ describe('sessionTag', () => {
   it('agent 任務要看得出是哪個 CLI', () => {
     expect(sessionTag(info({ type: 'agent', agentKind: 'claude' }))).toBe('Claude 任務');
     expect(sessionTag(info({ type: 'agent', agentKind: 'codex' }))).toBe('Codex 任務');
+    expect(sessionTag(info({ type: 'agent', agentKind: 'muse' }))).toBe('Muse 任務');
+    expect(sessionTag(info({ type: 'agent', agentKind: 'opencode' }))).toBe('OpenCode 任務');
   });
 });

@@ -355,9 +355,12 @@ describe('TakeOverCommand', () => {
     expect(connect).not.toHaveBeenCalled();
   });
 
-  it('resumeCommand 兩種 CLI 的形式', () => {
+  it('resumeCommand 四支 CLI 的形式', () => {
     expect(resumeCommand('claude', 'x')).toBe('claude --resume x');
     expect(resumeCommand('codex', 'x')).toBe('codex resume x');
+    expect(resumeCommand('muse', 'x')).toBe('muse resume x');
+    // opencode 沒有 resume 子命令，TUI 是用 --session 開回同一段對話。
+    expect(resumeCommand('opencode', 'x')).toBe('opencode --session x');
   });
 });
 

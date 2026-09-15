@@ -30,7 +30,8 @@ export function nodeDotClass(status: RunNodeStatus): string {
 
 /**
  * 這個金額要照哪一支 CLI 的登入方式寫。節點知道自己是誰跑的，
- * 執行總額 (沒有 kind) 就看 claude —— 混用兩支 CLI 的工作流很少見。
+ * 執行總額 (沒有 kind) 就看 claude —— 一個工作流裡混用多支 CLI 很少見。
+ * AgentKind 的四個值跟 CliAuthStatus 的四個鍵是同一組，所以直接查得到。
  */
 export function usageMode(auth: CliAuthStatus | null, kind?: AgentKind): BillingMode {
   return auth?.[kind ?? 'claude'].mode ?? 'unknown';
