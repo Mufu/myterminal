@@ -470,6 +470,26 @@ describe('畫布編輯器的 Command', () => {
     expect(model.definition.name).toBe('新工作流');
   });
 
+  /** 去看某個節點的終端機再回來，卡片上的執行檢視要還在。*/
+  it('OpenEditorCommand 在畫布那份工作流有執行時留著它', () => {
+    model.setName('跑起來了');
+    model.markSaved();
+    state.setRuns([
+      {
+        runId: 'run-1',
+        workflowId: model.definition.id,
+        name: '跑起來了',
+        status: 'running',
+        nodes: {},
+        totalCostUsd: 0,
+        startedAt: 1,
+      },
+    ]);
+
+    new OpenEditorCommand(state, model).execute();
+    expect(model.definition.name).toBe('跑起來了');
+  });
+
   it('CloseEditorCommand 切回終端機', () => {
     state.showEditor();
     new CloseEditorCommand(state).execute();

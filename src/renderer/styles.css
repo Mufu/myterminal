@@ -1818,11 +1818,23 @@ html[data-theme='warm'] .session-item.active .session-dot {
 }
 
 /* ---- 卡片上的執行檢視：狀態、用量、輸出、批准／退回 ---- */
+/* 右邊那一段留給絕對定位的出口文字，不要讓「輸出」疊在「成功／失敗」上面。*/
+.wf-run,
+.wf-run-actions {
+  padding-right: 34px;
+}
+
+.wf-start .wf-run,
+.wf-end .wf-run {
+  padding-right: 8px;
+}
+
 .wf-run {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 0 8px 6px;
+  padding-bottom: 6px;
+  padding-left: 8px;
   font-family: var(--meta-font);
   font-size: var(--meta-size);
   letter-spacing: var(--meta-tracking);
@@ -1879,7 +1891,8 @@ html[data-theme='warm'] .session-item.active .session-dot {
 .wf-run-actions {
   display: flex;
   gap: 6px;
-  padding: 0 8px 8px;
+  padding-bottom: 8px;
+  padding-left: 8px;
 }
 
 .wf-run-actions button {

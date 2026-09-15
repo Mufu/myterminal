@@ -3,6 +3,7 @@ import type { ThemeStore } from './theme';
 import { parseTheme } from './theme';
 import type { WorkflowEditorModel } from './workflow-editor-model';
 import { newWorkflowId } from './workflow-editor-model';
+import { latestRunFor } from './workflow-run-view';
 import type { MyTerminalApi } from '../shared/api';
 import type { ConnectionProfile, SavedProfile } from '../shared/profile';
 import type { AgentKind } from '../shared/agent';
@@ -234,7 +235,9 @@ export class CancelWorkflowCommand implements ICommand {
 }
 
 /**
- * 「編輯」：打開畫布。手上還有沒存的東西就直接顯示，不要把它蓋掉。
+ * 「編輯」：打開畫布。手上還有沒存的東西就直接顯示，不要把它蓋掉；
+ * 畫布上那份工作流正在執行時也留著 —— 去看了某個節點的終端機再回來，
+ * 卡片上的執行檢視要還在。
  */
 export class OpenEditorCommand implements ICommand {
   constructor(
@@ -242,7 +245,8 @@ export class OpenEditorCommand implements ICommand {
     private readonly model: WorkflowEditorModel,
   ) {}
   execute(): void {
-    if (!this.model.dirty) this.model.newWorkflow();
+    const watching = latestRunFor(this.state.runs, this.model.definition.id) !== null;
+    if (!this.model.dirty && !watching) this.model.newWorkflow();
     this.state.showEditor();
   }
 }
