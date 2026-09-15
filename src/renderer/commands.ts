@@ -6,6 +6,9 @@ import { newWorkflowId } from './workflow-editor-model';
 import type { MyTerminalApi } from '../shared/api';
 import type { ConnectionProfile, SavedProfile } from '../shared/profile';
 import type { AgentKind } from '../shared/agent';
+import type { CliAuthSetting, CliId } from '../shared/cli-auth';
+import { validateCliSetting } from '../shared/cli-auth';
+import type { SaveCliSettingRequest } from '../shared/ipc';
 import type { SessionInfo } from '../shared/session';
 import type {
   ICommand,
@@ -313,6 +316,81 @@ export class RemoveProfileCommand implements ICommand {
   async execute(): Promise<void> {
     if (!this.confirm(`刪除連線設定「${this.name}」？`)) return;
     await this.api.removeProfile(this.name);
+  }
+}
+
+/** 「CLI 設定」：頁尾的晶片或 ⚙ 按下去就開對話框。*/
+export class OpenCliSettingsCommand implements ICommand {
+  constructor(private readonly dialog: DialogPort) {}
+  execute(): void {
+    this.dialog.open();
+  }
+}
+
+/** 存一支 CLI 的登入方式。先在本地驗一次，不用等 main 拒絕才顯示原因。*/
+export class SaveCliSettingCommand implements ICommand {
+  constructor(
+    private readonly api: MyTerminalApi,
+    private readonly request: SaveCliSettingRequest,
+    /** 已經存過金鑰的話就不必重打。*/
+    private readonly hasKey: boolean,
+    private readonly onSaved: (settings: Record<CliId, CliAuthSetting>) => void,
+    private readonly showErrors: (messages: string[]) => void,
+  ) {}
+
+  async execute(): Promise<void> {
+    const errors = validateCliSetting(this.request, this.hasKey);
+    if (errors.length > 0) {
+      this.showErrors(errors);
+      return;
+    }
+    try {
+      this.onSaved(await this.api.saveCliSetting(this.request));
+      this.showErrors([]);
+    } catch (error) {
+      this.showErrors([errorText(error)]);
+    }
+  }
+}
+
+/** 清除金鑰：登入方式留著，那一支 CLI 回到自己原本的登入狀態。*/
+export class ClearCliKeyCommand implements ICommand {
+  constructor(
+    private readonly api: MyTerminalApi,
+    private readonly id: CliId,
+    private readonly onCleared: (settings: Record<CliId, CliAuthSetting>) => void,
+    private readonly showErrors: (messages: string[]) => void,
+  ) {}
+
+  async execute(): Promise<void> {
+    try {
+      this.onCleared(await this.api.clearCliKey(this.id));
+      this.showErrors([]);
+    } catch (error) {
+      this.showErrors([errorText(error)]);
+    }
+  }
+}
+
+/**
+ * 「登入」：開一個跑登入指令的工作階段，瀏覽器那一段由使用者自己走完。
+ * 工作階段結束時 main 會重探登入狀態，晶片上的字跟著換。
+ */
+export class LoginCliCommand implements ICommand {
+  constructor(
+    private readonly api: MyTerminalApi,
+    private readonly id: CliId,
+    private readonly onStarted: (sessionId: string) => void | Promise<void>,
+    private readonly showErrors: (messages: string[]) => void,
+  ) {}
+
+  async execute(): Promise<void> {
+    try {
+      await this.onStarted(await this.api.cliLogin(this.id));
+      this.showErrors([]);
+    } catch (error) {
+      this.showErrors([errorText(error)]);
+    }
   }
 }
 

@@ -21,6 +21,10 @@ import {
   SaveWorkflowCommand,
   DeleteWorkflowCommand,
   SaveAndRunWorkflowCommand,
+  OpenCliSettingsCommand,
+  SaveCliSettingCommand,
+  ClearCliKeyCommand,
+  LoginCliCommand,
   errorText,
 } from '../src/renderer/commands';
 import { WorkflowEditorModel } from '../src/renderer/workflow-editor-model';
@@ -558,5 +562,102 @@ describe('errorText', () => {
   it('不是 Error 的東西也變成字串', () => {
     expect(errorText('壞掉了')).toBe('壞掉了');
     expect(errorText(undefined)).toBe('undefined');
+  });
+});
+
+describe('CLI 設定', () => {
+  /** 這一組 Command 只用到這幾個方法，就不拉進上面那份 fakeApi。*/
+  const cliApi = (over: Partial<Record<string, unknown>> = {}) =>
+    ({
+      saveCliSetting: vi.fn().mockResolvedValue({ claude: { mode: 'apiKey', hasKey: true } }),
+      clearCliKey: vi.fn().mockResolvedValue({ claude: { mode: 'apiKey', hasKey: false } }),
+      cliLogin: vi.fn().mockResolvedValue('s9'),
+      ...over,
+    }) as unknown as MyTerminalApi & {
+      saveCliSetting: ReturnType<typeof vi.fn>;
+      clearCliKey: ReturnType<typeof vi.fn>;
+      cliLogin: ReturnType<typeof vi.fn>;
+    };
+
+  it('⚙ 打開對話框', () => {
+    let opened = 0;
+    const dialog: DialogPort = { open: () => (opened += 1) };
+    new OpenCliSettingsCommand(dialog).execute();
+    expect(opened).toBe(1);
+  });
+
+  it('存設定：送出去並把新的設定交給呼叫端', async () => {
+    const cli = cliApi();
+    const saved: unknown[] = [];
+    const errors: string[][] = [];
+    await new SaveCliSettingCommand(
+      cli,
+      { id: 'claude', mode: 'apiKey', apiKey: 'sk-1' },
+      false,
+      (settings) => saved.push(settings),
+      (messages) => errors.push(messages),
+    ).execute();
+
+    expect(cli.saveCliSetting).toHaveBeenCalledWith({
+      id: 'claude',
+      mode: 'apiKey',
+      apiKey: 'sk-1',
+    });
+    expect(saved).toHaveLength(1);
+    expect(errors).toEqual([[]]);
+  });
+
+  it('驗證沒過就不碰 main', async () => {
+    const cli = cliApi();
+    const errors: string[][] = [];
+    await new SaveCliSettingCommand(
+      cli,
+      { id: 'claude', mode: 'apiKey' },
+      false,
+      () => {},
+      (messages) => errors.push(messages),
+    ).execute();
+
+    expect(cli.saveCliSetting).not.toHaveBeenCalled();
+    expect(errors).toEqual([['請輸入 API 金鑰']]);
+  });
+
+  it('main 拒絕時把原因顯示出來', async () => {
+    const cli = cliApi({ saveCliSetting: vi.fn().mockRejectedValue(new Error('存不進去')) });
+    const errors: string[][] = [];
+    await new SaveCliSettingCommand(
+      cli,
+      { id: 'claude', mode: 'login' },
+      false,
+      () => {},
+      (messages) => errors.push(messages),
+    ).execute();
+
+    expect(errors).toEqual([['存不進去']]);
+  });
+
+  it('清除金鑰也回傳新的設定', async () => {
+    const cli = cliApi();
+    const cleared: unknown[] = [];
+    await new ClearCliKeyCommand(cli, 'claude', (s) => cleared.push(s), () => {}).execute();
+    expect(cli.clearCliKey).toHaveBeenCalledWith('claude');
+    expect(cleared).toHaveLength(1);
+  });
+
+  it('登入：開一個工作階段並把 id 交出去', async () => {
+    const cli = cliApi();
+    const started: string[] = [];
+    await new LoginCliCommand(cli, 'codex', (id) => void started.push(id), () => {}).execute();
+    expect(cli.cliLogin).toHaveBeenCalledWith('codex');
+    expect(started).toEqual(['s9']);
+  });
+
+  it('OpenCode 沒有登入流程，main 拒絕時顯示原因', async () => {
+    const cli = cliApi({
+      cliLogin: vi.fn().mockRejectedValue(new Error('OpenCode 只能使用 API 金鑰')),
+    });
+    const errors: string[][] = [];
+    await new LoginCliCommand(cli, 'opencode', () => {}, (m) => errors.push(m)).execute();
+    expect(errors).toEqual([['OpenCode 只能使用 API 金鑰']]);
   });
 });

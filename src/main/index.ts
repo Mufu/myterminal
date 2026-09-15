@@ -8,6 +8,9 @@ import { fileProfileStore } from './profile-store';
 import { defaultAgentRunners } from './agent-runner';
 import { NodeProcessSpawner } from './process-spawner';
 import { probeCliAuth } from './cli-auth-probe';
+import { fileCliAuthStore } from './cli-auth-store';
+import { safeStorageCipher } from './safe-storage-cipher';
+import { cliSecrets } from './cli-secrets';
 import type { AgentKind } from '../shared/agent';
 import type { BillingMode, CliAuthStatus } from '../shared/cli-auth';
 import { fileCheckpointSaver } from './workflow/json-file-saver';
@@ -24,17 +27,24 @@ process.on('uncaughtException', (error) => console.error('[main] 未捕捉的例
 const logDir = process.env.MYTERMINAL_LOG_DIR?.trim() || defaultLogDir();
 ensureLogDir(logDir);
 
+// 「CLI 設定」：使用者為每支 CLI 選的登入方式與 (加密後的) API 金鑰。
+const cliStore = fileCliAuthStore(join(app.getPath('userData'), 'cli-auth.json'), safeStorageCipher());
+
 // CLI 是用訂閱還是 API 金鑰登入：開機問一次就好，不擋啟動 (探測不出來也照跑)。
 // 金額要不要標成估算看它，所以 agent 的結果行與 renderer 都拿同一份結果。
-const cliAuth = probeCliAuth(new NodeProcessSpawner());
+const probe = (): Promise<CliAuthStatus> =>
+  probeCliAuth(new NodeProcessSpawner(), (id) => cliStore.get(id).hasKey);
+let cliAuth = probe();
 let auth: CliAuthStatus | null = null;
-void cliAuth.then((status) => (auth = status));
+const remember = (status: CliAuthStatus): CliAuthStatus => (auth = status);
+void cliAuth.then(remember);
 const billingMode = (kind: AgentKind): BillingMode => auth?.[kind].mode ?? 'unknown';
 
 // 組裝：正式環境注入真的 node-pty spawner 與真的檔案 sink。
+// ShellFactory 多拿一條金鑰縫線，選了 API 金鑰的 CLI 才會被注入環境變數。
 const manager = new SessionManager(
   new NodePtySpawner(),
-  new ShellFactory(),
+  new ShellFactory(undefined, cliSecrets(cliStore)),
   undefined,
   undefined,
   billingMode,
@@ -55,8 +65,19 @@ const workflows = new WorkflowService({
 const workflowDefinitions = fileWorkflowStore(join(app.getPath('userData'), 'workflows.json'));
 
 // 關窗之後 pty 的 exit 事件才可能送達，那時 webContents 已經被銷毀。
-registerIpc(manager, logger, profiles, workflows, workflowDefinitions, cliAuth, () =>
-  win && !win.isDestroyed() ? win.webContents : null,
+registerIpc(
+  manager,
+  logger,
+  profiles,
+  workflows,
+  workflowDefinitions,
+  {
+    status: () => cliAuth,
+    // 登入流程跑完之後重探一次，之後問到的就是新的結果。
+    refresh: () => (cliAuth = probe().then(remember)),
+    store: cliStore,
+  },
+  () => (win && !win.isDestroyed() ? win.webContents : null),
 );
 
 function createWindow(): void {

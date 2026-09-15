@@ -5,17 +5,33 @@ import type {
   WriteRequest,
   ResizeRequest,
   ResumeWorkflowRequest,
+  SaveCliSettingRequest,
   StartWorkflowRequest,
 } from '../shared/ipc';
 import type { SavedProfile } from '../shared/profile';
-import type { CliAuthStatus } from '../shared/cli-auth';
+import type { CliAuthStatus, CliId } from '../shared/cli-auth';
+import { loginProfile, validateCliSetting } from '../shared/cli-auth';
 import type { WorkflowDefinition } from '../shared/workflow';
 import type { SessionManager } from './session-manager';
 import type { SessionLogger } from './session-logger';
 import type { ProfileStore } from './profile-store';
+import type { CliAuthStore } from './cli-auth-store';
 import type { WorkflowService } from './workflow/workflow-service';
 import type { WorkflowStore } from './workflow/workflow-store';
 import { findWorkflow, listWorkflows } from './workflow/catalog';
+
+/** 登入用的工作階段開出來時還沒有終端機，先給一個尺寸，show() 時會量過重設。*/
+const LOGIN_COLS = 120;
+const LOGIN_ROWS = 30;
+
+/** CLI 設定與登入狀態：誰存的、怎麼重探，由 index.ts 組起來。*/
+export interface CliAuthBridge {
+  /** 目前這一份探測結果 (開機探一次，登入完重探)。*/
+  status(): Promise<CliAuthStatus>;
+  /** 重探一次，並成為新的 status()。*/
+  refresh(): Promise<CliAuthStatus>;
+  store: CliAuthStore;
+}
 
 /**
  * IPC 橋接層：刻意保持很薄。
@@ -28,7 +44,7 @@ export function registerIpc(
   profiles: ProfileStore,
   workflows: WorkflowService,
   definitions: WorkflowStore,
-  cliAuth: Promise<CliAuthStatus>,
+  cli: CliAuthBridge,
   getWebContents: () => WebContents | null,
 ): void {
   const send = (channel: string, payload: unknown): void => {
@@ -36,6 +52,9 @@ export function registerIpc(
   };
   const pushSessions = (): void => send(IPC.sessionsChanged, manager.list());
   const pushProfiles = (): void => send(IPC.profilesChanged, profiles.list());
+
+  /** 正在跑登入流程的工作階段；結束時要重探登入狀態。*/
+  const loginSessions = new Set<string>();
 
   // main -> renderer
   manager.on('data', (event) => {
@@ -45,6 +64,10 @@ export function registerIpc(
   manager.on('exit', (event) => {
     send(IPC.exit, event);
     pushSessions();
+    // 使用者在那個工作階段裡把登入走完了，晶片上的字要跟著換。
+    if (loginSessions.delete(event.id)) {
+      void cli.refresh().then((status) => send(IPC.cliAuthChanged, status));
+    }
   });
   manager.on('created', pushSessions);
   manager.on('updated', pushSessions);
@@ -111,5 +134,27 @@ export function registerIpc(
   ipcMain.handle(IPC.cancelWorkflow, (_e, runId: string) => workflows.cancel(runId));
   ipcMain.handle(IPC.workflowRuns, () => workflows.list());
   // 探測是開機時就開始的，這裡等的是同一個 Promise。
-  ipcMain.handle(IPC.cliAuth, () => cliAuth);
+  ipcMain.handle(IPC.cliAuth, () => cli.status());
+
+  ipcMain.handle(IPC.cliSettings, () => cli.store.settings());
+
+  ipcMain.handle(IPC.saveCliSetting, (_e, req: SaveCliSettingRequest) => {
+    // 跟連線設定一樣：renderer 先驗一次，main 這邊仍然是最後一道。
+    const errors = validateCliSetting(req, cli.store.get(req.id).hasKey);
+    if (errors.length > 0) throw new Error(errors.join('\n'));
+    cli.store.set(req.id, req);
+    return cli.store.settings();
+  });
+
+  ipcMain.handle(IPC.clearCliKey, (_e, id: CliId) => {
+    cli.store.clearKey(id);
+    return cli.store.settings();
+  });
+
+  ipcMain.handle(IPC.cliLogin, (_e, id: CliId) => {
+    // 就是一個普通的工作階段：出現在清單裡，使用者自己在裡面把瀏覽器流程走完。
+    const session = manager.create(loginProfile(id), LOGIN_COLS, LOGIN_ROWS);
+    loginSessions.add(session.id);
+    return session.id;
+  });
 }

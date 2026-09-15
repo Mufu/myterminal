@@ -1,8 +1,8 @@
 import type { ConnectionProfile, SavedProfile } from './profile';
 import type { SessionInfo } from './session';
-import type { DataEvent, ExitEvent } from './ipc';
+import type { DataEvent, ExitEvent, SaveCliSettingRequest } from './ipc';
 import type { RunState, WorkflowDefinition, WorkflowInfo } from './workflow';
-import type { CliAuthStatus } from './cli-auth';
+import type { CliAuthSetting, CliAuthStatus, CliId } from './cli-auth';
 
 /**
  * preload 透過 contextBridge 暴露到 window.myterminal 的介面。
@@ -36,14 +36,23 @@ export interface MyTerminalApi {
   cancelWorkflow(runId: string): Promise<void>;
   workflowRuns(): Promise<RunState[]>;
 
-  /** 兩支 CLI 的登入方式；開機探測一次，之後都是同一份結果。*/
+  /** 四支 CLI 實際的登入狀態；開機探測一次，登入流程跑完會再探一次。*/
   cliAuth(): Promise<CliAuthStatus>;
+  /** 使用者在「CLI 設定」裡選的登入方式；金鑰本身不會過來。*/
+  cliSettings(): Promise<Record<CliId, CliAuthSetting>>;
+  /** 存起來並回傳更新後的整份設定；驗證沒過會以訊息 reject。*/
+  saveCliSetting(request: SaveCliSettingRequest): Promise<Record<CliId, CliAuthSetting>>;
+  clearCliKey(id: CliId): Promise<Record<CliId, CliAuthSetting>>;
+  /** 開一個跑登入指令的工作階段，回傳它的 id。*/
+  cliLogin(id: CliId): Promise<string>;
 
   onData(listener: (event: DataEvent) => void): void;
   onExit(listener: (event: ExitEvent) => void): void;
   onSessionsChanged(listener: (sessions: SessionInfo[]) => void): void;
   onProfilesChanged(listener: (profiles: SavedProfile[]) => void): void;
   onWorkflowChanged(listener: (runs: RunState[]) => void): void;
+  /** 登入流程跑完之後 main 重探的結果。*/
+  onCliAuthChanged(listener: (status: CliAuthStatus) => void): void;
 }
 
 declare global {

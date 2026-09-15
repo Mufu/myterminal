@@ -481,6 +481,7 @@ body {
 #toolbar button.primary,
 #editor-bar button.primary,
 #new-connection menu button.primary,
+#cli-settings menu button.primary,
 #btn-send {
   background: var(--primary-bg);
   color: var(--primary-fg);
@@ -497,6 +498,7 @@ body {
 #toolbar button.primary:hover,
 #editor-bar button.primary:hover,
 #new-connection menu button.primary:hover,
+#cli-settings menu button.primary:hover,
 #btn-send:hover {
   background: var(--primary-hover-bg);
   color: var(--primary-hover-fg);
@@ -505,6 +507,7 @@ body {
 #toolbar button.primary:active,
 #editor-bar button.primary:active,
 #new-connection menu button.primary:active,
+#cli-settings menu button.primary:active,
 #btn-send:active {
   background: var(--primary-active-bg);
 }
@@ -1278,9 +1281,113 @@ html[data-theme='warm'] .session-item.active .session-dot {
   color: var(--dim);
 }
 
+/* 整條頁尾就是「CLI 設定」的入口，⚙ 只是視覺提示。*/
+#cli-status {
+  cursor: pointer;
+}
+
+#btn-cli-settings {
+  margin-left: auto;
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+#btn-cli-settings:hover {
+  color: var(--text);
+}
+
+/* ---- CLI 設定對話框：一支 CLI 一列 ---- */
+#cli-settings {
+  min-width: 460px;
+  max-height: 86vh;
+  overflow-y: auto;
+}
+
+#cli-settings .cli-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+#cli-settings .cli-row header {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+#cli-settings .cli-row h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.cli-row-status {
+  padding: var(--tag-pad);
+  border: var(--tag-border-width) solid var(--tag-border);
+  border-radius: var(--tag-radius);
+  background: var(--tag-bg);
+  color: var(--tag-fg);
+  font-family: var(--meta-font);
+  font-size: var(--tag-size);
+  white-space: nowrap;
+}
+
+/* 兩個單選鈕靠左排成一列，圓鈕不要跟著文字輸入框被拉寬。*/
+#cli-settings .cli-modes {
+  display: flex;
+  gap: 16px;
+}
+
+#cli-settings .cli-modes label {
+  gap: 6px;
+  justify-content: flex-start;
+  color: var(--text);
+}
+
+#cli-settings input[type='radio'] {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--accent);
+}
+
+#cli-settings .cli-key {
+  font-family: var(--meta-font);
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.cli-hint {
+  margin: 0;
+  color: var(--dim);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+/* 停用的欄位與按鈕：看得出來現在按不到。*/
+#cli-settings input:disabled,
+#cli-settings select:disabled,
+#cli-settings menu button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
 /* ---- 對話框：新連接與執行範本共用同一套規則 ---- */
 #new-connection,
-#workflow-run {
+#workflow-run,
+#cli-settings {
   min-width: 420px;
   padding: 0;
   border: 1px solid var(--border);
@@ -1290,12 +1397,14 @@ html[data-theme='warm'] .session-item.active .session-dot {
 }
 
 #new-connection::backdrop,
-#workflow-run::backdrop {
+#workflow-run::backdrop,
+#cli-settings::backdrop {
   background: var(--backdrop);
 }
 
 #new-connection form,
-#workflow-run form {
+#workflow-run form,
+#cli-settings form {
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -1303,14 +1412,16 @@ html[data-theme='warm'] .session-item.active .session-dot {
 }
 
 #new-connection h2,
-#workflow-run h2 {
+#workflow-run h2,
+#cli-settings h2 {
   margin: 0;
   font-size: 15px;
   font-weight: 600;
 }
 
 #new-connection label,
-#workflow-run label {
+#workflow-run label,
+#cli-settings label {
   display: flex;
   gap: 8px;
   align-items: center;
@@ -1323,7 +1434,9 @@ html[data-theme='warm'] .session-item.active .session-dot {
 #new-connection textarea,
 #workflow-run input,
 #workflow-run select,
-#workflow-run textarea {
+#workflow-run textarea,
+#cli-settings input,
+#cli-settings select {
   flex: 1;
   max-width: 260px;
   padding: 5px 8px;
@@ -1340,7 +1453,9 @@ html[data-theme='warm'] .session-item.active .session-dot {
 #new-connection textarea:focus,
 #workflow-run input:focus,
 #workflow-run select:focus,
-#workflow-run textarea:focus {
+#workflow-run textarea:focus,
+#cli-settings input:focus,
+#cli-settings select:focus {
   outline: none;
   border-color: var(--accent);
 }
@@ -1348,7 +1463,8 @@ html[data-theme='warm'] .session-item.active .session-dot {
 #new-connection input::placeholder,
 #new-connection textarea::placeholder,
 #workflow-run input::placeholder,
-#workflow-run textarea::placeholder {
+#workflow-run textarea::placeholder,
+#cli-settings input::placeholder {
   color: var(--dim);
 }
 
@@ -1397,7 +1513,8 @@ html[data-theme='warm'] .session-item.active .session-dot {
 /* DOM 裡確定鍵排在前面 (Enter 的隱含送出要挑到它)，所以這裡把順序翻回來：
    row-reverse 的主軸是從右往左，flex-start 就是靠右。*/
 #new-connection menu,
-#workflow-run menu {
+#workflow-run menu,
+#cli-settings menu {
   display: flex;
   flex-direction: row-reverse;
   gap: 8px;
@@ -1407,7 +1524,8 @@ html[data-theme='warm'] .session-item.active .session-dot {
 }
 
 #new-connection menu button,
-#workflow-run menu button {
+#workflow-run menu button,
+#cli-settings menu button {
   height: 30px;
   padding: 0 16px;
   border: 1px solid var(--border);
@@ -1420,12 +1538,14 @@ html[data-theme='warm'] .session-item.active .session-dot {
 }
 
 #new-connection menu button:hover,
-#workflow-run menu button:hover {
+#workflow-run menu button:hover,
+#cli-settings menu button:hover {
   background: var(--dialog-hover-bg);
 }
 
 #new-connection menu button.primary:hover,
-#workflow-run menu button.primary:hover {
+#workflow-run menu button.primary:hover,
+#cli-settings menu button.primary:hover {
   background: var(--accent-hover);
   border-color: var(--accent-hover);
 }

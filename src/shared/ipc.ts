@@ -1,4 +1,5 @@
 import type { ConnectionProfile } from './profile';
+import type { ApiProvider, AuthMode, CliId } from './cli-auth';
 
 /**
  * IPC 契約：頻道名稱 + payload 型別集中在 shared，
@@ -25,6 +26,10 @@ export const IPC = {
   cancelWorkflow: 'workflow:cancel',
   workflowRuns: 'workflow:runs',
   cliAuth: 'cli:auth',
+  cliSettings: 'cli:settings',
+  saveCliSetting: 'cli:save-setting',
+  clearCliKey: 'cli:clear-key',
+  cliLogin: 'cli:login',
 
   /** main -> renderer (send) */
   data: 'session:data',
@@ -32,6 +37,7 @@ export const IPC = {
   sessionsChanged: 'session:changed',
   profilesChanged: 'profiles:changed',
   workflowChanged: 'workflow:changed',
+  cliAuthChanged: 'cli:auth-changed',
 } as const;
 
 export interface CreateSessionRequest {
@@ -77,4 +83,13 @@ export interface StartWorkflowRequest {
 export interface ResumeWorkflowRequest {
   runId: string;
   approved: boolean;
+}
+
+/** 存一支 CLI 的登入方式。apiKey 留空代表沿用已經存著的那一把。*/
+export interface SaveCliSettingRequest {
+  id: CliId;
+  mode: AuthMode;
+  apiKey?: string;
+  provider?: ApiProvider;
+  model?: string;
 }

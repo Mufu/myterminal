@@ -9,7 +9,7 @@ import {
   usageTitle,
   validateCliSetting,
 } from '../src/shared/cli-auth';
-import { chipLabel } from '../src/renderer/cli-status-view';
+import { chipLabel, statusUsable } from '../src/renderer/cli-status-view';
 
 /** 這台機器上 `claude auth status` 真的印出來的那一行 (只留下會用到的欄位)。*/
 const MAX_LOGIN =
@@ -110,6 +110,19 @@ describe('chipLabel', () => {
     expect(chipLabel('Claude', parseClaudeAuth(MAX_LOGIN))).toBe('Claude · Max 訂閱');
     expect(chipLabel('Codex', parseCodexAuth('Not logged in'))).toBe('Codex · 未登入');
     expect(chipLabel('Codex', undefined)).toBe('Codex · 檢查中…');
+  });
+
+  /** 工作階段是拿那把金鑰跑的，所以晟片上要寫金鑰，不是 CLI 自己的登入狀態。*/
+  it('選了 API 金鑰而且存得住時以設定為準', () => {
+    const auth = parseClaudeAuth(MAX_LOGIN);
+    expect(chipLabel('Claude', auth, { mode: 'apiKey', hasKey: true })).toBe('Claude · API 金鑰');
+    expect(statusUsable(auth, { mode: 'apiKey', hasKey: true })).toBe(true);
+  });
+
+  it('選了 API 金鑰但一把都沒存時，還是看探測結果', () => {
+    const auth = parseCodexAuth('Not logged in');
+    expect(chipLabel('Codex', auth, { mode: 'apiKey', hasKey: false })).toBe('Codex · 未登入');
+    expect(statusUsable(auth, { mode: 'apiKey', hasKey: false })).toBe(false);
   });
 });
 

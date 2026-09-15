@@ -141,9 +141,14 @@
         </header>
         <ul id="workflow-list"></ul>
 
-        <footer id="cli-status">
+        <footer id="cli-status" title="CLI 設定：登入或 API 金鑰">
           <span id="cli-claude" class="cli-chip"></span>
           <span id="cli-codex" class="cli-chip"></span>
+          <span id="cli-muse" class="cli-chip"></span>
+          <span id="cli-opencode" class="cli-chip"></span>
+          <button id="btn-cli-settings" type="button" title="CLI 設定" aria-label="CLI 設定">
+            ⚙
+          </button>
         </footer>
       </aside>
     </div>
@@ -269,6 +274,141 @@
         <menu>
           <button id="w-ok" value="ok" type="submit" class="primary">開始</button>
           <button id="w-cancel" value="cancel" type="submit" formnovalidate>取消</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <dialog id="cli-settings">
+      <form method="dialog" novalidate>
+        <h2>CLI 設定</h2>
+        <p class="cli-hint">
+          選「登入」就用那支 CLI 自己的帳號；選「API 金鑰」時金鑰會加密存在本機，
+          只以環境變數送進該支 CLI 的工作階段。
+        </p>
+
+        <section class="cli-row" data-cli="claude">
+          <header>
+            <h3>Claude</h3>
+            <span id="cli-claude-status" class="cli-row-status"></span>
+          </header>
+          <div class="cli-modes">
+            <label>
+              <input id="cli-claude-mode-login" type="radio" name="cli-claude-mode" value="login" />
+              登入
+            </label>
+            <label>
+              <input id="cli-claude-mode-apiKey" type="radio" name="cli-claude-mode" value="apiKey" />
+              API 金鑰
+            </label>
+          </div>
+          <label class="cli-key">
+            ANTHROPIC_API_KEY
+            <input id="cli-claude-key" type="password" autocomplete="off" />
+          </label>
+          <menu>
+            <button id="cli-claude-save" type="button" class="primary">儲存</button>
+            <button id="cli-claude-login" type="button">登入</button>
+            <button id="cli-claude-clear" type="button">清除金鑰</button>
+          </menu>
+        </section>
+
+        <section class="cli-row" data-cli="codex">
+          <header>
+            <h3>Codex</h3>
+            <span id="cli-codex-status" class="cli-row-status"></span>
+          </header>
+          <div class="cli-modes">
+            <label>
+              <input id="cli-codex-mode-login" type="radio" name="cli-codex-mode" value="login" />
+              登入
+            </label>
+            <label>
+              <input id="cli-codex-mode-apiKey" type="radio" name="cli-codex-mode" value="apiKey" />
+              API 金鑰
+            </label>
+          </div>
+          <label class="cli-key">
+            OPENAI_API_KEY
+            <input id="cli-codex-key" type="password" autocomplete="off" />
+          </label>
+          <p class="cli-hint">存過 ChatGPT 登入時它優先，要用金鑰請先在終端機跑 codex logout。</p>
+          <menu>
+            <button id="cli-codex-save" type="button" class="primary">儲存</button>
+            <button id="cli-codex-login" type="button">登入</button>
+            <button id="cli-codex-clear" type="button">清除金鑰</button>
+          </menu>
+        </section>
+
+        <section class="cli-row" data-cli="muse">
+          <header>
+            <h3>Muse</h3>
+            <span id="cli-muse-status" class="cli-row-status"></span>
+          </header>
+          <div class="cli-modes">
+            <label>
+              <input id="cli-muse-mode-login" type="radio" name="cli-muse-mode" value="login" />
+              登入
+            </label>
+            <label>
+              <input id="cli-muse-mode-apiKey" type="radio" name="cli-muse-mode" value="apiKey" />
+              API 金鑰
+            </label>
+          </div>
+          <label class="cli-key">
+            META_API_KEY
+            <input id="cli-muse-key" type="password" autocomplete="off" />
+          </label>
+          <menu>
+            <button id="cli-muse-save" type="button" class="primary">儲存</button>
+            <button id="cli-muse-login" type="button">登入</button>
+            <button id="cli-muse-clear" type="button">清除金鑰</button>
+          </menu>
+        </section>
+
+        <section class="cli-row" data-cli="opencode">
+          <header>
+            <h3>OpenCode</h3>
+            <span id="cli-opencode-status" class="cli-row-status"></span>
+          </header>
+          <div class="cli-modes">
+            <!-- OpenCode 沒有自己的登入流程，只有 API 金鑰。 -->
+            <label>
+              <input
+                id="cli-opencode-mode-apiKey"
+                type="radio"
+                name="cli-opencode-mode"
+                value="apiKey"
+              />
+              API 金鑰
+            </label>
+          </div>
+          <label>
+            供應商
+            <select id="cli-opencode-provider">
+              <option value="anthropic">Anthropic</option>
+              <option value="openai">OpenAI</option>
+              <option value="google">Google</option>
+              <option value="openrouter">OpenRouter</option>
+            </select>
+          </label>
+          <label class="cli-key">
+            API 金鑰
+            <input id="cli-opencode-key" type="password" autocomplete="off" />
+          </label>
+          <label>
+            型號 <input id="cli-opencode-model" type="text" placeholder="留空讓 opencode 自己挑" />
+          </label>
+          <p class="cli-hint">用 opencode models &lt;provider&gt; 查型號。</p>
+          <menu>
+            <button id="cli-opencode-save" type="button" class="primary">儲存</button>
+            <button id="cli-opencode-clear" type="button">清除金鑰</button>
+          </menu>
+        </section>
+
+        <p id="cli-errors" class="errors"></p>
+
+        <menu>
+          <button id="cli-close" value="cancel" type="submit">關閉</button>
         </menu>
       </form>
     </dialog>

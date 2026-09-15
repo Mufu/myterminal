@@ -8,6 +8,7 @@ import { ProfileListView } from './profile-list-view';
 import { WorkflowListView } from './workflow-list-view';
 import { CliStatusView } from './cli-status-view';
 import { NewConnectionDialog } from './new-connection-dialog';
+import { CliSettingsDialog } from './cli-settings-dialog';
 import { WorkflowRunDialog } from './workflow-run-dialog';
 import { InputPanel } from './input-panel';
 import { Toolbar } from './toolbar';
@@ -31,6 +32,7 @@ import {
   SaveWorkflowCommand,
   DeleteWorkflowCommand,
   SaveAndRunWorkflowCommand,
+  OpenCliSettingsCommand,
   errorText,
 } from './commands';
 import { WorkflowEditorModel } from './workflow-editor-model';
@@ -291,7 +293,27 @@ new WorkflowListView(
   (sessionId) => state.setActive(sessionId),
 );
 
-new CliStatusView($<HTMLElement>('cli-claude'), $<HTMLElement>('cli-codex'), state);
+new CliStatusView(
+  {
+    claude: $<HTMLElement>('cli-claude'),
+    codex: $<HTMLElement>('cli-codex'),
+    muse: $<HTMLElement>('cli-muse'),
+    opencode: $<HTMLElement>('cli-opencode'),
+  },
+  state,
+);
+
+/**
+ * 「CLI 設定」。登入開出來的是 main 自己建的工作階段，所以 invoke 回來之後
+ * 重新問一次清單再切過去 —— created 事件與這個回覆走不同的 IPC 佇列，
+ * 順序沒有保證，直接 setActive 可能切不過去。
+ */
+const cliSettingsDialog = new CliSettingsDialog(state, api, async (sessionId) => {
+  state.setSessions(await api.list());
+  state.setActive(sessionId);
+});
+const openCliSettings = new OpenCliSettingsCommand(cliSettingsDialog);
+$<HTMLElement>('cli-status').addEventListener('click', () => openCliSettings.execute());
 
 // 順序有意義：先把畫布收起來，syncTerminals 才量得到終端機的寬度。
 state.subscribe(syncView);
@@ -299,6 +321,8 @@ state.subscribe(syncTerminals);
 api.onSessionsChanged((sessions) => state.setSessions(sessions));
 api.onProfilesChanged((profiles) => state.setProfiles(profiles));
 api.onWorkflowChanged((runs) => state.setRuns(runs));
+// 登入流程跑完之後 main 重探的結果。
+api.onCliAuthChanged((auth) => state.setCliAuth(auth));
 api.onData(({ id, data }) => {
   const view = terminals.get(id);
   if (view) view.write(data);
@@ -316,4 +340,6 @@ void api.cliAuth().then((auth) => {
   state.setCliAuth(auth);
   workflowDialog.setBillingMode(auth.claude.mode);
 });
+// 使用者自己選的登入方式：晶片上的字以它為準 (選了金鑰就是拿金鑰在跑)。
+void api.cliSettings().then((settings) => state.setCliSettings(settings));
 void refreshWorkflows();
