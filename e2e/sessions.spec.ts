@@ -164,6 +164,52 @@ test('Claude 互動工作階段：TUI 起得來，✕ 關得掉，app 還活著'
   await app.close();
 });
 
+test('Muse 互動工作階段：TUI 起得來，✕ 關得掉，app 還活著', async () => {
+  test.setTimeout(150_000);
+  const { app, window, dialogs } = await open();
+
+  // Muse Code 在 Windows 上有原生安裝 (%LOCALAPPDATA%\Programs\muse)，
+  // 所以基礎 shell 就是 PowerShell。
+  await newSession(window, 'muse', async () => {
+    await window.selectOption('#f-base-shell', 'powershell');
+  });
+
+  // 沒有憑證時 muse 起來是「Log in with browser / Set an API key」那一頁，
+  // 有憑證時是輸入框；兩種都會先印版本橫幅，所以等的是它。
+  await expect(activeRows(window)).toContainText(/Muse Code \d/, { timeout: 120_000 });
+  await shot(window, 'muse');
+
+  await window.locator('.session-item', { hasText: 'Muse' }).locator('.session-close').click();
+  await expect(window.locator('.session-item')).toHaveCount(0);
+  await expect(window.locator('#empty-hint')).toBeVisible();
+
+  await expectAlive(app, window);
+  expect(dialogs).toEqual([]);
+  await app.close();
+});
+
+test('OpenCode 互動工作階段：TUI 起得來，✕ 關得掉，app 還活著', async () => {
+  test.setTimeout(150_000);
+  const { app, window, dialogs } = await open();
+
+  await newSession(window, 'opencode', async () => {
+    await window.selectOption('#f-base-shell', 'powershell');
+  });
+
+  // 沒有憑證 (opencode auth list 是 0) 也照樣進得了 TUI，
+  // 下面那條輸入提示與底部的快捷鍵列一定會畫出來。
+  await expect(activeRows(window)).toContainText(/Ask anything|tab agents/, { timeout: 120_000 });
+  await shot(window, 'opencode');
+
+  await window.locator('.session-item', { hasText: 'OpenCode' }).locator('.session-close').click();
+  await expect(window.locator('.session-item')).toHaveCount(0);
+  await expect(window.locator('#empty-hint')).toBeVisible();
+
+  await expectAlive(app, window);
+  expect(dialogs).toEqual([]);
+  await app.close();
+});
+
 test('Codex 互動工作階段：TUI 起得來，✕ 關得掉，app 還活著', async () => {
   test.setTimeout(150_000);
   const { app, window, dialogs } = await open();
