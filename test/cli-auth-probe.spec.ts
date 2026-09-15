@@ -118,6 +118,13 @@ describe('probeCliAuth', () => {
     expect(status.muse.label).toBe('找不到指令');
   });
 
+  /** 繁中 Windows 的 cmd.exe 找不到命令時回 1，不是 9009。*/
+  it('muse --version 只要不是 0 就是沒裝，不必猜 cmd.exe 的離開碼', async () => {
+    museFile = JSON.stringify({ providers: { meta: { api_key: 'x' } } });
+    const status = await probe({ muse: (c) => c.emitExit(1) });
+    expect(status.muse.label).toBe('找不到指令');
+  });
+
   it('其他非零離開碼只能說無法判斷', async () => {
     const status = await probe({
       claude: (c) => {

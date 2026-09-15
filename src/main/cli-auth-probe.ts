@@ -52,8 +52,13 @@ export function probeCliAuth(
     probe(spawner, { file: 'cmd.exe', args: ['/c', 'codex', 'login', 'status'], cwd }, parseCodexAuth),
     // Muse 沒有「看登入狀態」的指令，所以先用 --version 確認裝了沒有，
     // 再讀它存憑證的檔案判斷是帳號登入還是 API 金鑰。
-    probe(spawner, { file: 'cmd.exe', args: ['/c', 'muse', '--version'], cwd }, () =>
-      parseMuseAuth(readFile(museAuthPath())),
+    // --version 本身不會失敗，所以只要不是 0 就是沒裝 —— cmd.exe 找不到命令的
+    // 離開碼跟 Windows 語系有關 (這台繁中機器是 1，不是 9009)，不能只靠 9009。
+    probe(
+      spawner,
+      { file: 'cmd.exe', args: ['/c', 'muse', '--version'], cwd },
+      () => parseMuseAuth(readFile(museAuthPath())),
+      true,
     ),
     probe(spawner, { file: 'cmd.exe', args: ['/c', 'opencode', 'auth', 'list'], cwd }, (stdout) =>
       parseOpencodeAuth(stdout, hasStoredKey('opencode')),
@@ -65,6 +70,8 @@ function probe(
   spawner: IProcessSpawner,
   spec: ProcessSpec,
   parse: (stdout: string) => CliAuth,
+  /** 這個命令跑不起來就等於「沒裝」(只有拿來確認存在的 muse --version 是這樣)。*/
+  missingOnFailure = false,
 ): Promise<CliAuth> {
   return new Promise<CliAuth>((resolve) => {
     let stdout = '';
@@ -97,7 +104,9 @@ function probe(
         return;
       }
       // spawn 失敗是 ENOENT (見 NodeProcessSpawner)，cmd.exe 找不到命令則是 9009。
-      finish(stderr.includes('ENOENT') || exitCode === CMD_NOT_FOUND ? MISSING : UNKNOWN_AUTH);
+      const missing =
+        missingOnFailure || stderr.includes('ENOENT') || exitCode === CMD_NOT_FOUND;
+      finish(missing ? MISSING : UNKNOWN_AUTH);
     });
   }).catch(() => UNKNOWN_AUTH);
 }
