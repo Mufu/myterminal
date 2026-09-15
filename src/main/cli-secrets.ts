@@ -1,4 +1,5 @@
 import type { ApiProvider, CliAuthSetting, CliId } from '../shared/cli-auth';
+import { OPENCODE_FREE_MODEL, OPENCODE_FREE_PROVIDER } from '../shared/cli-auth';
 import type { BaseShell } from '../shared/profile';
 import type { CliAuthStore } from './cli-auth-store';
 import type { CliInjection, CliSecrets } from './shell-factory';
@@ -9,11 +10,12 @@ import type { CliInjection, CliSecrets } from './shell-factory';
  * GOOGLE_GENERATIVE_AI_API_KEY / GEMINI_API_KEY)，但真正被 AI SDK 讀走的是
  * GOOGLE_GENERATIVE_AI_API_KEY，所以設這一個最保險。
  */
-const PROVIDER_ENV: Record<ApiProvider, string> = {
+const PROVIDER_ENV: Partial<Record<ApiProvider, string>> = {
   anthropic: 'ANTHROPIC_API_KEY',
   openai: 'OPENAI_API_KEY',
   google: 'GOOGLE_GENERATIVE_AI_API_KEY',
   openrouter: 'OPENROUTER_API_KEY',
+  // opencode 自家的免費模型不必金鑰，所以沒有對應的環境變數。
 };
 
 /** Windows 的環境變數不會自動進 WSL，要列在 WSLENV 裡才會被帶過去。*/
@@ -52,10 +54,14 @@ export function cliInjection(
 
     case 'opencode': {
       const { provider } = setting;
-      const name = setting.model?.trim();
+      // 免費模型那一家不必填型號，沒填就用實測跑得起來的那一個。
+      const name =
+        setting.model?.trim() ||
+        (provider === OPENCODE_FREE_PROVIDER ? OPENCODE_FREE_MODEL : undefined);
       const model = provider && name ? `${provider}/${name}` : undefined;
+      const envName = provider ? PROVIDER_ENV[provider] : undefined;
       return {
-        env: secret && provider ? { [PROVIDER_ENV[provider]]: secret } : {},
+        env: secret && envName ? { [envName]: secret } : {},
         startupCommand: model ? `opencode -m ${model}` : undefined,
         model,
       };

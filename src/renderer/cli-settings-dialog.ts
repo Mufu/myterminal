@@ -1,5 +1,5 @@
 import type { ApiProvider, CliAuthSetting, CliId } from '../shared/cli-auth';
-import { CLI_IDS, defaultCliMode } from '../shared/cli-auth';
+import { CLI_IDS, OPENCODE_FREE_MODEL, defaultCliMode, providerNeedsKey } from '../shared/cli-auth';
 import type { SaveCliSettingRequest } from '../shared/ipc';
 import type { MyTerminalApi } from '../shared/api';
 import type { AppState } from './app-state';
@@ -49,6 +49,10 @@ export class CliSettingsDialog implements DialogPort {
       maybe<HTMLInputElement>(`cli-${id}-mode-${mode}`)?.addEventListener('change', () =>
         this.syncRow(id),
       );
+    }
+    // 換供應商會換掉「要不要金鑰」與型號的預設值。
+    if (id === 'opencode') {
+      $('cli-opencode-provider').addEventListener('change', () => this.syncRow(id));
     }
 
     maybe<HTMLButtonElement>(`cli-${id}-login`)?.addEventListener('click', () => {
@@ -121,7 +125,13 @@ export class CliSettingsDialog implements DialogPort {
     if (login) login.disabled = apiKeyMode;
     $<HTMLButtonElement>(`cli-${id}-clear`).disabled = !this.setting(id)?.hasKey;
     if (id === 'opencode') {
-      $<HTMLSelectElement>('cli-opencode-provider').disabled = !apiKeyMode;
+      const provider = $<HTMLSelectElement>('cli-opencode-provider');
+      provider.disabled = !apiKeyMode;
+      // 免費模型那一家不必金鑰，那一格就收起來；型號則先填上預設的那一個。
+      const needsKey = providerNeedsKey(provider.value as ApiProvider);
+      $('cli-opencode-key-row').hidden = !needsKey;
+      const model = $<HTMLInputElement>('cli-opencode-model');
+      if (!needsKey && !model.value.trim()) model.value = OPENCODE_FREE_MODEL;
     }
   }
 

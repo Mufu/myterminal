@@ -98,6 +98,13 @@ test('OpenCode 只有 API 金鑰，沒有「登入」；Muse 兩種基礎 shell 
   await window.click('#cli-opencode-save');
   await expect(window.locator('#cli-errors')).toHaveText('請輸入 API 金鑰');
 
+  // 免費模型那一家不必金鑰：那一格收起來、型號自動填好，空著也存得進去。
+  await window.selectOption('#cli-opencode-provider', 'opencode');
+  await expect(window.locator('#cli-opencode-key-row')).toBeHidden();
+  await expect(window.locator('#cli-opencode-model')).toHaveValue('mimo-v2.5-free');
+  await window.click('#cli-opencode-save');
+  await expect(window.locator('#cli-errors')).toHaveText('');
+
   await shot(window, 'opencode');
   await window.click('#cli-close');
   await expect(window.locator('#cli-settings')).toBeHidden();

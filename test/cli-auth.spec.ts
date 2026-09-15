@@ -1,10 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import {
+  API_PROVIDERS,
+  OPENCODE_FREE_MODEL,
+  OPENCODE_FREE_PROVIDER,
   loginProfile,
   parseClaudeAuth,
   parseCodexAuth,
   parseMuseAuth,
   parseOpencodeAuth,
+  providerNeedsKey,
   usageLabel,
   usageTitle,
   validateCliSetting,
@@ -224,5 +228,30 @@ describe('validateCliSetting', () => {
     expect(
       validateCliSetting({ id: 'opencode', mode: 'apiKey', apiKey: 'k', provider: 'google' }, false),
     ).toEqual([]);
+  });
+
+  /** opencode 自家的免費模型不必金鑰，所以那一格是空的也存得起來。*/
+  it('OpenCode 的免費模型不必填金鑰', () => {
+    expect(
+      validateCliSetting({ id: 'opencode', mode: 'apiKey', provider: OPENCODE_FREE_PROVIDER }, false),
+    ).toEqual([]);
+  });
+});
+
+describe('OpenCode 的供應商清單', () => {
+  it('自家的免費模型也是一個選項', () => {
+    const free = API_PROVIDERS.find((provider) => provider.id === OPENCODE_FREE_PROVIDER);
+    expect(free?.label).toBe('OpenCode 免費模型（不需金鑰）');
+  });
+
+  it('只有免費那一家不必金鑰', () => {
+    expect(providerNeedsKey(OPENCODE_FREE_PROVIDER)).toBe(false);
+    for (const { id } of API_PROVIDERS.filter((p) => p.id !== OPENCODE_FREE_PROVIDER)) {
+      expect(providerNeedsKey(id)).toBe(true);
+    }
+  });
+
+  it('免費模型的型號就是實測跑得起來的那一個', () => {
+    expect(`${OPENCODE_FREE_PROVIDER}/${OPENCODE_FREE_MODEL}`).toBe('opencode/mimo-v2.5-free');
   });
 });

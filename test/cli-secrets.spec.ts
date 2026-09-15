@@ -52,6 +52,13 @@ describe('cliInjection 的環境變數對應', () => {
   it('沒選供應商時 OpenCode 不注入任何東西', () => {
     expect(cliInjection('opencode', apiKey(), KEY, 'powershell').env).toEqual({});
   });
+
+  /** 免費模型是 opencode 自家的，沒有對應的環境變數；存過的金鑰也不該被帶進去。*/
+  it('選了免費模型時什麼都不注入', () => {
+    expect(cliInjection('opencode', apiKey({ provider: 'opencode' }), KEY, 'powershell').env).toEqual(
+      {},
+    );
+  });
 });
 
 describe('cliInjection 的登入模式', () => {
@@ -84,6 +91,25 @@ describe('cliInjection 的 OpenCode 型號', () => {
   it('沒設型號就不改寫 (讓 opencode 自己挑)', () => {
     const injection = cliInjection('opencode', apiKey({ provider: 'google' }), KEY, 'powershell');
     expect(injection.startupCommand).toBeUndefined();
+  });
+
+  it('免費模型不必填型號 —— 沒填就是實測跑得起來的那一個', () => {
+    const setting: CliAuthSetting = { mode: 'apiKey', hasKey: false, provider: 'opencode' };
+    const injection = cliInjection('opencode', setting, undefined, 'powershell');
+    expect(injection.model).toBe('opencode/mimo-v2.5-free');
+    expect(injection.startupCommand).toBe('opencode -m opencode/mimo-v2.5-free');
+  });
+
+  it('免費那一家也可以自己指定別的型號', () => {
+    const setting: CliAuthSetting = {
+      mode: 'apiKey',
+      hasKey: false,
+      provider: 'opencode',
+      model: 'grok-code',
+    };
+    expect(cliInjection('opencode', setting, undefined, 'powershell').model).toBe(
+      'opencode/grok-code',
+    );
   });
 
   it('型號跟金鑰無關：沒存金鑰也照樣指定型號', () => {

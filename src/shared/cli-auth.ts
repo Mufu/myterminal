@@ -16,15 +16,25 @@ export const CLI_IDS = CLI_TYPES;
 /** 使用者為某支 CLI 選的登入方式。*/
 export type AuthMode = 'login' | 'apiKey';
 
-/** OpenCode 的金鑰要放進哪一家的環境變數。*/
-export type ApiProvider = 'anthropic' | 'openai' | 'google' | 'openrouter';
+/** OpenCode 的金鑰要放進哪一家的環境變數；'opencode' 是它自家那幾個免費模型。*/
+export type ApiProvider = 'anthropic' | 'openai' | 'google' | 'openrouter' | 'opencode';
+
+/** opencode 自家的供應商：模型免費，所以這一家不必金鑰。*/
+export const OPENCODE_FREE_PROVIDER = 'opencode';
+/** 免費模型的預設型號 (實測跑得起來的那一個)，組起來是 opencode/mimo-v2.5-free。*/
+export const OPENCODE_FREE_MODEL = 'mimo-v2.5-free';
 
 export const API_PROVIDERS: readonly { id: ApiProvider; label: string }[] = [
   { id: 'anthropic', label: 'Anthropic' },
   { id: 'openai', label: 'OpenAI' },
   { id: 'google', label: 'Google' },
   { id: 'openrouter', label: 'OpenRouter' },
+  { id: OPENCODE_FREE_PROVIDER, label: 'OpenCode 免費模型（不需金鑰）' },
 ];
+
+/** 這一家要不要金鑰；免費模型那一家不必。*/
+export const providerNeedsKey = (provider: ApiProvider): boolean =>
+  provider !== OPENCODE_FREE_PROVIDER;
 
 /**
  * OpenCode 沒有自己的登入流程 (`opencode auth list` 只認 API 金鑰)，
@@ -81,7 +91,9 @@ export function validateCliSetting(
   if (setting.mode === 'login' && !CLI_SUPPORTS_LOGIN[setting.id]) {
     errors.push(`${TYPE_LABELS[setting.id]} 只能使用 API 金鑰`);
   }
-  if (setting.mode === 'apiKey' && !setting.apiKey?.trim() && !hasKey) {
+  // 免費模型那一家不必金鑰，所以那一格空著也存得起來。
+  const needsKey = !setting.provider || providerNeedsKey(setting.provider);
+  if (setting.mode === 'apiKey' && needsKey && !setting.apiKey?.trim() && !hasKey) {
     errors.push('請輸入 API 金鑰');
   }
   if (setting.id === 'opencode' && setting.mode === 'apiKey' && !setting.provider) {
