@@ -115,9 +115,9 @@ AGENT_E2E_OK
   沒登入就會在終端機裡看到 `✘ 失敗：…`。右側面板最下面那一行就是 app 開機時
   問出來的結果，沒登入或找不到指令也會寫在那裡。
   在那裡存的 API 金鑰**無介面執行也吃得到**，跟互動式工作階段是同一份設定。
-  唯一的例外是 OpenCode 的免費模型（例如 `opencode/mimo-v2.5-free`）：
-  它不必金鑰，但那家供應商不在「CLI 設定」的清單裡，要用環境變數
-  `MYTERMINAL_OPENCODE_MODEL` 指定（它的優先度高於「CLI 設定」的型號）。
+  唯一不必金鑰的是 OpenCode 的免費模型：「CLI 設定」的供應商選
+  **「OpenCode 免費模型（不需金鑰）」**，型號留空就是 `opencode/mimo-v2.5-free`。
+  環境變數 `MYTERMINAL_OPENCODE_MODEL` 仍然可以覆蓋（它的優先度高於「CLI 設定」的型號）。
 - **接手**：任務跑起來之後，右側那一列滑過去會出現「接手」。
   按下去會開一個**真的互動式**工作階段（PowerShell 裡跑 `claude --resume <id>`、
   `codex resume <id>`、`muse resume <uuid>` 或 `opencode --session <id>`），
@@ -146,6 +146,15 @@ JSON schema、節點型別、怎麼加一種新節點，見
 （claude／codex）、角色與提示。按「儲存」就是一份跟內建範本同格式的自訂工作流
 （存進 `%APPDATA%\myterminal\workflows.json`），「儲存並執行」則是存完直接開
 執行對話框。用法與規則見 [`docs/WORKFLOW.md`](docs/WORKFLOW.md) 的「畫布編輯器」。
+
+畫布也是**監看畫面**：載入的那份工作流有執行時，每張節點卡片上就會寫著它的狀態
+（執行中／等待批准／完成／失敗／已取消／略過／等待）與用掉的額度，有工作階段的卡片給一顆
+**「輸出」**切過去看那個節點的終端機，停著等人的批准節點卡片上直接有**「批准」／「退回」**，
+編輯列上則是這次執行的狀態與累計用量（執行中還有「取消」）。「儲存並執行」之後會**留在畫布上**，
+可以看著卡片跑完；agent 節點跑起來之後，右側屬性面板會多出**「接手」**與「看輸出」。
+不過**執行中的節點沒辦法追問**——節點跑的是無介面模式，中途不吃輸入，要追問就用「接手」開一個
+真的互動式工作階段，或等那個節點跑完再問。細節見
+[`docs/WORKFLOW.md`](docs/WORKFLOW.md) 的「畫布上的執行檢視」。
 
 ![畫布編輯器](docs/UI-editor.png)
 
@@ -178,6 +187,7 @@ agent 節點可以指定**角色**（產品經理／架構師／工程師／測�
 清單上每個執行顯示名稱、狀態（執行中／等待批准／完成／失敗／已取消）、累計用量
 （訂閱帳號是估算，所以寫成 `≈$0.175`），以及一列一個節點的狀態點。
 等待批准時出現問題與「批准」「退回」，執行中出現「取消」。
+同一份執行在**畫布上**也看得到（見上面的畫布那一段）。
 
 注意事項：
 
@@ -209,7 +219,7 @@ agent 節點可以指定**角色**（產品經理／架構師／工程師／測�
 | Claude | `claude auth login` | `ANTHROPIC_API_KEY` |
 | Codex | `codex login` | `OPENAI_API_KEY` |
 | Muse | `muse login` | `META_API_KEY` |
-| OpenCode | 沒有 | 依供應商：`ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GOOGLE_GENERATIVE_AI_API_KEY` / `OPENROUTER_API_KEY` |
+| OpenCode | 沒有 | 依供應商：`ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GOOGLE_GENERATIVE_AI_API_KEY` / `OPENROUTER_API_KEY`；選「OpenCode 免費模型」則不必金鑰 |
 
 - **登入**：按那一列的「登入」會開一個普通的工作階段跑上面那條指令，
   瀏覽器那一段由你自己在裡面走完。工作階段結束時 app 會重新探一次登入狀態，
@@ -222,6 +232,8 @@ agent 節點可以指定**角色**（產品經理／架構師／工程師／測�
 **OpenCode 只有 API 金鑰**：它自己沒有登入流程（`opencode auth list` 只認憑證）。
 那一列多了「供應商」與「型號」；填了型號，啟動指令就變成
 `opencode -m <供應商>/<型號>`。型號可以用 `opencode models <供應商>` 查。
+供應商選 **「OpenCode 免費模型（不需金鑰）」** 時金鑰那一格會收起來 —— 那是 opencode
+自家的免費模型，型號留空就是 `mimo-v2.5-free`（組起來是 `opencode/mimo-v2.5-free`）。
 
 ### 金鑰存在哪裡
 

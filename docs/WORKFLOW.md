@@ -274,6 +274,31 @@ type WorkflowEdge = {
 - 存完「刪除」才會亮（只有自訂工作流刪得掉），而且執行對話框的「自訂」分組馬上看得到它。
 - **「儲存並執行」**＝存起來 + 打開執行對話框並預選這一個。
 
+### 畫布上的執行檢視
+
+畫布不只用來畫：**載入的那份工作流有執行時，畫布本身就是監看畫面**
+（右側清單那一份仍然在，兩邊看的是同一個 `RunState`）。挑的是還在跑的那一次；
+都跑完了就看最近開始的那一次。
+
+| 在哪裡 | 看得到什麼 |
+| --- | --- |
+| 每張節點卡片 | 狀態點與狀態（執行中／等待批准／完成／失敗／已取消／略過／等待）、那個節點用掉的額度。卡片本身多一個 `data-run-status` |
+| 有工作階段的卡片 | **「輸出」**：切回終端機畫面並顯示那個節點的終端機 |
+| 停著等人的批准節點 | 卡片上直接給 **「批准」／「退回」**（跟右側清單那兩顆是同一件事） |
+| 編輯列 | 一條執行摘要：狀態徽章、這次執行的累計用量、執行中時的「取消」 |
+| 屬性面板（agent 節點） | 節點跑起來之後多出 **「接手」**（開一個真的互動式 `claude --resume` / `codex resume` / `muse resume` / `opencode --session`）與「看輸出」 |
+
+**「儲存並執行」之後會留在畫布上**，可以直接看著卡片跑完；從右側清單開的執行不會切畫面。
+去看了某個節點的終端機之後按「編輯」回來，畫布上還是同一份工作流、覆蓋層也還在
+（畫布上沒有執行時，「編輯」仍然是開一張新的）。
+
+> **執行中的節點沒辦法追問。** 節點跑的是 CLI 的**無介面**模式（`claude -p`、`codex exec`…），
+> 它不吃中途的輸入 —— 要接著問就用「接手」開一個真的互動式工作階段，或是等那個節點跑完
+> 再從接手的工作階段問下去。卡片上的「輸出」只是切過去**看**，不是輸入。
+
+覆蓋層只加／刪自己那幾個元素（`.wf-run`、`.wf-run-actions`），
+不動 `WorkflowEditorModel` —— 看執行狀況不算編輯，工作流不會因此變髒。
+
 ### 程式碼
 
 沒有用任何畫布／流程圖套件：節點是絕對定位的 `<div>`，連線是一層 `<svg>` 裡的
@@ -283,11 +308,14 @@ type WorkflowEdge = {
 | --- | --- |
 | [`workflow-editor-model.ts`](../src/renderer/workflow-editor-model.ts) | 狀態與規則：id、座標吸附、接線合不合法、刪節點要清掉什麼、接點座標。跟 `AppState` 同一套 Observer，**完全不碰 DOM** |
 | [`workflow-editor-view.ts`](../src/renderer/workflow-editor-view.ts) | DOM 殼：卡片、連線、屬性面板、滑鼠與鍵盤 |
-| [`commands.ts`](../src/renderer/commands.ts) | 開啟／關閉／儲存／刪除／儲存並執行，各一個 `ICommand` |
+| [`workflow-run-view.ts`](../src/renderer/workflow-run-view.ts) | 執行檢視：挑哪一次執行（`latestRunFor`）與一張卡片上要寫什麼（`cardOverlay`）是純函式，`RunOverlay` 只負責畫 |
+| [`commands.ts`](../src/renderer/commands.ts) | 開啟／關閉／儲存／刪除／儲存並執行／切換工作階段，各一個 `ICommand` |
 
-規則都在 model 裡，所以 vitest 的 node 環境測得到
-（`test/workflow-editor-model.spec.ts`）；畫面與滑鼠則由
-`e2e/editor.spec.ts` 顧（不呼叫任何 CLI，所以不花錢）。
+規則都在 model 與那兩個純函式裡，所以 vitest 的 node 環境測得到
+（`test/workflow-editor-model.spec.ts`、`test/workflow-run-view.spec.ts`）；
+畫面與滑鼠則由 `e2e/editor.spec.ts` 與 `e2e/editor-deep.spec.ts` 顧
+（不呼叫任何 CLI，所以不花錢），執行檢視由 `e2e/editor-run.spec.ts` 顧
+（用 OpenCode 的免費模型，只要網路、不要金鑰）。
 
 ## 執行時的狀態
 
@@ -353,7 +381,8 @@ CLI 回報的 `total_cost_usd` **不一定是錢**：用訂閱登入（claude.ai
 
 所以它有終端機、看得到輸出、能開紀錄、**也能「接手」**（CLI 回報 session id 之後
 那一列會出現「接手」按鈕，按下去開一個真的互動式 `claude --resume <id>`）。
-工作流清單裡點節點那一列，就是切到那個工作階段的終端機。
+工作流清單裡點節點那一列，就是切到那個工作階段的終端機；
+畫布上那張卡片的「輸出」也是同一件事（見上面的[畫布上的執行檢視](#畫布上的執行檢視)）。
 
 ## 中斷與接續
 

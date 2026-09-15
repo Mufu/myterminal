@@ -23,7 +23,9 @@ myterminal 的自動測試分四層，由便宜到昂貴。前三層不需要任
 - 每次 Playwright 執行都會先清空 `test-results/`。
 - 工作目錄一律用真實長路徑，不要用 8.3 短路徑（`C:\Users\ROBERT~1\…`），無介面的 `claude` 會拒絕在那裡寫檔。
 - 需要帳號或環境的 spec 用環境變數當開關（`MYTERMINAL_SSH_E2E`、`MYTERMINAL_AGENT_E2E`、
-  `MYTERMINAL_AGENT_E2E_CODEX`、`MYTERMINAL_WORKFLOW_E2E`），沒設就 `test.skip`。
+  `MYTERMINAL_AGENT_E2E_CODEX`、`MYTERMINAL_AGENT_E2E_OPENCODE`、`MYTERMINAL_WORKFLOW_E2E`），
+  沒設就 `test.skip`。`MYTERMINAL_AGENT_E2E_OPENCODE` 那兩個只要網路：用的是免費模型
+  `opencode/mimo-v2.5-free`（`MYTERMINAL_OPENCODE_MODEL` 指定）。
 
 ## e2e spec 一覽
 
@@ -39,6 +41,7 @@ myterminal 的自動測試分四層，由便宜到昂貴。前三層不需要任
 | `theme.spec.ts` | 3 | 無 | 淺色、暖色、重啟後記得 |
 | `editor.spec.ts` | 1 | 無 | 畫布拉一個流程、接線、存檔、出現在執行對話框 |
 | `editor-deep.spec.ts` | 13 | 無 | 範本另存副本與刪除、換線、刪節點連帶清參照、Delete 在輸入框不刪節點、條件 / 批准屬性重啟後還在、驗證錯誤、儲存並執行、回終端機、未儲存確認、執行對話框驗證、工作目錄不存在的錯誤 |
+| `editor-run.spec.ts` | 1 | `MYTERMINAL_AGENT_E2E_OPENCODE` | 畫布上的執行檢視：儲存並執行後留在畫布、卡片顯示執行中→完成、卡片的「輸出」切到節點的終端機、回畫布後覆蓋層還在、屬性面板的接手 / 看輸出、卡片上的批准。只要網路不要金鑰（OpenCode 免費模型） |
 | `ssh.spec.ts` | 1 | `MYTERMINAL_SSH_E2E` | 登入本機 sshd、執行指令、離線 |
 | `agent.spec.ts` | 4 | `MYTERMINAL_AGENT_E2E`（codex／opencode／muse 另需 `_CODEX`／`_OPENCODE`／`_MUSE`） | 四支 CLI 各跑一次 Agent 任務；claude／codex 還會接手。opencode 那個只要網路不要金鑰，muse 那個在開發機上跑不了（沒有 Meta 憑證） |
 | `workflow.spec.ts` | 2 | `MYTERMINAL_WORKFLOW_E2E` | 範本跑到批准後完成；重啟後仍可批准 |

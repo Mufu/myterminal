@@ -398,6 +398,10 @@ Anthropic／OpenAI／Google／OpenRouter 四家，寫不出 `opencode/mimo-v2.5-
 「CLI 設定」），e2e 就是靠它把免費模型帶進去的。`OPENCODE_MODEL` 沒有用（試過，
 opencode 不讀）。
 
+> 後來供應商清單補了第五個選項 **「OpenCode 免費模型（不需金鑰）」**（`provider: 'opencode'`，
+> 型號留空就是 `mimo-v2.5-free`），所以一般使用者在「CLI 設定」裡就選得到免費模型，
+> 不必再靠環境變數；環境變數保留給 e2e（它仍然優先）。
+
 ### Muse 沒有驗到的
 
 這台機器**既沒有 `muse login` 也沒有 `META_API_KEY`**，所以 meta provider 一次都沒跑過。
