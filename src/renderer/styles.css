@@ -1429,6 +1429,11 @@ html[data-theme='warm'] .session-item.active .session-dot {
   font-size: 13px;
 }
 
+/* 上面那條 display 會蓋掉 hidden 的預設值 (免費模型那一列沒有金鑰欄)。*/
+#cli-settings label[hidden] {
+  display: none;
+}
+
 #new-connection input,
 #new-connection select,
 #new-connection textarea,
@@ -1613,6 +1618,48 @@ html[data-theme='warm'] .session-item.active .session-dot {
   border-color: var(--accent);
 }
 
+/* 編輯列上的執行摘要：載入的工作流有執行時才出現。*/
+#editor-run {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-family: var(--meta-font);
+  font-size: var(--meta-size);
+  letter-spacing: var(--meta-tracking);
+  color: var(--muted);
+}
+
+#editor-run[hidden] {
+  display: none;
+}
+
+#editor-run .workflow-cost {
+  color: var(--dim);
+}
+
+#editor-run .workflow-error {
+  max-width: 220px;
+}
+
+#editor-run .wf-run-cancel {
+  height: 22px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--selected);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--meta-size);
+  letter-spacing: var(--meta-tracking);
+  cursor: pointer;
+}
+
+#editor-run .wf-run-cancel:hover {
+  background: var(--dialog-hover-bg);
+}
+
 #editor-errors {
   flex: none;
   padding: 6px var(--toolbar-pad-x);
@@ -1770,6 +1817,88 @@ html[data-theme='warm'] .session-item.active .session-dot {
   color: var(--muted);
 }
 
+/* ---- 卡片上的執行檢視：狀態、用量、輸出、批准／退回 ---- */
+.wf-run {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px 6px;
+  font-family: var(--meta-font);
+  font-size: var(--meta-size);
+  letter-spacing: var(--meta-tracking);
+  color: var(--muted);
+}
+
+.wf-run .session-dot {
+  flex: none;
+}
+
+.wf-run-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wf-run-cost {
+  color: var(--dim);
+}
+
+/* 執行中的卡片框起來，一眼看得出流程走到哪裡。*/
+.wf-node[data-run-status='running'] {
+  border-color: var(--accent);
+}
+
+.wf-node[data-run-status='failed'] {
+  border-color: var(--recording);
+}
+
+.wf-open-terminal,
+.wf-run-actions button {
+  height: 20px;
+  padding: 0 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--selected);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--tag-size);
+  letter-spacing: var(--tag-tracking);
+  cursor: pointer;
+}
+
+.wf-open-terminal {
+  margin-left: auto;
+}
+
+.wf-open-terminal:hover,
+.wf-run-actions button:hover {
+  background: var(--dialog-hover-bg);
+}
+
+.wf-run-actions {
+  display: flex;
+  gap: 6px;
+  padding: 0 8px 8px;
+}
+
+.wf-run-actions button {
+  flex: 1;
+  height: 22px;
+}
+
+.wf-run-actions .wf-approve {
+  border-color: transparent;
+  background: var(--primary-bg);
+  color: var(--primary-fg);
+  font-weight: var(--primary-weight);
+}
+
+.wf-run-actions .wf-approve:hover {
+  background: var(--primary-hover-bg);
+  color: var(--primary-hover-fg);
+}
+
 /* 接點：圓心就是 portAnchor 算出來的那一點。*/
 .wf-port {
   position: absolute;
@@ -1874,6 +2003,31 @@ html[data-theme='warm'] .session-item.active .session-dot {
 #editor-props textarea:focus {
   outline: none;
   border-color: var(--accent);
+}
+
+/* 屬性面板下方的「接手」「看輸出」。*/
+.props-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.props-actions button {
+  flex: 1;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--selected);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--meta-size);
+  letter-spacing: var(--meta-tracking);
+  cursor: pointer;
+}
+
+.props-actions button:hover {
+  background: var(--dialog-hover-bg);
 }
 
 #editor-props input[type='checkbox'] {

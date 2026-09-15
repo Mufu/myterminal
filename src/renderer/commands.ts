@@ -179,6 +179,21 @@ export class TakeOverCommand implements ICommand {
   }
 }
 
+/**
+ * 點畫布卡片上的「輸出」：切回終端機畫面並顯示那個節點的工作階段。
+ * 右側清單那一列不必切畫面 (它本來就在終端機那一側)，所以只有畫布用它。
+ */
+export class SelectSessionCommand implements ICommand {
+  constructor(
+    private readonly state: AppState,
+    private readonly sessionId: string,
+  ) {}
+  execute(): void {
+    this.state.showTerminal();
+    this.state.setActive(this.sessionId);
+  }
+}
+
 /** 「執行工作流」對話框按下開始：把工作流與參數交給 main，之後全部走 workflow:changed。*/
 export class StartWorkflowCommand implements ICommand {
   constructor(

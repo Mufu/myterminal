@@ -27,6 +27,7 @@ import {
   StartWorkflowCommand,
   ResumeWorkflowCommand,
   CancelWorkflowCommand,
+  SelectSessionCommand,
   OpenEditorCommand,
   CloseEditorCommand,
   SaveWorkflowCommand,
@@ -254,17 +255,32 @@ async function pickWorkflow(id: string): Promise<void> {
   editorModel.load(definition, builtin ? 'builtin' : 'custom');
 }
 
-const editorView = new WorkflowEditorView(editorModel, {
-  close: () => new CloseEditorCommand(state).execute(),
-  save: () => void saveWorkflow.execute(),
-  saveAndRun: () =>
-    void new SaveAndRunWorkflowCommand(saveWorkflow, editorModel, (id) =>
-      workflowDialog.open(id),
-    ).execute(),
-  remove: () =>
-    void new DeleteWorkflowCommand(api, confirmRemove, editorModel, refreshWorkflows).execute(),
-  pick: (id) => void pickWorkflow(id),
-});
+const editorView = new WorkflowEditorView(
+  editorModel,
+  {
+    close: () => new CloseEditorCommand(state).execute(),
+    save: () => void saveWorkflow.execute(),
+    saveAndRun: () =>
+      void new SaveAndRunWorkflowCommand(saveWorkflow, editorModel, (id) =>
+        workflowDialog.open(id),
+      ).execute(),
+    remove: () =>
+      void new DeleteWorkflowCommand(api, confirmRemove, editorModel, refreshWorkflows).execute(),
+    pick: (id) => void pickWorkflow(id),
+    openTerminal: (sessionId) => new SelectSessionCommand(state, sessionId).execute(),
+    takeOver: (sessionId) => takeOver(sessionId),
+    resume: (runId, approved) => void new ResumeWorkflowCommand(api, runId, approved).execute(),
+    cancel: (run) => void new CancelWorkflowCommand(api, confirmRemove, run).execute(),
+  },
+  state,
+);
+
+/** 畫布上的「接手」：節點的工作階段本身知道是哪一支 CLI、哪一段對話。*/
+function takeOver(sessionId: string): void {
+  const session = state.sessions.find((s) => s.id === sessionId);
+  if (!session) return;
+  new TakeOverCommand((profile) => void createSession(profile), session).execute();
+}
 
 const saveWorkflow = new SaveWorkflowCommand(
   api,

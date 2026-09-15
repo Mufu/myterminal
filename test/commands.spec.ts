@@ -16,6 +16,7 @@ import {
   StartWorkflowCommand,
   ResumeWorkflowCommand,
   CancelWorkflowCommand,
+  SelectSessionCommand,
   OpenEditorCommand,
   CloseEditorCommand,
   SaveWorkflowCommand,
@@ -473,6 +474,15 @@ describe('畫布編輯器的 Command', () => {
     state.showEditor();
     new CloseEditorCommand(state).execute();
     expect(state.view).toBe('terminal');
+  });
+
+  /** 畫布上按節點卡片的「輸出」：要看得到那個終端機，所以畫面也要切回去。*/
+  it('SelectSessionCommand 切回終端機並選起那個工作階段', () => {
+    state.setSessions([session('s1'), session('s2')]);
+    state.showEditor();
+    new SelectSessionCommand(state, 's1').execute();
+    expect(state.view).toBe('terminal');
+    expect(state.activeSessionId).toBe('s1');
   });
 
   it('SaveWorkflowCommand 存進去之後變乾淨，並重新取一次清單', async () => {

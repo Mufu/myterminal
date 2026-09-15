@@ -3,6 +3,7 @@ import type {
   ApprovalNodeConfig,
   ConditionNodeConfig,
   NodePosition,
+  RunState,
   WorkflowInfo,
   WorkflowNode,
   WorkflowNodeType,
@@ -12,8 +13,10 @@ import { NODE_PORTS } from '../shared/workflow';
 import type { AgentKind } from '../shared/agent';
 import { CLI_TYPES, TYPE_LABELS as CLI_LABELS } from '../shared/profile';
 import { ROLES, findRole } from '../shared/roles';
+import type { AppState } from './app-state';
 import type { WorkflowEditorModel } from './workflow-editor-model';
 import { NODE_HEADER, NODE_WIDTH, PORT_LABELS, PORT_ROW } from './workflow-editor-model';
+import { RunOverlay, latestRunFor } from './workflow-run-view';
 
 /**
  * WorkflowEditorView：LabVIEW 風格的畫布。
@@ -80,6 +83,14 @@ export interface EditorHandlers {
   remove(): void;
   /** 下拉選單挑了一個工作流；空字串是「＋ 新工作流」。*/
   pick(id: string): void;
+  /** 卡片的「輸出」與屬性面板的「看輸出」：切到那個節點的終端機。*/
+  openTerminal(sessionId: string): void;
+  /** 屬性面板的「接手」：開一個真的互動式 CLI 接續那段對話。*/
+  takeOver(sessionId: string): void;
+  /** 卡片上的批准／退回。*/
+  resume(runId: string, approved: boolean): void;
+  /** 編輯列上的「取消」。*/
+  cancel(run: RunState): void;
 }
 
 type Drag =
@@ -103,6 +114,8 @@ export class WorkflowEditorView {
   private readonly nameInput = $<HTMLInputElement>('editor-name');
   private readonly picker = $<HTMLSelectElement>('editor-workflow');
   private readonly deleteButton = $<HTMLButtonElement>('btn-editor-delete');
+  /** 執行檢視：卡片上的狀態與編輯列上那一條，全部由它畫。*/
+  private readonly overlay: RunOverlay;
 
   private pan = { x: 40, y: 40 };
   private infos: WorkflowInfo[] = [];
@@ -115,7 +128,16 @@ export class WorkflowEditorView {
   constructor(
     private readonly model: WorkflowEditorModel,
     private readonly handlers: EditorHandlers,
+    private readonly state: AppState,
   ) {
+    this.overlay = new RunOverlay(
+      {
+        openTerminal: (sessionId) => this.handlers.openTerminal(sessionId),
+        resume: (runId, approved) => this.handlers.resume(runId, approved),
+        cancel: (run) => this.handlers.cancel(run),
+      },
+      $('editor-run'),
+    );
     this.svg.setAttribute('width', String(SVG_SIZE));
     this.svg.setAttribute('height', String(SVG_SIZE));
     this.applyPan();
@@ -145,6 +167,12 @@ export class WorkflowEditorView {
     document.addEventListener('keydown', (event) => this.onKeyDown(event));
 
     this.model.subscribe(() => this.render());
+    // 執行的狀態不是編輯的內容，所以只重畫覆蓋層與屬性面板，
+    // 不動 model 也不弄髒它。
+    this.state.subscribe(() => {
+      this.renderRun();
+      this.renderProps();
+    });
     this.render();
   }
 
@@ -200,6 +228,27 @@ export class WorkflowEditorView {
     this.renderNodes();
     this.renderEdges();
     this.renderProps();
+    this.renderRun();
+  }
+
+  /**
+   * 執行檢視：畫布上這份工作流的執行 (還在跑的優先)。
+   * 卡片本身是 renderNodes() 畫的，這裡只在上面加／刪自己那幾個元素。
+   */
+  private renderRun(): void {
+    if (this.drag) return;
+    const run = latestRunFor(this.state.runs, this.model.definition.id);
+    const auth = this.state.cliAuth;
+    this.overlay.paintStrip(run, auth);
+    for (const card of Array.from(this.viewport.querySelectorAll<HTMLElement>('.wf-node'))) {
+      const id = card.dataset.id;
+      if (id) this.overlay.paintCard(card, id, run, auth);
+    }
+  }
+
+  /** 目前執行裡這個節點對應的工作階段；沒有就是 undefined。*/
+  private sessionFor(nodeId: string): string | undefined {
+    return latestRunFor(this.state.runs, this.model.definition.id)?.nodes[nodeId]?.sessionId;
   }
 
   private syncPicker(): void {
@@ -440,7 +489,8 @@ export class WorkflowEditorView {
     const key = !selection
       ? 'none'
       : selection.kind === 'node'
-        ? `node:${selection.id}`
+        ? // 工作階段也算進鑰匙：節點跑起來之後面板才長得出「接手」。
+          `node:${selection.id}:${this.sessionFor(selection.id) ?? ''}`
         : `edge:${selection.index}`;
     if (key === this.propsKey) return;
     this.propsKey = key;
@@ -556,6 +606,17 @@ export class WorkflowEditorView {
         ),
       ),
     );
+
+    // 這個節點在目前這次執行裡已經有工作階段了：可以去看它，也可以接手。
+    const sessionId = this.sessionFor(id);
+    if (!sessionId) return;
+    this.propsPanel.append(
+      actions([
+        ['props-takeover', '接手', () => this.handlers.takeOver(sessionId)],
+        ['props-open-terminal', '看輸出', () => this.handlers.openTerminal(sessionId)],
+      ]),
+      note('無介面執行中的節點沒辦法追問；要接著問就用「接手」開一個真的互動式 CLI。'),
+    );
   }
 
   private conditionProps(id: string, config: ConditionNodeConfig): void {
@@ -657,6 +718,21 @@ function note(text: string): HTMLParagraphElement {
   const el = document.createElement('p');
   el.className = 'props-note';
   el.textContent = text;
+  return el;
+}
+
+/** 屬性面板下方的一排按鈕 (接手／看輸出)。*/
+function actions(buttons: Array<[id: string, label: string, onClick: () => void]>): HTMLDivElement {
+  const el = document.createElement('div');
+  el.className = 'props-actions';
+  for (const [id, text, onClick] of buttons) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.id = id;
+    button.textContent = text;
+    button.addEventListener('click', onClick);
+    el.appendChild(button);
+  }
   return el;
 }
 
