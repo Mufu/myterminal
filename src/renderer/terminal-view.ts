@@ -52,10 +52,14 @@ export class TerminalView implements TerminalPort {
     this.term.write(data);
   }
 
+  /**
+   * 顯示出來，但「不」搶焦點：syncTerminals() 每次狀態變動都會呼叫到這裡，
+   * 搶過來會打斷使用者正在別處打的字 (輸入字面板、以及 IME 正在組的字)。
+   * 真的要換焦點的時候由呼叫端自己呼叫 focus()。
+   */
   show(): void {
     this.host.hidden = false;
     this.resize();
-    this.term.focus();
   }
 
   hide(): void {
