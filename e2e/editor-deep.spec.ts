@@ -2,6 +2,7 @@ import { test, expect, _electron as electron } from '@playwright/test';
 import type { ElectronApplication, Page } from '@playwright/test';
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { TEMPLATES } from '../src/main/workflow/templates';
 
 const root = join(__dirname, '..');
 
@@ -664,5 +665,56 @@ test('自訂工作流在 app 重開之後還在執行對話框裡', async () => 
     await second.window.click('#w-cancel');
   } finally {
     await second.app.close();
+  }
+});
+
+// ---- 12. 八份內建範本 ----
+
+test('內建範本都載得進畫布：節點與連線數對得上，沒有驗證錯誤，刪不掉', async () => {
+  test.setTimeout(120_000);
+  const userData = userDataFor('all-templates');
+  const { app, window } = await launch(userData);
+
+  try {
+    await window.click('#btn-workflow-edit');
+    await expect(window.locator('#workflow-editor')).toBeVisible();
+
+    for (const template of TEMPLATES) {
+      await window.selectOption('#editor-workflow', template.id);
+      await expect(window.locator('#editor-name')).toHaveValue(template.name);
+      await expect(window.locator('.wf-node')).toHaveCount(template.nodes.length);
+      await expect(window.locator('path.wf-edge')).toHaveCount(template.edges.length);
+      // 內建範本一律是合法的，而且刪不得。
+      await expect(window.locator('#editor-errors')).toBeHidden();
+      await expect(window.locator('#btn-editor-delete')).toBeDisabled();
+    }
+
+    await shot(window, 'all-templates');
+  } finally {
+    await app.close();
+  }
+});
+
+test('執行對話框：內建範本八份都在，說明跟著選擇換', async () => {
+  test.setTimeout(120_000);
+  const userData = userDataFor('template-descriptions');
+  const { app, window } = await launch(userData);
+
+  try {
+    await window.click('#btn-workflow-run');
+    await expect(window.locator('#workflow-run')).toBeVisible();
+    await expect(window.locator('#w-template optgroup[label="內建"] option')).toHaveCount(
+      TEMPLATES.length,
+    );
+
+    for (const template of TEMPLATES) {
+      await window.selectOption('#w-template', template.id);
+      await expect(window.locator('#w-description')).toHaveText(template.description ?? '');
+    }
+
+    await shot(window, 'template-descriptions');
+    await window.click('#w-cancel');
+  } finally {
+    await app.close();
   }
 });
