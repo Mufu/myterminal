@@ -299,6 +299,35 @@ type WorkflowEdge = {
 覆蓋層只加／刪自己那幾個元素（`.wf-run`、`.wf-run-actions`），
 不動 `WorkflowEditorModel` —— 看執行狀況不算編輯，工作流不會因此變髒。
 
+### 手動操作（自己在節點的工作目錄裡下 prompt）
+
+無介面的執行是「按一次就跑完」，但很多時候想**自己來**：在同一個工作目錄裡自己決定問什麼、
+看它回什麼再追問。所以畫布上的 agent 節點另外有一組「手動操作」（屬性面板一個區塊，
+選起來的卡片上也有精簡版），全程由人控制：
+
+| 按鈕 | 做什麼 |
+| --- | --- |
+| **開終端機** | 用這個節點的工作目錄開一個互動式 PowerShell 或 WSL（屬性面板的「終端機」下拉決定，存在節點的 `config.shell`，預設 PowerShell；執行那一側不看它）。接下來下什麼指令都是你的事 |
+| **開終端機並啟動 `<CLI>`** | 同上，再順手把那個節點的 CLI（Claude／Codex／Muse／OpenCode）叫起來，並把代好的提示**填進「輸入字」面板**——看過、改過，自己按「送出」。API 金鑰的注入跟一般 CLI 工作階段完全一樣 |
+| **複製提示** | 把代好的提示放進剪貼簿，要貼到哪裡由你決定 |
+
+「代好的提示」是指：`{{params.task}}`、`{{params.cwd}}` 用**這份工作流最近一次執行**的啟動參數
+代進去（`RunState.params`，跟著執行一起存），代不出來的（沒跑過、或是 `{{<節點id>.text}}`
+這種上游輸出）**原樣留著**，讓你一眼看得出還缺什麼；節點有角色時前面會加上那個角色的前置指示
+（中間空一行）——跟編排層真的送給 CLI 的是同一段話。
+
+工作目錄同理：寫死的路徑直接用，`{{params.cwd}}` 要有一次執行才代得出來。代不出來時會先問一次
+（預設填執行對話框上次打的那個，記在 `localStorage` 的 `myterminal.lastCwd`），按取消就什麼都不開。
+目錄不存在時跟其他工作階段一樣顯示「工作目錄不存在：…」。
+
+**這個節點在最近那次執行裡跑過的話，「開終端機並啟動」會接續它那段對話** ——
+用的就是「接手」那條指令（`claude --resume <id>`／`codex resume <id>`／`muse resume <id>`／
+`opencode --session <id>`），CLI 一起來就帶著上下文，提示也已經填在面板裡了。
+沒跑過（或換過一支 CLI）就是乾淨地開一個新的。
+
+> 「手動操作」與無介面的執行是**兩條路**，同一個節點兩邊都能用：前者是人在控制，
+> 畫布只負責把工作目錄、提示、要接續的對話準備好；後者是按一次跑完再回來看結果。
+
 ### 程式碼
 
 沒有用任何畫布／流程圖套件：節點是絕對定位的 `<div>`，連線是一層 `<svg>` 裡的
@@ -309,13 +338,14 @@ type WorkflowEdge = {
 | [`workflow-editor-model.ts`](../src/renderer/workflow-editor-model.ts) | 狀態與規則：id、座標吸附、接線合不合法、刪節點要清掉什麼、接點座標。跟 `AppState` 同一套 Observer，**完全不碰 DOM** |
 | [`workflow-editor-view.ts`](../src/renderer/workflow-editor-view.ts) | DOM 殼：卡片、連線、屬性面板、滑鼠與鍵盤 |
 | [`workflow-run-view.ts`](../src/renderer/workflow-run-view.ts) | 執行檢視：挑哪一次執行（`latestRunFor`）與一張卡片上要寫什麼（`cardOverlay`）是純函式，`RunOverlay` 只負責畫 |
+| [`node-shell.ts`](../src/renderer/node-shell.ts) | 手動操作：代出節點的工作目錄（`resolveNodeCwd`）與提示（`renderNodePrompt`），全部是純函式。樣板替換跟編排層共用 [`shared/template.ts`](../src/shared/template.ts) |
 | [`commands.ts`](../src/renderer/commands.ts) | 開啟／關閉／儲存／刪除／儲存並執行／切換工作階段，各一個 `ICommand` |
 
-規則都在 model 與那兩個純函式裡，所以 vitest 的 node 環境測得到
-（`test/workflow-editor-model.spec.ts`、`test/workflow-run-view.spec.ts`）；
-畫面與滑鼠則由 `e2e/editor.spec.ts` 與 `e2e/editor-deep.spec.ts` 顧
-（不呼叫任何 CLI，所以不花錢），執行檢視由 `e2e/editor-run.spec.ts` 顧
-（用 OpenCode 的免費模型，只要網路、不要金鑰）。
+規則都在 model 與那幾個純函式裡，所以 vitest 的 node 環境測得到
+（`test/workflow-editor-model.spec.ts`、`test/workflow-run-view.spec.ts`、`test/node-shell.spec.ts`）；
+畫面與滑鼠則由 `e2e/editor.spec.ts`、`e2e/editor-deep.spec.ts` 與 `e2e/editor-shell.spec.ts` 顧
+（不呼叫任何 CLI，所以不花錢——手動操作那個只是把 Claude 的 TUI 叫起來，不送任何提示），
+執行檢視由 `e2e/editor-run.spec.ts` 顧（用 OpenCode 的免費模型，只要網路、不要金鑰）。
 
 ## 執行時的狀態
 
