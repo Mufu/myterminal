@@ -480,6 +480,7 @@ describe('畫布編輯器的 Command', () => {
         workflowId: model.definition.id,
         name: '跑起來了',
         status: 'running',
+        params: {},
         nodes: {},
         totalCostUsd: 0,
         startedAt: 1,

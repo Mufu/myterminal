@@ -13,6 +13,7 @@ import {
   validateWorkflow,
 } from '../../shared/workflow';
 import { findRole } from '../../shared/roles';
+import { renderTemplate } from '../../shared/template';
 import type { AdoptSpec } from '../session-manager';
 import type { IAgentRun, IAgentRunnerFactory } from '../agent-runner';
 import type { SessionInfo } from '../../shared/session';
@@ -342,10 +343,11 @@ export function render(
   state: RunGraphState,
   params: Record<string, string>,
 ): string {
-  return template.replace(/\{\{\s*([^.\s{}]+)\.([^.\s{}]+)\s*\}\}/g, (whole, head, field) => {
+  return renderTemplate(template, (head, field) => {
+    // 執行時代不出來的一律是空字串 —— 把 {{…}} 原樣送給 CLI 更難懂。
     if (head === 'params') return params[field] ?? '';
     if (field === 'text') return state.outputs[head]?.text ?? '';
-    return whole;
+    return undefined;
   });
 }
 

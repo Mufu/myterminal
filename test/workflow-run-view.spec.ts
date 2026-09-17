@@ -20,6 +20,7 @@ const run = (over: Partial<RunState> = {}): RunState => ({
   workflowId: 'wf-1',
   name: '我的流程',
   status: 'running',
+  params: {},
   nodes: {},
   totalCostUsd: 0,
   startedAt: 1000,

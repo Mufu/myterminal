@@ -87,6 +87,7 @@ export class WorkflowService extends EventEmitter<WorkflowEvents> {
         workflowId: definition.id,
         name: definition.name,
         status: 'running',
+        params,
         nodes: Object.fromEntries(
           definition.nodes.map((node) => [
             node.id,
@@ -227,6 +228,8 @@ export class WorkflowService extends EventEmitter<WorkflowEvents> {
     if (!Array.isArray(parsed)) return [];
 
     return parsed.filter(isStoredRun).map((stored) => {
+      // 舊版存下來的沒有 state.params，用同一筆裡的啟動參數補回去。
+      stored.state.params ??= stored.params ?? {};
       if (stored.state.status !== 'running') return stored;
       stored.state.status = 'failed';
       stored.state.error = 'app 在執行途中關閉了';

@@ -173,6 +173,7 @@ describe('AppState 工作流', () => {
     workflowId: 'w',
     name: '實作 → 審查 → 批准',
     status: 'waiting_approval',
+    params: {},
     question: '要保留這次的變更嗎？',
     nodes: { implement: { label: '實作', status: 'done', attempts: 1 } },
     totalCostUsd: 0.27,

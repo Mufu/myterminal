@@ -214,6 +214,8 @@ export interface RunState {
   workflowId: string;
   name: string;
   status: RunStatus;
+  /** 這次執行的啟動參數 (task、cwd)；畫布上的「手動操作」靠它代 {{params.x}}。*/
+  params: Record<string, string>;
   /** status === 'waiting_approval' 時要問人的問題。*/
   question?: string;
   nodes: Record<string, RunNodeState>;

@@ -112,6 +112,16 @@ describe('WorkflowService', () => {
     ]);
   });
 
+  it('啟動參數跟著執行走，畫布才代得出節點的工作目錄與提示', async () => {
+    const service = new WorkflowService(disk.deps());
+    service.start(linear(), { task: '建立 hello.txt', cwd: 'D:/work' });
+    expect(service.list()[0].params).toEqual({ task: '建立 hello.txt', cwd: 'D:/work' });
+
+    // 重開之後也還在 (畫布上的「手動操作」靠它代 {{params.cwd}})。
+    const second = new WorkflowService(disk.deps());
+    expect(second.list()[0].params).toEqual({ task: '建立 hello.txt', cwd: 'D:/work' });
+  });
+
   it('節點狀態帶著角色與 CLI 種類，畫面才貼得出標籤與金額', async () => {
     const service = new WorkflowService(disk.deps());
     const definition = linear();
