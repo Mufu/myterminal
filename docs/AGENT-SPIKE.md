@@ -425,3 +425,29 @@ opencode 不讀）。
 `ANTHROPIC_API_KEY`／… 在 **Agent 任務與工作流節點**也會被注入。
 `ProcessSpec` 因此多了一個 `env`，`NodeProcessSpawner` 把它疊在 `process.env` 上。
 無介面一律在 Windows 原生跑，所以 `baseShell` 固定傳 `powershell`（不會有 WSLENV 那段）。
+
+
+## 2026-09-17 更新：權限從兩檔變成三檔
+
+第 8 節的風險 1（「`allowEdits` 只有兩檔」）踩到了：
+**`claude -p --permission-mode acceptEdits` 改得了檔案，卻擋掉 Bash 指令。**
+這台機器上實測，`git --version` 與 `npm --version` 都進了結果的
+`permission_denials`（只有 `echo` 這種擺明無害的過得去），所以工程師 /
+測試工程師節點的「實作完要跑測試」根本做不到。
+
+`--permission-mode bypassPermissions` 同一句話實測會真的執行，
+`permission_denials` 是空的（`~/.claude/settings.json` 有
+`skipDangerousModePermissionPrompt: true`，所以不會停下來問）。
+
+因此 `AgentTask.allowEdits: boolean` 換成
+`AgentTask.permission: 'readonly' | 'edit' | 'full'`，各家的對應寫在
+[`WORKFLOW.md`](WORKFLOW.md#為什麼需要-full)。`full` 用的是
+claude `bypassPermissions`、codex `danger-full-access`、muse `never`、
+opencode `--auto`；互動式那一面（畫布上的「開終端機並啟動 <CLI>」）
+補的是 `--dangerously-skip-permissions`。
+
+順便驗到的坑：把 `Bash(git --version)` 寫進目標專案的
+`.claude/settings.json` 的 `permissions.allow`，在**沒有被信任過**的目錄裡
+整份會被忽略（claude 印 `Ignoring 1 permissions.allow entry ... this
+workspace has not been trusted`），照樣被擋。這條路要先用互動式 claude
+在那個目錄開過一次、按過信任才算數。

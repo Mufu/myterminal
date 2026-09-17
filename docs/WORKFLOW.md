@@ -45,7 +45,7 @@ type WorkflowEdge = {
 | --- | --- | --- |
 | `start` | — | 一條沒有名字的連線 |
 | `end` | — | 沒有出口 |
-| `agent` | `{ kind, prompt, cwd?, allowEdits, role?, resumeFrom?, maxAttempts?, timeoutSec? }` | `ok` / `fail` |
+| `agent` | `{ kind, prompt, cwd?, permission?, role?, resumeFrom?, maxAttempts?, timeoutSec? }` | `ok` / `fail` |
 | `condition` | `{ source, rule }` | `yes` / `no` |
 | `approval` | `{ question }` | `approved` / `rejected` |
 
@@ -56,20 +56,71 @@ type WorkflowEdge = {
 | `kind` | 四支 CLI 之一，走的是 Agent 任務那條既有的 `IAgentRunner`（見下面的表） |
 | `prompt` | 樣板，見下面的「樣板」 |
 | `cwd` | 也吃樣板；不能留空（驗證會擋），而且執行前會檢查代入後的目錄真的存在 |
-| `allowEdits` | `false` 是每支 CLI 最嚴格但仍會回答的模式（見下表），`true` 才會動檔案 |
+| `permission` | `readonly` / `edit` / `full`（見下表）。省略就是 `readonly` |
 | `role` | 角色 id，見下面的「角色」。省略就沒有前置指示 |
 | `resumeFrom` | 某個節點的 id：用那個節點的 CLI session 接續對話（見下表的「接續」） |
 | `maxAttempts` | 這個節點最多跑幾次（迴圈用），預設 3。超過就把整個執行標成失敗並收尾 |
 | `timeoutSec` | 單一次執行的上限，預設 600。超過就取消 CLI，這個節點算失敗 |
 
-`kind` 可以是四支 CLI 的任何一支，`allowEdits` 與 `resumeFrom` 在各家的對應：
+`kind` 可以是四支 CLI 的任何一支。`permission` 三檔在各家的對應
+（[`agent-runner.ts`](../src/main/agent-runner.ts)）：
 
-| `kind` | `allowEdits: false` | `allowEdits: true` | 接續 | 接手（互動式） |
-| --- | --- | --- | --- | --- |
-| `claude` | `--permission-mode plan` | `--permission-mode acceptEdits` | `--resume <id>` | `claude --resume <id>` |
-| `codex` | `--sandbox read-only` | `--sandbox workspace-write` | `exec resume <id>` | `codex resume <id>` |
-| `muse` | `--approval-mode untrusted --disable-write` | `--approval-mode never` | `--session-id <uuid>` | `muse resume <uuid>` |
-| `opencode` | `--agent plan`（內建的唯讀 agent） | 不帶 `--agent`（預設 `build`） | `--session <id>` | `opencode --session <id>` |
+| `kind` | `readonly` | `edit` | `full` |
+| --- | --- | --- | --- |
+| `claude` | `--permission-mode plan` | `--permission-mode acceptEdits` | `--permission-mode bypassPermissions` |
+| `codex` | `--sandbox read-only` | `--sandbox workspace-write` | `--sandbox danger-full-access` |
+| `muse` | `--approval-mode untrusted --disable-write` | `--approval-mode never` | `--approval-mode never` |
+| `opencode` | `--agent plan`（內建的唯讀 agent） | 不帶 `--agent`（預設 `build`） | `--auto` |
+
+（`codex exec resume` 沒有 `--sandbox`，接續時一律用 `-c sandbox_mode="…"` 覆寫；
+muse 只有「擋掉」與「全部放行」兩檔，所以 `edit` 與 `full` 是同一條。）
+
+`resumeFrom` 與接手在各家的對應：
+
+| `kind` | 接續 | 接手（互動式） |
+| --- | --- | --- |
+| `claude` | `--resume <id>` | `claude --resume <id>` |
+| `codex` | `exec resume <id>` | `codex resume <id>` |
+| `muse` | `--session-id <uuid>` | `muse resume <uuid>` |
+| `opencode` | `--session <id>` | `opencode --session <id>` |
+
+#### 為什麼需要 `full`
+
+**無介面的 `claude` 在 `acceptEdits` 下改得了檔案，卻擋掉 Bash 指令。**
+2026-09-17 在這台機器上實測：`claude -p --permission-mode acceptEdits` 跑
+`git --version` 與 `npm --version` 都進了結果的 `permission_denials`，
+只有 `echo` 這種擺明無害的過得去 —— 也就是說工程師 / 測試工程師節點
+「實作完要跑測試」那一句做不到。
+
+`full` 走 `--permission-mode bypassPermissions`，同一台機器上實測過：
+同一句話真的執行了 `git --version`，`permission_denials` 是空的。
+代價是**那一次執行什麼指令都擋不住**，所以：
+
+- 內建範本一律不用 `full`，要開是自己在畫布上選。
+- 選了 `full` 的節點，終端機的任務標頭會多一個 `[完全放行]`，
+  畫布上的「開終端機並啟動 <CLI>」也會補上
+  `--dangerously-skip-permissions`（codex `--sandbox danger-full-access`、
+  muse `--approval-mode never`、opencode `--auto`）。
+
+不想整個放行時的替代做法（**文件上的說法**）：在**目標專案**的
+`.claude/settings.json` 裡把要跑的指令列進 `permissions.allow`，
+無介面的 claude 在 `acceptEdits` 下就會放行它們，只開「跑測試」這一條：
+
+```jsonc
+{ "permissions": { "allow": ["Bash(npm test:*)", "Bash(npx tsc:*)"] } }
+```
+
+**但有一個坑（2026-09-17 實測）**：那個專案沒有被信任過時，這份 allow
+整個會被忽略 —— claude 印
+
+```
+Ignoring 1 permissions.allow entry from .claude/settings.json:
+this workspace has not been trusted.
+```
+
+然後照樣擋掉 `git --version`。所以這條路只有在「那個目錄先用互動式
+claude 開過一次、按過信任」之後才算數；在被信任的專案裡真的會放行，
+這一半還沒在這台機器上驗過。
 
 四支的實測記錄（命令、事件形狀、哪些驗過哪些沒有）在
 [`AGENT-SPIKE.md`](AGENT-SPIKE.md)。
@@ -79,16 +130,16 @@ type WorkflowEdge = {
 
 ### 角色
 
-角色是**一段可以重複用的系統提示前言**，加上一個預設的檔案修改權限。
+角色是**一段可以重複用的系統提示前言**，加上一個預設的權限。
 定義在 [`src/shared/roles.ts`](../src/shared/roles.ts)，就五個，改一次全部生效：
 
-| `role` | 名稱 | 做什麼 | `allowEdits` 預設 |
+| `role` | 名稱 | 做什麼 | `permission` 預設 |
 | --- | --- | --- | --- |
-| `pm` | 產品經理 | 把需求拆成可驗收的工作項目，不寫程式 | 關 |
-| `architect` | 架構師 | 設計模組邊界與介面、說明取捨，不實作細節 | 關 |
-| `coder` | 工程師 | 依指示實作、跑測試，最後摘要改了哪些檔案 | **開** |
-| `tester` | 測試工程師 | 撰寫並執行測試，回報失敗的測試與原因 | **開** |
-| `reviewer` | 審查者 | 只審查不修改，最後一行輸出 `PASS` 或 `FAIL` | 關 |
+| `pm` | 產品經理 | 把需求拆成可驗收的工作項目，不寫程式 | `readonly` |
+| `architect` | 架構師 | 設計模組邊界與介面、說明取捨，不實作細節 | `readonly` |
+| `coder` | 工程師 | 依指示實作、跑測試，最後摘要改了哪些檔案 | **`edit`** |
+| `tester` | 測試工程師 | 撰寫並執行測試，回報失敗的測試與原因 | **`edit`** |
+| `reviewer` | 審查者 | 只審查不修改，最後一行輸出 `PASS` 或 `FAIL` | `readonly` |
 
 怎麼送給 CLI（[`agent-runner.ts`](../src/main/agent-runner.ts)）：
 
@@ -98,9 +149,11 @@ type WorkflowEdge = {
 <提示>`）
   一起走 stdin。
 
-`allowEdits` 的預設值只是**對話框上的方便**：在「Agent 任務」裡換角色時，
-「允許修改檔案」會跟著跳到那個角色的預設值，之後還是可以自己改。
-節點的 `allowEdits` 是定義裡寫死的，角色不會覆寫它。
+`permission` 的預設值只是**對話框上的方便**：在「Agent 任務」裡換角色時，
+「權限」會跟著跳到那個角色的預設值，之後還是可以自己改。
+節點的 `permission` 是定義裡寫死的，角色不會覆寫它。
+要跑測試的角色（工程師、測試工程師）預設只到 `edit`，跑不了測試 ——
+真的要跑就自己把那個節點改成 `full`，理由見上面的「為什麼需要 `full`」。
 
 角色不存在時 `validateWorkflow` 會報 `節點 <id> 的角色不存在：<role>`。
 `RunNodeState` 也複製一份 `role`，右側清單才貼得出那個標籤。
@@ -156,16 +209,16 @@ type WorkflowEdge = {
     { "id": "start", "type": "start", "label": "開始", "position": { "x": 0, "y": 0 } },
     { "id": "implement", "type": "agent", "label": "實作", "position": { "x": 180, "y": 0 },
       "config": { "kind": "claude", "prompt": "{{params.task}}", "cwd": "{{params.cwd}}",
-                  "allowEdits": true } },
+                  "permission": "edit" } },
     { "id": "review", "type": "agent", "label": "審查", "position": { "x": 360, "y": 0 },
-      "config": { "kind": "claude", "allowEdits": false, "cwd": "{{params.cwd}}",
+      "config": { "kind": "claude", "permission": "readonly", "cwd": "{{params.cwd}}",
                   "prompt": "審查目前工作目錄的變更是否完成「{{params.task}}」，最後一行只輸出 PASS 或 FAIL" } },
     { "id": "check", "type": "condition", "label": "檢查", "position": { "x": 540, "y": 0 },
       "config": { "source": "review", "rule": { "type": "lastLineEquals", "value": "PASS" } } },
     { "id": "approve", "type": "approval", "label": "批准", "position": { "x": 720, "y": 0 },
       "config": { "question": "要保留這次的變更嗎？" } },
     { "id": "fix", "type": "agent", "label": "修正", "position": { "x": 540, "y": 160 },
-      "config": { "kind": "claude", "allowEdits": true, "cwd": "{{params.cwd}}",
+      "config": { "kind": "claude", "permission": "edit", "cwd": "{{params.cwd}}",
                   "prompt": "審查意見如下，請修正：{{review.text}}",
                   "resumeFrom": "implement", "maxAttempts": 3 } },
     { "id": "end", "type": "end", "label": "結束", "position": { "x": 900, "y": 0 } }
@@ -283,11 +336,11 @@ type WorkflowEdge = {
 | 節點 | 可以設的東西 |
 | --- | --- |
 | 全部 | 節點 id（唯讀，提示裡用 `{{<id>.text}}` 取得它的輸出）、名稱 |
-| `agent` | 執行者（claude／codex）、角色、提示、工作目錄、允許修改檔案、接續對話（`resumeFrom`）、最多幾次、逾時 |
+| `agent` | 執行者（claude／codex）、角色、提示、工作目錄、權限、接續對話（`resumeFrom`）、最多幾次、逾時 |
 | `condition` | 看哪個 agent 節點的輸出、判斷方式（最後一行等於／符合正規式）與值 |
 | `approval` | 要問的問題 |
 
-換**角色**時「允許修改檔案」會跟著跳到那個角色的預設值（跟「新連接」對話框一樣），
+換**角色**時「權限」會跟著跳到那個角色的預設值（跟「新連接」對話框一樣），
 之後還是可以自己改。角色的清單見上面的[角色](#角色)。
 
 ### 儲存

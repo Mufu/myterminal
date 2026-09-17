@@ -472,7 +472,8 @@ export class CodexRunner implements IAgentRunner {
  * 核准模式 (都用 --provider echo 實測過，不會卡住)：
  *   - untrusted：要授權的工具被政策直接擋掉，不是停下來問人；再加
  *     --disable-write 關掉非 shell 的寫檔，等價於 codex 的 read-only。
- *   - never：永遠不問，也就是全部放行 —— 允許修改檔案時用這個。
+ *   - never：永遠不問，也就是全部放行 —— edit 與 full 都是這個
+ *     (muse 只有這兩檔)。
  * 預設的 on-request 真的有工具要授權時會停下來等人，無介面不能用。
  */
 export class MuseRunner implements IAgentRunner {
@@ -506,7 +507,8 @@ export class MuseRunner implements IAgentRunner {
  *
  * 它沒有「唯讀」旗標 —— `opencode run` 預設就直接寫檔，不問也不擋 ——
  * 但內建的 plan agent 權限是 edit: deny，效果等同 claude 的 plan 模式，
- * 所以不允許修改檔案時就換成它 (實測：模型寫不了檔，也不會卡住)。
+ * 所以 readonly 就換成它 (實測：模型寫不了檔，也不會卡住)。
+ * full 再加 --auto：自動核准沒有被明確拒絕的權限。
  */
 export class OpenCodeRunner implements IAgentRunner {
   constructor(

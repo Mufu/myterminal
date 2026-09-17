@@ -97,10 +97,10 @@ AGENT_E2E_OK
 | 欄位 | 說明 |
 | --- | --- |
 | 執行者 | Claude／Codex／Muse／OpenCode |
-| 角色 | 產品經理／架構師／工程師／測試工程師／審查者，選了就在任務前面加一段前置指示（只有 Claude 有 `--append-system-prompt`，其他三支是接在提示前面）。換角色時「允許修改檔案」會跟著跳到那個角色的預設值。留「無」就沒有 |
+| 角色 | 產品經理／架構師／工程師／測試工程師／審查者，選了就在任務前面加一段前置指示（只有 Claude 有 `--append-system-prompt`，其他三支是接在提示前面）。換角色時「權限」會跟著跳到那個角色的預設值。留「無」就沒有 |
 | 任務 | 要它做什麼（多行沒問題：Claude／Codex／OpenCode 走 stdin，Muse 寫成暫存檔用 `--prompt-file` 讀，都不碰命令列引號） |
 | 工作目錄 | 留空的話用家目錄 |
-| 允許修改檔案 | **預設關閉**。關著是每支 CLI 最嚴格但仍會回答的模式（會讀、會回答，但不能寫）：Claude 的 `plan`、Codex 的 `read-only` 沙箱、Muse 的 `--approval-mode untrusted --disable-write`、OpenCode 內建的唯讀 `plan` agent。打開才會動檔案 |
+| 權限 | 三檔，**預設「唯讀」**：<br>**唯讀** —— 每支 CLI 最嚴格但仍會回答的模式（會讀、會回答，但不能寫）：Claude 的 `plan`、Codex 的 `read-only` 沙箱、Muse 的 `--approval-mode untrusted --disable-write`、OpenCode 內建的唯讀 `plan` agent。<br>**可修改檔案** —— Claude 的 `acceptEdits`、Codex 的 `workspace-write`、Muse 的 `--approval-mode never`、OpenCode 的預設。**注意：Claude 這一檔改得了檔案卻會擋掉 Bash 指令**，所以跑不了測試。<br>**完全放行（會執行任何指令）** —— Claude 的 `bypassPermissions`、Codex 的 `danger-full-access`、Muse 的 `never`、OpenCode 的 `--auto`。要跑測試就是這一檔，代價是那一次執行什麼指令都擋不住；終端機的任務標頭會標 `[完全放行]`。細節見 [`docs/WORKFLOW.md`](docs/WORKFLOW.md) 的「為什麼需要 `full`」 |
 
 注意事項：
 
@@ -193,10 +193,10 @@ JSON schema、節點型別、怎麼加一種新節點，見
 
 | 節點 | 做什麼 |
 | --- | --- |
-| 實作 | `claude`，**工程師**角色，**允許修改檔案**，提示就是你填的任務 |
+| 實作 | `claude`，**工程師**角色，**可修改檔案**，提示就是你填的任務 |
 | 審查 | `claude`，**審查者**角色，唯讀，看工作目錄的變更有沒有完成任務，最後一行只輸出 `PASS` 或 `FAIL` |
 | 檢查 | 看審查輸出的最後一行是不是 `PASS` |
-| 修正 | `claude`，工程師角色，允許修改檔案，**接續「實作」那段對話**，帶著審查意見重做，最多三次 |
+| 修正 | `claude`，工程師角色，可修改檔案，**接續「實作」那段對話**，帶著審查意見重做，最多三次 |
 | 批准 | 停下來問你「要保留這次的變更嗎？」 |
 
 agent 節點可以指定**角色**（產品經理／架構師／工程師／測試工程師／審查者）——
