@@ -114,6 +114,9 @@ test.describe('新連接對話框的驗證', () => {
 
   test('Agent 任務沒填任務：對話框不關，顯示「請輸入任務內容」', async () => {
     await openDialog('agent');
+    // 權限預設是最保守的唯讀；三檔都在下拉裡。
+    await expect(window.locator('#f-agent-permission')).toHaveValue('readonly');
+    await expect(window.locator('#f-agent-permission option')).toHaveCount(3);
     await window.fill('#f-agent-prompt', '');
 
     await window.click('#f-ok');

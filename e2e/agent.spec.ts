@@ -27,7 +27,7 @@ async function startTask(window: Page, kind: AgentKind, prompt = PROMPT): Promis
   await window.selectOption('#f-agent-kind', kind);
   await window.fill('#f-agent-prompt', prompt);
   await window.fill('#f-cwd', mkdtempSync(join(tmpdir(), `myterminal-agent-${kind}-`)));
-  await expect(window.locator('#f-agent-edits')).not.toBeChecked();
+  await expect(window.locator('#f-agent-permission')).toHaveValue('readonly');
   await window.click('#f-ok');
 }
 

@@ -37,7 +37,7 @@ test('在畫布上拉出一個工作流並存起來', async () => {
 
   await window.selectOption('#props-role', 'coder');
   // 角色的預設權限會跟著跳過來
-  await expect(window.locator('#props-allow-edits')).toBeChecked();
+  await expect(window.locator('#props-permission')).toHaveValue('edit');
   await window.fill('#props-prompt', '{{params.task}}');
   await expect(window.locator('.wf-node[data-id="agent-1"] .role-tag')).toHaveText('工程師');
 

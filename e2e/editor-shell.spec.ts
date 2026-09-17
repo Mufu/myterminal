@@ -59,6 +59,8 @@ test('節點的手動操作：開終端機、複製提示、開終端機並啟�
     await window.fill('#props-cwd', realWorkDir);
     await window.fill('#props-prompt', '請說 SHELL_OK');
     await window.selectOption('#props-role', 'coder');
+    // 工程師的預設權限是可修改檔案。
+    await expect(window.locator('#props-permission')).toHaveValue('edit');
     // 預設在 PowerShell 裡開。
     await expect(window.locator('#props-shell')).toHaveValue('powershell');
     // 選起來的卡片上也有同一組動作。

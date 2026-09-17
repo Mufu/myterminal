@@ -66,7 +66,7 @@ const APPROVAL: Definition = {
       config: {
         kind: 'claude',
         role: 'coder',
-        allowEdits: true,
+        permission: 'edit',
         cwd: '{{params.cwd}}',
         prompt:
           '在工作目錄建立 hello.txt，內容 hi，最後一行只輸出 DONE（DONE 之後不要再寫任何字）',
@@ -102,7 +102,7 @@ const LONG_PROMPT = '列出工作目錄下所有檔案並逐一說明用途，�
 /** B：五秒就逾時的節點。*/
 const TIMEOUT = straight('wf-e2e-timeout', 'E2E 逾時', {
   kind: 'claude',
-  allowEdits: false,
+  permission: 'readonly',
   cwd: '{{params.cwd}}',
   prompt: LONG_PROMPT,
   timeoutSec: 5,
@@ -111,7 +111,7 @@ const TIMEOUT = straight('wf-e2e-timeout', 'E2E 逾時', {
 /** C：跑得夠久，來得及按取消。*/
 const CANCEL = straight('wf-e2e-cancel', 'E2E 取消', {
   kind: 'claude',
-  allowEdits: false,
+  permission: 'readonly',
   cwd: '{{params.cwd}}',
   prompt: LONG_PROMPT,
 });
@@ -119,7 +119,7 @@ const CANCEL = straight('wf-e2e-cancel', 'E2E 取消', {
 /** D：codex 節點。*/
 const CODEX = straight('wf-e2e-codex', 'E2E Codex', {
   kind: 'codex',
-  allowEdits: false,
+  permission: 'readonly',
   cwd: '{{params.cwd}}',
   prompt: 'Reply with exactly CODEX_WF_OK',
 });
@@ -128,7 +128,7 @@ const CODEX = straight('wf-e2e-codex', 'E2E Codex', {
 const ROLE = straight('wf-e2e-role', 'E2E 角色', {
   kind: 'claude',
   role: 'reviewer',
-  allowEdits: false,
+  permission: 'readonly',
   cwd: '{{params.cwd}}',
   prompt: '用一句話說明你現在扮演的角色',
 });
@@ -374,8 +374,8 @@ test('F：Agent 任務選了角色，CLI 也吃得到', async () => {
     await window.selectOption('#f-type', 'agent');
     await window.selectOption('#f-agent-kind', 'claude');
     await window.selectOption('#f-agent-role', 'reviewer');
-    // 審查者的預設是不改檔案。
-    await expect(window.locator('#f-agent-edits')).not.toBeChecked();
+    // 審查者的預設是唯讀。
+    await expect(window.locator('#f-agent-permission')).toHaveValue('readonly');
     await window.fill('#f-agent-prompt', '用一句話說明你現在扮演的角色');
     await window.fill('#f-cwd', work);
     await window.click('#f-ok');

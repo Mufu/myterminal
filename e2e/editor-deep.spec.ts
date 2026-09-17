@@ -300,7 +300,7 @@ const ROUND_TRIP: Definition = {
       type: 'agent',
       label: 'Agent',
       position: { x: 240, y: 120 },
-      config: { kind: 'claude', prompt: '{{params.task}}', cwd: '{{params.cwd}}', allowEdits: false },
+      config: { kind: 'claude', prompt: '{{params.task}}', cwd: '{{params.cwd}}', permission: 'readonly' },
     },
     {
       id: 'condition-1',
