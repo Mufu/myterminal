@@ -85,9 +85,16 @@ test('節點的手動操作：開終端機、複製提示、開終端機並啟�
     await window.click(`${card('agent-1')} .wf-node-body`);
     await window.click('#props-copy-prompt');
     const prompt = `${findRole('coder')?.systemPrompt}\n\n請說 SHELL_OK`;
-    const clip = await app.evaluate(({ clipboard }) => clipboard.readText());
+    // 寫進剪貼簿是非同步的（CopyNodePromptCommand 的 await），點完不一定馬上讀得到，
+    // 所以要等 —— 直接讀會偶爾拿到上一次的內容。
     // Windows 的剪貼簿把換行正規化成 CRLF。
-    expect(clip.replace(/\r\n/g, '\n')).toBe(prompt);
+    await expect
+      .poll(
+        async () =>
+          (await app.evaluate(({ clipboard }) => clipboard.readText())).replace(/\r\n/g, '\n'),
+        { timeout: 5_000 },
+      )
+      .toBe(prompt);
 
     // 4. 「開終端機並啟動 Claude」：TUI 起來，提示填進「輸入字」面板但沒送出
     await expect(window.locator('#props-open-cli')).toHaveText('開終端機並啟動 Claude');
