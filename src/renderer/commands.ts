@@ -115,7 +115,7 @@ export class SendInputCommand implements ICommand {
     if (!text.trim()) return;
     terminal.paste(text);
     await this.api.write(id, '\r');
-    this.panel.clear();
+    this.panel.sent();
   }
 }
 

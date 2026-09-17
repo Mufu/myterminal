@@ -213,18 +213,28 @@ const dialog = new NewConnectionDialog((profile, save) => {
 });
 
 const inputPanel = new InputPanel(
-  $<HTMLElement>('input-panel'),
-  $<HTMLTextAreaElement>('input-text'),
-  $<HTMLElement>('input-target-name'),
-  $<HTMLElement>('input-target-dot'),
+  {
+    panel: $<HTMLElement>('input-panel'),
+    textarea: $<HTMLTextAreaElement>('input-text'),
+    targetName: $<HTMLElement>('input-target-name'),
+    targetDot: $<HTMLElement>('input-target-dot'),
+    keep: $<HTMLInputElement>('input-keep'),
+  },
   state,
+  // Ctrl+Enter 跟工具列的「送出」是同一件事；sendInput 在下面才建得出來
+  // (它需要這個面板)，所以這裡用一個晚一點才會被呼叫的函式繞開。
+  () => void sendInput.execute(),
   (visible) => {
     const terminal = activeTerminal();
     terminal?.resize();
     // 收起來的時候焦點要還給終端機；打開的時候留在輸入區 (面板自己會 focus)。
     if (!visible) terminal?.focus();
   },
+  // 輸入區被拉高 / 拉矮之後終端機少了 / 多了那幾個 row。
+  () => activeTerminal()?.resize(),
 );
+
+const sendInput = new SendInputCommand(state, api, inputPanel, activeTerminal);
 
 const themeSelect = $<HTMLSelectElement>('theme-select');
 themeSelect.value = themeStore.get();
@@ -236,7 +246,7 @@ new Toolbar(state, {
   paste: new PasteCommand(activeTerminal, clipboard),
   toggleLog: new ToggleLogCommand(state, api),
   clear: new ClearScreenCommand(activeTerminal),
-  send: new SendInputCommand(state, api, inputPanel, activeTerminal),
+  send: sendInput,
   switchTheme: new SwitchThemeCommand(themeStore, () => themeSelect.value),
 });
 

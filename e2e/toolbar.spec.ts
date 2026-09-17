@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import type { ElectronApplication, Page } from '@playwright/test';
 import { mkdirSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { activeRows, freshUserData, launchApp, root, runInTerminal } from './helpers';
+import { activeRows, freshUserData, launchApp, root, runInTerminal, sessionRow } from './helpers';
 
 const userData = freshUserData('toolbar');
 /** 紀錄檔寫到 test-results 底下，不要碰使用者自己的 %USERPROFILE%\myterminal-logs。*/
@@ -69,6 +69,72 @@ test('輸入字：兩行一次送出，兩行的輸出都出現，標題顯示�
   expect(text.match(/LINE_TWO/g)?.length ?? 0, seen).toBeGreaterThanOrEqual(2);
   // 順序：LINE_ONE 的輸出在 LINE_TWO 之前
   expect(text.indexOf('LINE_ONE'), seen).toBeLessThan(text.indexOf('LINE_TWO'));
+
+  expect(dialogs).toEqual([]);
+  await app.close();
+});
+
+test('輸入字：Ctrl+Enter 送出，↑ 叫回送出過的內容', async () => {
+  const { app, window, dialogs } = await openWithSession();
+
+  await window.click('#btn-input');
+  await expect(window.locator('#input-text')).toBeFocused();
+  await expect(window.locator('#input-hint')).toContainText('Ctrl+Enter 送出');
+
+  // 單獨的 Enter 是換行，不送出。
+  await window.fill('#input-text', 'echo CTRL_A');
+  await window.locator('#input-text').press('Enter');
+  await expect(window.locator('#input-text')).toHaveValue('echo CTRL_A\n');
+
+  await window.fill('#input-text', 'echo CTRL_A');
+  await window.locator('#input-text').press('Control+Enter');
+  await expect(window.locator('#input-text')).toHaveValue('');
+  // 送完接著寫下一段，焦點留在輸入區。
+  await expect(window.locator('#input-text')).toBeFocused();
+  await expect.poll(() => countOn(window, 'CTRL_A'), { timeout: 20_000 }).toBeGreaterThanOrEqual(2);
+
+  // ↑ 叫回剛才送出的那一段，↓ 回到還沒送出的那一格。
+  await window.locator('#input-text').press('ArrowUp');
+  await expect(window.locator('#input-text')).toHaveValue('echo CTRL_A');
+  await window.locator('#input-text').press('ArrowUp');
+  await expect(window.locator('#input-text')).toHaveValue('echo CTRL_A');
+  await window.locator('#input-text').press('ArrowDown');
+  await expect(window.locator('#input-text')).toHaveValue('');
+  await shot(window, 'history');
+
+  expect(dialogs).toEqual([]);
+  await app.close();
+});
+
+test('輸入字：切工作階段草稿留著，「送出後保留」送完字還在', async () => {
+  const { app, window, dialogs } = await openWithSession();
+
+  await window.click('#btn-input');
+  await window.fill('#input-text', 'DRAFT_ONE');
+
+  // 第二個 PowerShell：它自己的輸入區是空的。
+  await window.click('#btn-new');
+  await window.selectOption('#f-type', 'powershell');
+  await window.click('#f-ok');
+  await expect(window.locator('#input-target-name')).toHaveText('PowerShell 2');
+  await expect(window.locator('#input-text')).toHaveValue('');
+
+  await window.check('#input-keep');
+  await window.fill('#input-text', 'echo KEEP_ME');
+  await window.click('#btn-send');
+  // 勾了「送出後保留」就留著，同一句話可以再送一次。
+  await expect(window.locator('#input-text')).toHaveValue('echo KEEP_ME');
+  await expect.poll(() => countOn(window, 'KEEP_ME'), { timeout: 20_000 }).toBeGreaterThanOrEqual(2);
+
+  // 切回第一個：它那份草稿還在。
+  await sessionRow(window, 'PowerShell 1').click();
+  await expect(window.locator('#input-target-name')).toHaveText('PowerShell 1');
+  await expect(window.locator('#input-text')).toHaveValue('DRAFT_ONE');
+  await shot(window, 'draft');
+
+  // 再切回去，第二個的字也還在。
+  await sessionRow(window, 'PowerShell 2').click();
+  await expect(window.locator('#input-text')).toHaveValue('echo KEEP_ME');
 
   expect(dialogs).toEqual([]);
   await app.close();

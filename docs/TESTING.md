@@ -34,7 +34,7 @@ myterminal 的自動測試分四層，由便宜到昂貴。前三層不需要任
 | `smoke.spec.ts` | 1 | 無 | 新連接開 PowerShell 看到提示字元 |
 | `packaged.spec.ts` | 1 | 無 | `dist/win-unpacked/myterminal.exe` 也開得出 PowerShell |
 | `sessions.spec.ts` | 6 | 無 | 多工作階段切換與命名、WSL、自訂命令與離開碼、✕ 關閉、Claude / Codex 互動 TUI 起得來（不送提示） |
-| `toolbar.spec.ts` | 6 | 無 | 輸入字多行送出、貼上、多行貼上依序執行、複製文字、紀錄檔內容與停止、清除畫面 |
+| `toolbar.spec.ts` | 8 | 無 | 輸入字多行送出、Ctrl+Enter 送出與 ↑ 叫回歷史、切工作階段的草稿與「送出後保留」、貼上、多行貼上依序執行、複製文字、紀錄檔內容與停止、清除畫面 |
 | `dialogs.spec.ts` | 8 | 無 | SSH 空主機 / 埠 abc / 埠 70000、自訂命令空執行檔、Agent 任務空提示、取消永遠關得掉、Enter 等於建立、WSL 不存在的發行版不會讓 app 掛掉 |
 | `robustness.spec.ts` | 4 | 無 | 視窗縮放到 500×300 再放大、連開 6 個再全關、執行中關視窗、輸入框按 Delete |
 | `profiles.spec.ts` | 2 | 無 | 儲存連線、重啟後保留、點一下連線、刪除 |

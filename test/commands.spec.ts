@@ -80,15 +80,15 @@ class FakeClipboard implements ClipboardPort {
 
 class FakeInputPanel implements InputPanelPort {
   text = '';
-  cleared = 0;
+  sends = 0;
   getText(): string {
     return this.text;
   }
   setText(text: string): void {
     this.text = text;
   }
-  clear(): void {
-    this.cleared += 1;
+  sent(): void {
+    this.sends += 1;
   }
 }
 
@@ -238,13 +238,13 @@ describe('清除畫面', () => {
 });
 
 describe('送出 (輸入面板)', () => {
-  it('整段文字走貼上路徑，再補一個 CR 送出，並清空輸入框', async () => {
+  it('整段文字走貼上路徑，再補一個 CR 送出，然後通知面板送出完成', async () => {
     const panel = new FakeInputPanel();
     panel.text = '請幫我重構這段程式';
     await new SendInputCommand(state, api, panel, activeTerminal).execute();
     expect(terminal.pasted).toEqual(['請幫我重構這段程式']);
     expect(api.write).toHaveBeenCalledWith('s1', '\r');
-    expect(panel.cleared).toBe(1);
+    expect(panel.sends).toBe(1);
   });
 
   /** 多行不拆開：shell 收到的是一段多行緩衝區，最後那個 CR 才一次執行。*/
@@ -257,13 +257,13 @@ describe('送出 (輸入面板)', () => {
     expect(api.write).toHaveBeenCalledWith('s1', '\r');
   });
 
-  it('空白內容不送出也不清空', async () => {
+  it('空白內容不送出，也不通知面板', async () => {
     const panel = new FakeInputPanel();
     panel.text = '   ';
     await new SendInputCommand(state, api, panel, activeTerminal).execute();
     expect(terminal.pasted).toEqual([]);
     expect(api.write).not.toHaveBeenCalled();
-    expect(panel.cleared).toBe(0);
+    expect(panel.sends).toBe(0);
   });
 
   it('沒有作用中的終端機就什麼都不做', async () => {
@@ -271,7 +271,7 @@ describe('送出 (輸入面板)', () => {
     panel.text = 'x';
     await new SendInputCommand(state, api, panel, () => null).execute();
     expect(api.write).not.toHaveBeenCalled();
-    expect(panel.cleared).toBe(0);
+    expect(panel.sends).toBe(0);
   });
 });
 

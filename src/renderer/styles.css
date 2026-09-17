@@ -673,11 +673,16 @@ body {
   gap: 10px;
 }
 
+/* 可以自己拉高：面板一長高終端機就少幾個 row，
+   所以 InputPanel 會在尺寸變動時叫終端機重新量測，高度也記進 localStorage。
+   上限留一半視窗高度，免得一拖就把終端機壓沒了。*/
 #input-text {
   flex: 1;
   min-width: 0;
   height: var(--field-height);
-  resize: none;
+  min-height: var(--field-height);
+  max-height: 50vh;
+  resize: vertical;
   padding: 9px 11px;
   border: 1px solid var(--field-border);
   border-radius: var(--radius);
@@ -688,6 +693,25 @@ body {
 
 #input-text::placeholder {
   color: var(--dim);
+}
+
+/* 面板最下面那一行：按鍵提示 + 「送出後保留」。*/
+.input-hints {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-family: var(--meta-font);
+  font-size: 11.5px;
+  letter-spacing: var(--meta-tracking);
+  color: var(--dim);
+}
+
+#input-keep-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  cursor: pointer;
 }
 
 /* 淺色是 Fluent 的重點色底線，其餘主題就是整圈換色。*/

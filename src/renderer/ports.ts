@@ -29,7 +29,8 @@ export interface InputPanelPort {
   getText(): string;
   /** 填好一段文字等人自己按送出 (畫布上的「開終端機並啟動」用)。*/
   setText(text: string): void;
-  clear(): void;
+  /** 送出成功了；要清空還是留著由面板自己決定 (「送出後保留」)。*/
+  sent(): void;
 }
 
 export interface DialogPort {
