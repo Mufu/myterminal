@@ -245,11 +245,12 @@ async function runAgent(
   const cwd = render(config.cwd ?? '', state, deps.params).trim() || homedir();
   deps.report?.({ nodeId: node.id, status: 'running', attempts });
 
+  const permission = config.permission ?? 'readonly';
   const run = deps.runnerFactory(config.kind).start({
     kind: config.kind,
     prompt,
     cwd,
-    allowEdits: config.allowEdits,
+    permission,
     resumeId: config.resumeFrom ? state.outputs[config.resumeFrom]?.sessionId : undefined,
     systemPrompt: config.role ? findRole(config.role)?.systemPrompt : undefined,
   });
@@ -261,6 +262,7 @@ async function runAgent(
     kind: config.kind,
     prompt,
     cwd,
+    permission,
   });
   deps.report?.({ nodeId: node.id, status: 'running', sessionId: session.id, attempts });
 

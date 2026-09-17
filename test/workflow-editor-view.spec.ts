@@ -59,7 +59,7 @@ describe('nodeSummary', () => {
     expect(nodeSummary(node({ type: 'start' }))).toBe('');
     expect(nodeSummary(node({ type: 'end' }))).toBe('');
     expect(
-      nodeSummary(node({ type: 'agent', config: { kind: 'claude', prompt: 'x', allowEdits: false } })),
+      nodeSummary(node({ type: 'agent', config: { kind: 'claude', prompt: 'x', permission: 'readonly' } })),
     ).toBe('');
   });
 });

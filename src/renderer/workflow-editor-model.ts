@@ -161,7 +161,7 @@ export class WorkflowEditorModel {
 
     const node: WorkflowNode =
       type === 'agent'
-        ? { ...base, type, config: { kind: 'claude', prompt: '', cwd: '{{params.cwd}}', allowEdits: false } }
+        ? { ...base, type, config: { kind: 'claude', prompt: '', cwd: '{{params.cwd}}', permission: 'readonly' } }
         : type === 'condition'
           ? { ...base, type, config: { source: '', rule: { type: 'lastLineEquals', value: '' } } }
           : type === 'approval'

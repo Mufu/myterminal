@@ -99,7 +99,7 @@ describe('ROLES', () => {
   });
 
   it('只有要動手的角色預設允許修改檔案', () => {
-    expect(ROLES.filter((role) => role.defaultAllowEdits).map((role) => role.id)).toEqual([
+    expect(ROLES.filter((role) => role.defaultPermission === 'edit').map((role) => role.id)).toEqual([
       'coder',
       'tester',
     ]);

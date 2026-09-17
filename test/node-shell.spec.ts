@@ -20,7 +20,7 @@ const node = (config: Partial<AgentNodeConfig> = {}, label = 'Agent'): AgentNode
   type: 'agent',
   label,
   position: { x: 0, y: 0 },
-  config: { kind: 'claude', prompt: '', cwd: '{{params.cwd}}', allowEdits: false, ...config },
+  config: { kind: 'claude', prompt: '', cwd: '{{params.cwd}}', permission: 'readonly', ...config },
 });
 
 const run = (params: Record<string, string>): RunState => ({

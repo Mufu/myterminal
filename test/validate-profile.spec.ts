@@ -82,7 +82,7 @@ describe('validateProfile 要儲存設定檔時', () => {
 });
 
 describe('Agent 任務', () => {
-  const task = { type: 'agent', kind: 'claude', allowEdits: false } as const;
+  const task = { type: 'agent', kind: 'claude', permission: 'readonly' } as const;
 
   it('沒有任務內容就不合法', () => {
     expect(validateProfile({ ...task, prompt: '   ' })).toEqual(['請輸入任務內容']);

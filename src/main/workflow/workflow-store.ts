@@ -1,5 +1,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
-import type { WorkflowDefinition } from '../../shared/workflow';
+import type { AgentPermission } from '../../shared/agent';
+import { readPermission } from '../../shared/agent';
+import type { AgentNodeConfig, WorkflowDefinition, WorkflowNode } from '../../shared/workflow';
 import { validateWorkflow } from '../../shared/workflow';
 import { findTemplate } from './templates';
 
@@ -24,7 +26,7 @@ export class WorkflowStore {
     if (!raw) return [];
     try {
       const parsed: unknown = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed.filter(isWorkflowDefinition) : [];
+      return Array.isArray(parsed) ? parsed.filter(isWorkflowDefinition).map(migrate) : [];
     } catch {
       return [];
     }
@@ -57,6 +59,25 @@ export class WorkflowStore {
   private persist(definitions: WorkflowDefinition[]): void {
     this.write(JSON.stringify(definitions, null, 2));
   }
+}
+
+/**
+ * 舊檔案的 agent 節點只有 allowEdits 兩檔 (true/false)，讀進來就換成三檔的
+ * permission；之後畫布存回去寫的就是新欄位，舊的不再留著。
+ */
+function migrate(definition: WorkflowDefinition): WorkflowDefinition {
+  return { ...definition, nodes: definition.nodes.map(migrateNode) };
+}
+
+function migrateNode(node: WorkflowNode): WorkflowNode {
+  if (node.type !== 'agent') return node;
+  const config: AgentNodeConfig & { allowEdits?: unknown; permission?: AgentPermission } = {
+    ...node.config,
+  };
+  const permission = readPermission(config as unknown as Record<string, unknown>);
+  delete config.allowEdits;
+  if (permission) config.permission = permission;
+  return { ...node, config };
 }
 
 const NODE_TYPES: readonly string[] = ['start', 'end', 'agent', 'condition', 'approval'];

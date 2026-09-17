@@ -26,7 +26,7 @@ const task = (over: Partial<AgentTask> = {}): AgentTask => ({
   kind: 'claude',
   prompt: '只回覆 AGENT_SPIKE_OK，不要做別的事',
   cwd: 'C:/tmp',
-  allowEdits: false,
+  permission: 'readonly',
   ...over,
 });
 
@@ -57,9 +57,19 @@ describe('ClaudeCodeRunner 組出來的命令列', () => {
     expect(spec.stdin).toBe('只回覆 AGENT_SPIKE_OK，不要做別的事');
   });
 
-  it('allowEdits 換成 acceptEdits，resumeId 加上 --resume', () => {
-    new ClaudeCodeRunner(spawner).start(task({ allowEdits: true, resumeId: 'abc-123' }));
-    expect(spawner.last().spec.args).toContain('acceptEdits');
+  // acceptEdits 改得了檔案卻擋掉 Bash (實測：git --version 會進 permission_denials)，
+  // 所以要跑測試的節點得用 full —— bypassPermissions 實測過不會被擋。
+  it.each([
+    ['readonly', 'plan'],
+    ['edit', 'acceptEdits'],
+    ['full', 'bypassPermissions'],
+  ] as const)('%s 對應 --permission-mode %s', (permission, mode) => {
+    new ClaudeCodeRunner(spawner).start(task({ permission }));
+    expect(spawner.last().spec.args.slice(-2)).toEqual(['--permission-mode', mode]);
+  });
+
+  it('resumeId 加上 --resume', () => {
+    new ClaudeCodeRunner(spawner).start(task({ permission: 'edit', resumeId: 'abc-123' }));
     expect(spawner.last().spec.args.slice(-2)).toEqual(['--resume', 'abc-123']);
   });
 
@@ -136,9 +146,27 @@ describe('CodexRunner 組出來的命令列', () => {
     expect(spec.stdin).toBe('只回覆 AGENT_SPIKE_OK，不要做別的事');
   });
 
-  it('allowEdits 換成 workspace-write', () => {
-    new CodexRunner(spawner).start(task({ kind: 'codex', allowEdits: true }));
-    expect(spawner.last().spec.args).toContain('workspace-write');
+  it.each([
+    ['readonly', 'read-only'],
+    ['edit', 'workspace-write'],
+    ['full', 'danger-full-access'],
+  ] as const)('%s 對應 --sandbox %s', (permission, sandbox) => {
+    new CodexRunner(spawner).start(task({ kind: 'codex', permission }));
+    expect(spawner.last().spec.args.slice(3, 5)).toEqual(['--sandbox', sandbox]);
+  });
+
+  it.each([
+    ['readonly', 'read-only'],
+    ['edit', 'workspace-write'],
+    ['full', 'danger-full-access'],
+  ] as const)('接續時 %s 走 -c sandbox_mode="%s"', (permission, sandbox) => {
+    new CodexRunner(spawner).start(task({ kind: 'codex', permission, resumeId: 'thread-9' }));
+    expect(spawner.last().spec.args.slice(3, 7)).toEqual([
+      'resume',
+      'thread-9',
+      '-c',
+      `sandbox_mode="${sandbox}"`,
+    ]);
   });
 
   it('resumeId 走 exec resume，沙箱只能用 -c sandbox_mode 覆寫', () => {
@@ -226,13 +254,19 @@ describe('MuseRunner 組出來的命令列', () => {
     expect(readFileSync(promptFile(spec.args), 'utf8')).toBe('只回覆 AGENT_SPIKE_OK，不要做別的事');
   });
 
-  it('allowEdits 換成 --approval-mode never，resumeId 走 --session-id', () => {
-    new MuseRunner(spawner).start(task({ kind: 'muse', allowEdits: true, resumeId: 'ses-1' }));
-    const args = spawner.last().spec.args;
+  // muse 只有「擋掉」跟「全部放行」兩檔，edit 與 full 都是 never。
+  it.each([
+    ['readonly', ['--approval-mode', 'untrusted', '--disable-write']],
+    ['edit', ['--approval-mode', 'never']],
+    ['full', ['--approval-mode', 'never']],
+  ] as const)('%s 對應 %s', (permission, flags) => {
+    new MuseRunner(spawner).start(task({ kind: 'muse', permission }));
+    expect(spawner.last().spec.args.slice(-flags.length)).toEqual([...flags]);
+  });
 
-    expect(args).toContain('never');
-    expect(args).not.toContain('--disable-write');
-    expect(args.slice(-2)).toEqual(['--session-id', 'ses-1']);
+  it('resumeId 走 --session-id', () => {
+    new MuseRunner(spawner).start(task({ kind: 'muse', permission: 'edit', resumeId: 'ses-1' }));
+    expect(spawner.last().spec.args.slice(-2)).toEqual(['--session-id', 'ses-1']);
   });
 
   it('muse 沒有對應的旗標，角色的前置指示接在提示檔的最前面', () => {
@@ -320,14 +354,22 @@ describe('OpenCodeRunner 組出來的命令列', () => {
     expect(spec.stdin).toBe('只回覆 AGENT_SPIKE_OK，不要做別的事');
   });
 
-  it('allowEdits 就不帶 --agent，resumeId 走 --session', () => {
-    new OpenCodeRunner(spawner).start(
-      task({ kind: 'opencode', allowEdits: true, resumeId: 'ses_abc' }),
-    );
-    const args = spawner.last().spec.args;
+  // opencode 預設 (build agent) 就會寫檔，所以 edit 什麼都不必加。
+  it.each([
+    ['readonly', ['--agent', 'plan']],
+    ['edit', []],
+    ['full', ['--auto']],
+  ] as const)('%s 對應 %s', (permission, flags) => {
+    const base = ['/c', 'opencode', 'run', '--format', 'json', '--dir', 'C:/tmp'];
+    new OpenCodeRunner(spawner).start(task({ kind: 'opencode', permission }));
+    expect(spawner.last().spec.args).toEqual([...base, ...flags]);
+  });
 
-    expect(args).not.toContain('--agent');
-    expect(args.slice(-2)).toEqual(['--session', 'ses_abc']);
+  it('resumeId 走 --session', () => {
+    new OpenCodeRunner(spawner).start(
+      task({ kind: 'opencode', permission: 'edit', resumeId: 'ses_abc' }),
+    );
+    expect(spawner.last().spec.args.slice(-2)).toEqual(['--session', 'ses_abc']);
   });
 
   it('「CLI 設定」選了型號就變成 -m provider/model', () => {

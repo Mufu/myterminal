@@ -10,7 +10,8 @@ import type {
   WorkflowPort,
 } from '../shared/workflow';
 import { NODE_PORTS } from '../shared/workflow';
-import type { AgentKind } from '../shared/agent';
+import type { AgentKind, AgentPermission } from '../shared/agent';
+import { PERMISSIONS, PERMISSION_LABELS } from '../shared/agent';
 import type { BaseShell } from '../shared/profile';
 import { CLI_TYPES, TYPE_LABELS as CLI_LABELS } from '../shared/profile';
 import { ROLES, findRole } from '../shared/roles';
@@ -44,6 +45,11 @@ export const TYPE_LABELS: Record<WorkflowNodeType, string> = {
 
 /** 屬性面板的「執行者」下拉：四支 CLI，跟新連接對話框同一組。*/
 const KIND_OPTIONS = CLI_TYPES.map((cli) => [cli, CLI_LABELS[cli]] as [string, string]);
+
+/** 「權限」下拉：三檔，跟新連接對話框同一組；「完全放行」的標籤自己帶著警語。*/
+const PERMISSION_OPTIONS = PERMISSIONS.map(
+  (permission) => [permission, PERMISSION_LABELS[permission]] as [string, string],
+);
 
 /** 「手動操作」要在哪個終端機裡開；跟新連接對話框的「基礎 shell」同一組。*/
 const SHELL_OPTIONS: Array<[string, string]> = [
@@ -585,10 +591,10 @@ export class WorkflowEditorView {
       config.role ?? '',
       (value) => {
         const info = findRole(value);
-        // 換角色順便把「允許修改檔案」跳到那個角色的預設值，跟新連接對話框一樣。
+        // 換角色順便把「權限」跳到那個角色的預設值，跟新連接對話框一樣。
         this.model.updateNode(id, {
           config: info
-            ? { role: info.id, allowEdits: info.defaultAllowEdits }
+            ? { role: info.id, permission: info.defaultPermission }
             : { role: undefined },
         });
         this.propsKey = '';
@@ -617,11 +623,15 @@ export class WorkflowEditorView {
         '工作目錄',
         input(config.cwd ?? '', (value) => this.model.updateNode(id, { config: { cwd: value } }), 'props-cwd'),
       ),
-      check(
-        '允許修改檔案',
-        config.allowEdits,
-        (value) => this.model.updateNode(id, { config: { allowEdits: value } }),
-        'props-allow-edits',
+      row(
+        '權限',
+        select(
+          PERMISSION_OPTIONS,
+          config.permission ?? 'readonly',
+          (value) =>
+            this.model.updateNode(id, { config: { permission: value as AgentPermission } }),
+          'props-permission',
+        ),
       ),
       row(
         '接續對話',
@@ -838,23 +848,6 @@ function row(label: string, control: HTMLElement): HTMLLabelElement {
   const el = document.createElement('label');
   el.className = 'props-row';
   el.append(span('props-label', label), control);
-  return el;
-}
-
-function check(
-  label: string,
-  value: boolean,
-  onChange: (value: boolean) => void,
-  id: string,
-): HTMLLabelElement {
-  const box = document.createElement('input');
-  box.type = 'checkbox';
-  box.id = id;
-  box.checked = value;
-  box.addEventListener('change', () => onChange(box.checked));
-  const el = document.createElement('label');
-  el.className = 'props-row check';
-  el.append(box, span('props-label', label));
   return el;
 }
 

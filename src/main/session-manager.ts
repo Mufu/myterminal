@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import type { AgentTaskProfile, ConnectionProfile } from '../shared/profile';
 import { TYPE_LABELS } from '../shared/profile';
-import type { AgentEvent, AgentKind } from '../shared/agent';
+import type { AgentEvent, AgentKind, AgentPermission } from '../shared/agent';
 import type { BillingMode } from '../shared/cli-auth';
 import { findRole } from '../shared/roles';
 import type { SessionInfo } from '../shared/session';
@@ -20,6 +20,7 @@ export interface AdoptSpec {
   kind: AgentKind;
   prompt: string;
   cwd: string;
+  permission: AgentPermission;
 }
 
 interface Session {
@@ -103,7 +104,10 @@ export class SessionManager extends EventEmitter<SessionEvents> {
       agentKind: spec.kind,
     };
     this.watchAgentSessionId(run, info);
-    this.register(info, new AgentRunPty(run, spec.kind, spec.prompt, this.billing(spec.kind)));
+    this.register(
+      info,
+      new AgentRunPty(run, spec.kind, spec.prompt, this.billing(spec.kind), spec.permission),
+    );
     this.emit('created', info);
     return info;
   }
@@ -169,18 +173,30 @@ export class SessionManager extends EventEmitter<SessionEvents> {
     // 工作目錄不存在時 spawn 只會丟 ENOENT，看不出是目錄的問題。
     if (!this.exists(cwd)) {
       const failed = new FailedRun(`工作目錄不存在：${cwd}`);
-      return new AgentRunPty(failed, profile.kind, profile.prompt, this.billing(profile.kind));
+      return new AgentRunPty(
+        failed,
+        profile.kind,
+        profile.prompt,
+        this.billing(profile.kind),
+        profile.permission,
+      );
     }
 
     const run = this.agents(profile.kind).start({
       kind: profile.kind,
       prompt: profile.prompt,
       cwd,
-      allowEdits: profile.allowEdits,
+      permission: profile.permission,
       systemPrompt: profile.role ? findRole(profile.role)?.systemPrompt : undefined,
     });
     this.watchAgentSessionId(run, info);
-    return new AgentRunPty(run, profile.kind, profile.prompt, this.billing(profile.kind));
+    return new AgentRunPty(
+      run,
+      profile.kind,
+      profile.prompt,
+      this.billing(profile.kind),
+      profile.permission,
+    );
   }
 
   /** CLI 一開始就會報 session id，記下來右側清單才能顯示「接手」。*/

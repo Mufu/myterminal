@@ -6,7 +6,7 @@ import { newWorkflowId } from './workflow-editor-model';
 import { latestRunFor } from './workflow-run-view';
 import type { MyTerminalApi } from '../shared/api';
 import type { BaseShell, ConnectionProfile, SavedProfile } from '../shared/profile';
-import type { AgentKind } from '../shared/agent';
+import type { AgentKind, AgentPermission } from '../shared/agent';
 import type { CliAuthSetting, CliId } from '../shared/cli-auth';
 import { validateCliSetting } from '../shared/cli-auth';
 import type { SaveCliSettingRequest } from '../shared/ipc';
@@ -156,6 +156,29 @@ export function resumeCommand(kind: AgentKind, sessionId: string): string {
   }
 }
 
+/** 「完全放行」時要補在啟動指令後面的旗標；另外兩檔用 CLI 自己的預設。*/
+const BYPASS_FLAGS: Record<AgentKind, string> = {
+  claude: '--dangerously-skip-permissions',
+  codex: '--sandbox danger-full-access',
+  muse: '--approval-mode never',
+  opencode: '--auto',
+};
+
+/**
+ * 「開終端機並啟動 <CLI>」要送進終端機的那一行。
+ * 不接續、也不是完全放行時回 undefined，讓 ShellFactory 用「CLI 設定」
+ * 算出來的那一條 (opencode 的 -m 就是從那裡來的)。
+ */
+export function cliStartupCommand(
+  kind: AgentKind,
+  permission: AgentPermission,
+  resumeId?: string,
+): string | undefined {
+  const base = resumeId ? resumeCommand(kind, resumeId) : kind;
+  if (permission !== 'full') return resumeId ? base : undefined;
+  return `${base} ${BYPASS_FLAGS[kind]}`;
+}
+
 /**
  * 「接手」：把跑完的 agent 任務接到一個真的互動式工作階段裡。
  * 走的是既有的 Claude / Codex 型別 (PowerShell 起 shell 再送啟動指令)，
@@ -189,6 +212,8 @@ export interface NodeShellSpec {
 
 export interface NodeCliSpec extends NodeShellSpec {
   kind: AgentKind;
+  /** 節點的權限；「完全放行」才會在啟動指令上補旗標。*/
+  permission: AgentPermission;
   /** 代好的提示：開完之後填進「輸入字」面板，送不送由人決定。*/
   prompt: string;
   /** 這個節點上一次執行的 CLI 對話；有的話就接續同一段。*/
@@ -228,8 +253,7 @@ export class OpenNodeCliCommand implements ICommand {
       name: this.spec.name,
       cwd: this.spec.cwd,
       baseShell: this.spec.shell,
-      // 沒有要接續就不指定，讓 ShellFactory 用「CLI 設定」算出來的那一條。
-      startupCommand: resumeId ? resumeCommand(kind, resumeId) : undefined,
+      startupCommand: cliStartupCommand(kind, this.spec.permission, resumeId),
     });
     this.panel.setText(this.spec.prompt);
     this.state.showInputPanel();

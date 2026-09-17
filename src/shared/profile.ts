@@ -1,4 +1,4 @@
-import type { AgentKind } from './agent';
+import type { AgentKind, AgentPermission } from './agent';
 import type { AgentRole } from './roles';
 
 /**
@@ -69,8 +69,8 @@ export interface AgentTaskProfile extends ProfileBase {
   type: 'agent';
   kind: AgentKind;
   prompt: string;
-  /** 預設 false：不讓 agent 改檔案。*/
-  allowEdits: boolean;
+  /** 給 CLI 多少權限；預設是唯讀。*/
+  permission: AgentPermission;
   /** 角色：前置指示在 shared/roles.ts，這裡只存 id。*/
   role?: AgentRole;
 }

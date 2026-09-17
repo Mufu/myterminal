@@ -16,6 +16,7 @@ import {
   OpenNodeCliCommand,
   CopyNodePromptCommand,
   resumeCommand,
+  cliStartupCommand,
   StartWorkflowCommand,
   ResumeWorkflowCommand,
   CancelWorkflowCommand,
@@ -398,6 +399,7 @@ describe('畫布上的手動操作', () => {
       ...spec,
       name: '我的流程 · 實作 Claude',
       kind: 'claude',
+      permission: 'edit',
       prompt: '請做這件事',
     }).execute();
 
@@ -419,12 +421,43 @@ describe('畫布上的手動操作', () => {
       ...spec,
       name: '我的流程 · 實作 Codex',
       kind: 'codex',
+      permission: 'edit',
       prompt: 'x',
       resumeId: 'thread-9',
     }).execute();
 
     expect(connect).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'codex', startupCommand: 'codex resume thread-9' }),
+    );
+  });
+
+  it('OpenNodeCliCommand 完全放行時啟動指令帶著跳過權限的旗標', () => {
+    const connect = vi.fn();
+    new OpenNodeCliCommand(connect, state, new FakeInputPanel(), {
+      ...spec,
+      name: '我的流程 · 實作 Claude',
+      kind: 'claude',
+      permission: 'full',
+      prompt: 'x',
+    }).execute();
+
+    expect(connect).toHaveBeenCalledWith(
+      expect.objectContaining({ startupCommand: 'claude --dangerously-skip-permissions' }),
+    );
+  });
+
+  it('cliStartupCommand 四支 CLI 的完全放行旗標，接續時接在後面', () => {
+    // 唯讀 / 可修改檔案不指定，讓「CLI 設定」算出來的那一條生效。
+    expect(cliStartupCommand('claude', 'readonly')).toBeUndefined();
+    expect(cliStartupCommand('claude', 'edit', 'x')).toBe('claude --resume x');
+
+    expect(cliStartupCommand('claude', 'full')).toBe('claude --dangerously-skip-permissions');
+    expect(cliStartupCommand('codex', 'full')).toBe('codex --sandbox danger-full-access');
+    expect(cliStartupCommand('muse', 'full')).toBe('muse --approval-mode never');
+    expect(cliStartupCommand('opencode', 'full')).toBe('opencode --auto');
+
+    expect(cliStartupCommand('claude', 'full', 'x')).toBe(
+      'claude --resume x --dangerously-skip-permissions',
     );
   });
 

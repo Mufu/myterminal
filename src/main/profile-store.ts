@@ -1,4 +1,5 @@
 import { readFileSync, writeFileSync } from 'node:fs';
+import { readPermission } from '../shared/agent';
 import type { SavedProfile } from '../shared/profile';
 
 /** 讀檔的縫線：回傳整個檔案內容，檔案不存在時回傳 null。*/
@@ -22,7 +23,7 @@ export class ProfileStore {
     if (!raw) return [];
     try {
       const parsed: unknown = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed.filter(isSavedProfile) : [];
+      return Array.isArray(parsed) ? parsed.filter(isSavedProfile).map(migrate) : [];
     } catch {
       return [];
     }
@@ -47,6 +48,18 @@ export class ProfileStore {
   private persist(profiles: SavedProfile[]): void {
     this.write(`${JSON.stringify(profiles, null, 2)}\n`);
   }
+}
+
+/**
+ * 舊檔案的 Agent 任務只有 allowEdits 兩檔，讀進來換成三檔的 permission；
+ * 兩個欄位都沒有 (手改過的 JSON) 就給最保守的唯讀。
+ */
+function migrate(profile: SavedProfile): SavedProfile {
+  if (profile.type !== 'agent') return profile;
+  const next: SavedProfile & { allowEdits?: unknown } = { ...profile };
+  next.permission = readPermission(next as unknown as Record<string, unknown>) ?? 'readonly';
+  delete next.allowEdits;
+  return next;
 }
 
 /** 手動編輯過的 JSON 也可能少欄位，缺名稱或類型的項目直接忽略。*/

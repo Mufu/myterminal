@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { AgentEvent, AgentKind, AgentTask } from '../shared/agent';
+import type { AgentEvent, AgentKind, AgentPermission, AgentTask } from '../shared/agent';
 import type { IChildProcess, IProcessSpawner, ProcessSpec } from './process-spawner';
 import { NodeProcessSpawner } from './process-spawner';
 import type { CliSecrets } from './shell-factory';
@@ -382,6 +382,19 @@ export function opencodeEvents(): EventMapper {
 }
 
 /**
+ * 權限對應到 claude 的 --permission-mode。
+ * acceptEdits 改得了檔案，卻會擋掉 Bash 指令 —— 實測 `claude -p
+ * --permission-mode acceptEdits` 下 `git --version` 進了 permission_denials ——
+ * 所以要跑測試 (工程師 / 測試工程師) 的節點得用 full。
+ * bypassPermissions 實測過：同一句話會真的執行，permission_denials 是空的。
+ */
+const CLAUDE_MODES: Record<AgentPermission, string> = {
+  readonly: 'plan',
+  edit: 'acceptEdits',
+  full: 'bypassPermissions',
+};
+
+/**
  * ClaudeCodeRunner — Adapter，把 AgentTask 變成一次 claude -p 執行。
  * stream-json 在 print 模式下一定要配 --verbose，否則 claude 直接拒絕啟動。
  */
@@ -394,7 +407,7 @@ export class ClaudeCodeRunner implements IAgentRunner {
   start(task: AgentTask): IAgentRun {
     const args = ['-p', '--output-format', 'stream-json', '--verbose'];
     // plan 模式仍然會讀檔與回答，只是不能寫；比 --tools "" 有用得多。
-    args.push('--permission-mode', task.allowEdits ? 'acceptEdits' : 'plan');
+    args.push('--permission-mode', CLAUDE_MODES[task.permission]);
     if (task.systemPrompt) args.push('--append-system-prompt', task.systemPrompt);
     if (task.resumeId) args.push('--resume', task.resumeId);
     return new JsonlRun(
@@ -411,6 +424,13 @@ export class ClaudeCodeRunner implements IAgentRunner {
   }
 }
 
+/** 權限對應到 codex 的沙箱。*/
+const CODEX_SANDBOXES: Record<AgentPermission, string> = {
+  readonly: 'read-only',
+  edit: 'workspace-write',
+  full: 'danger-full-access',
+};
+
 /**
  * CodexRunner — 同上，但走 codex exec。
  * codex 是 .cmd shim，一定要透過 cmd.exe /c 才 spawn 得起來 (見 process-spawner.ts)。
@@ -424,7 +444,7 @@ export class CodexRunner implements IAgentRunner {
   ) {}
 
   start(task: AgentTask): IAgentRun {
-    const sandbox = task.allowEdits ? 'workspace-write' : 'read-only';
+    const sandbox = CODEX_SANDBOXES[task.permission];
     const args = ['/c', 'codex', 'exec'];
     if (task.resumeId) args.push('resume', task.resumeId, '-c', `sandbox_mode="${sandbox}"`);
     else args.push('--sandbox', sandbox);
@@ -466,8 +486,8 @@ export class MuseRunner implements IAgentRunner {
     writeFileSync(file, withSystemPrompt(task), 'utf8');
 
     const args = ['/c', 'muse', 'exec', '--json', '--prompt-file', file];
-    if (task.allowEdits) args.push('--approval-mode', 'never');
-    else args.push('--approval-mode', 'untrusted', '--disable-write');
+    if (task.permission === 'readonly') args.push('--approval-mode', 'untrusted', '--disable-write');
+    else args.push('--approval-mode', 'never');
     // muse exec 沒有 resume 子命令，接續是「指定同一個 session id」。
     if (task.resumeId) args.push('--session-id', task.resumeId);
 
@@ -503,7 +523,9 @@ export class OpenCodeRunner implements IAgentRunner {
     const chosen = process.env.MYTERMINAL_OPENCODE_MODEL?.trim() || model;
     if (chosen) args.push('-m', chosen);
     if (task.resumeId) args.push('--session', task.resumeId);
-    if (!task.allowEdits) args.push('--agent', 'plan');
+    if (task.permission === 'readonly') args.push('--agent', 'plan');
+    // --auto 是「什麼都自動核准」；預設的 build agent 只寫檔，不會自己跑指令。
+    if (task.permission === 'full') args.push('--auto');
 
     return new JsonlRun(
       this.spawner,

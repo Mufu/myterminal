@@ -24,7 +24,7 @@ const agent = (
   type: 'agent',
   label: id,
   position: at,
-  config: { kind: 'claude', prompt: id, allowEdits: false, cwd: 'D:/work', ...config },
+  config: { kind: 'claude', prompt: id, permission: 'readonly', cwd: 'D:/work', ...config },
 });
 
 const def = (nodes: WorkflowNode[], edges: WorkflowEdge[]): WorkflowDefinition => ({
@@ -128,7 +128,7 @@ describe('compile', () => {
     await compiled.app.invoke({}, thread());
 
     expect(sessions.adopted).toEqual([
-      { name: '測試流程 · impl', kind: 'claude', prompt: 'impl', cwd: 'D:/work' },
+      { name: '測試流程 · impl', kind: 'claude', prompt: 'impl', cwd: 'D:/work', permission: 'readonly' },
     ]);
     expect(reports).toContainEqual({
       nodeId: 'impl',

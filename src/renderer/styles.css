@@ -1494,8 +1494,7 @@ html[data-theme='warm'] .session-item.active .session-dot {
 
 /* 勾選框那一列：左對齊，方框不要跟著文字輸入框被拉寬。
    選擇器要帶上 #new-connection，否則權重輸給上面的 #new-connection label。*/
-#new-connection #f-save-row,
-#new-connection #f-agent-edits-row {
+#new-connection #f-save-row {
   justify-content: flex-start;
   gap: 8px;
 }
@@ -2024,12 +2023,6 @@ html[data-theme='warm'] .session-item.active .session-dot {
   display: flex;
   flex-direction: column;
   gap: 4px;
-}
-
-.props-row.check {
-  flex-direction: row;
-  align-items: center;
-  gap: 8px;
 }
 
 .props-label {

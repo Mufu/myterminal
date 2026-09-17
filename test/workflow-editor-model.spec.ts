@@ -31,7 +31,7 @@ const saved = (): WorkflowDefinition => ({
       type: 'agent',
       label: '實作',
       position: { x: 200, y: 0 },
-      config: { kind: 'claude', prompt: '{{params.task}}', cwd: '{{params.cwd}}', allowEdits: true },
+      config: { kind: 'claude', prompt: '{{params.task}}', cwd: '{{params.cwd}}', permission: 'edit' },
     },
     { id: 'end', type: 'end', label: '結束', position: { x: 400, y: 0 } },
   ],
@@ -165,7 +165,7 @@ describe('加節點', () => {
 
     expect(agent).toMatchObject({
       label: 'Agent',
-      config: { kind: 'claude', prompt: '', cwd: '{{params.cwd}}', allowEdits: false },
+      config: { kind: 'claude', prompt: '', cwd: '{{params.cwd}}', permission: 'readonly' },
     });
     expect(condition).toMatchObject({
       label: '條件',
@@ -329,7 +329,7 @@ describe('改節點內容', () => {
       kind: 'claude',
       prompt: '做事',
       cwd: '{{params.cwd}}',
-      allowEdits: false,
+      permission: 'readonly',
     });
   });
 

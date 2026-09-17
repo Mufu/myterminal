@@ -25,6 +25,33 @@ beforeEach(() => {
 });
 
 describe('WorkflowStore 讀取', () => {
+  it('舊檔案的 allowEdits 讀進來換成 permission', () => {
+    const old = minimalWorkflow('w') as unknown as {
+      nodes: Array<{ config?: Record<string, unknown> }>;
+    };
+    old.nodes[1].config = { kind: 'claude', prompt: 'x', cwd: 'D:/work', allowEdits: true };
+    file.content = JSON.stringify([old]);
+
+    const node = store.list()[0].nodes[1];
+    expect(node.type === 'agent' && node.config).toEqual({
+      kind: 'claude',
+      prompt: 'x',
+      cwd: 'D:/work',
+      permission: 'edit',
+    });
+  });
+
+  it('兩個欄位都沒有的 agent 節點不補值 (執行那一側當成唯讀)', () => {
+    const old = minimalWorkflow('w') as unknown as {
+      nodes: Array<{ config?: Record<string, unknown> }>;
+    };
+    old.nodes[1].config = { kind: 'claude', prompt: 'x', cwd: 'D:/work' };
+    file.content = JSON.stringify([old]);
+
+    const node = store.list()[0].nodes[1];
+    expect(node.type === 'agent' && node.config.permission).toBeUndefined();
+  });
+
   it('檔案不存在時是空清單', () => {
     expect(store.list()).toEqual([]);
   });

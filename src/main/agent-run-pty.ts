@@ -1,4 +1,4 @@
-import type { AgentEvent, AgentKind } from '../shared/agent';
+import type { AgentEvent, AgentKind, AgentPermission } from '../shared/agent';
 import type { BillingMode } from '../shared/cli-auth';
 import { usageLabel } from '../shared/cli-auth';
 import type { IAgentRun } from './agent-runner';
@@ -30,8 +30,11 @@ export class AgentRunPty implements IPtyProcess {
     prompt: string,
     /** CLI 的登入方式，決定結果那一行的金額要不要標成估算。*/
     private readonly mode: BillingMode = 'unknown',
+    /** 只有「完全放行」要在標頭上講出來 —— 它會真的執行任何指令。*/
+    permission: AgentPermission = 'readonly',
   ) {
-    this.write_(`${DIM}[${kind}] 任務：${oneLine(prompt)}${RESET}`);
+    const warning = permission === 'full' ? ' [完全放行]' : '';
+    this.write_(`${DIM}[${kind}] 任務：${oneLine(prompt)}${warning}${RESET}`);
     this.run.onEvent((event) => this.render(event));
   }
 

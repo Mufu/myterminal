@@ -36,6 +36,14 @@ describe('AgentRunPty 把事件變成終端機看得懂的文字', () => {
     expect(out.lines()).toEqual(['[claude] 任務：讀 README 然後 說一句話']);
   });
 
+  it('完全放行時標題後面掛一個提醒 —— 終端機上看得到', () => {
+    const pty = new AgentRunPty(run, 'claude', '做事', 'unknown', 'full');
+    const chunks: string[] = [];
+    pty.onData((data) => chunks.push(data));
+    const text = chunks.join('').replace(/\x1b\[\d+m/g, '');
+    expect(text).toBe('[claude] 任務：做事 [完全放行]\r\n');
+  });
+
   it('assistant 文字照原樣輸出，換行換成 CRLF', () => {
     const pty = new AgentRunPty(run, 'claude', 'x');
     const chunks: string[] = [];

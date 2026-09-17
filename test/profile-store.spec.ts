@@ -27,6 +27,21 @@ beforeEach(() => {
 });
 
 describe('ProfileStore 讀取', () => {
+  it('舊檔案的 Agent 任務：allowEdits 換成 permission，兩個都沒有就是唯讀', () => {
+    file.content = JSON.stringify([
+      { type: 'agent', name: '改檔案', kind: 'claude', prompt: 'x', allowEdits: true },
+      { type: 'agent', name: '只看', kind: 'claude', prompt: 'x', allowEdits: false },
+      { type: 'agent', name: '手改過', kind: 'claude', prompt: 'x' },
+    ]);
+
+    expect(store.list().map((p) => p.type === 'agent' && p.permission)).toEqual([
+      'edit',
+      'readonly',
+      'readonly',
+    ]);
+    expect(store.list()[0]).not.toHaveProperty('allowEdits');
+  });
+
   it('檔案不存在時是空清單', () => {
     expect(store.list()).toEqual([]);
   });

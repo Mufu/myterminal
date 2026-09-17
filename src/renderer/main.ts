@@ -351,6 +351,7 @@ function openNodeCli(nodeId: string): void {
       shell: nodeShell(node),
       cwd,
       kind: node.config.kind,
+      permission: node.config.permission ?? 'readonly',
       prompt: renderNodePrompt(node, editorRun()),
       resumeId: nodeResumeId(node),
     }).execute(),

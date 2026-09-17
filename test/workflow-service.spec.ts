@@ -28,7 +28,7 @@ const linear = (): WorkflowDefinition => ({
       type: 'agent',
       label: '實作',
       position: at,
-      config: { kind: 'claude', prompt: '{{params.task}}', cwd: 'D:/work', allowEdits: true },
+      config: { kind: 'claude', prompt: '{{params.task}}', cwd: 'D:/work', permission: 'edit' },
     },
     { id: 'ask', type: 'approval', label: '批准', position: at, config: { question: '要保留嗎？' } },
     { id: 'skipme', type: 'agent', label: '備援', position: at, config: agentConfig() },
@@ -44,7 +44,7 @@ const linear = (): WorkflowDefinition => ({
 });
 
 function agentConfig(): Extract<WorkflowNode, { type: 'agent' }>['config'] {
-  return { kind: 'claude', prompt: 'x', cwd: 'D:/work', allowEdits: false };
+  return { kind: 'claude', prompt: 'x', cwd: 'D:/work', permission: 'readonly' };
 }
 
 /** 測試共用的一份「磁碟」：清單存在記憶體字串，checkpoint 存在暫存目錄。*/
@@ -108,7 +108,13 @@ describe('WorkflowService', () => {
     expect(waiting.totalCostUsd).toBeCloseTo(0.1);
     // 提示樣板是在編排層代入的，所以工作階段的名字與提示都是最終版本。
     expect(sessions.adopted).toEqual([
-      { name: '測試流程 · 實作', kind: 'claude', prompt: '建立 hello.txt', cwd: 'D:/work' },
+      {
+        name: '測試流程 · 實作',
+        kind: 'claude',
+        prompt: '建立 hello.txt',
+        cwd: 'D:/work',
+        permission: 'edit',
+      },
     ]);
   });
 
@@ -276,7 +282,7 @@ describe('內建範本', () => {
 
     const waiting = await waitFor(service, 'waiting_approval');
     expect(waiting.question).toBe('要保留這次的變更嗎？');
-    expect(runner.tasks.map((t) => t.allowEdits)).toEqual([true, false]);
+    expect(runner.tasks.map((t) => t.permission)).toEqual(['edit', 'readonly']);
     expect(runner.tasks[0]).toMatchObject({ prompt: '建立 hello.txt', cwd: 'D:/tmp' });
     expect(runner.tasks[1].prompt).toContain('最後一行只輸出 PASS 或 FAIL');
     expect(waiting.nodes.fix.status).toBe('idle');

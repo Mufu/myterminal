@@ -1,5 +1,6 @@
 import type { ConnectionProfile, SessionType, BaseShell } from '../shared/profile';
-import type { AgentKind } from '../shared/agent';
+import type { AgentKind, AgentPermission } from '../shared/agent';
+import { PERMISSION_LABELS, PERMISSIONS } from '../shared/agent';
 import type { AgentRole } from '../shared/roles';
 import { ROLES, findRole } from '../shared/roles';
 import { defaultStartupCommand, isCliType } from '../shared/profile';
@@ -36,10 +37,12 @@ export class NewConnectionDialog implements DialogPort {
   private readonly errors = $<HTMLParagraphElement>('f-errors');
   private readonly saveProfile = $<HTMLInputElement>('f-save');
   private readonly roleSelect = $<HTMLSelectElement>('f-agent-role');
+  private readonly permissionSelect = $<HTMLSelectElement>('f-agent-permission');
 
   constructor(private readonly onCreate: (profile: ConnectionProfile, save: boolean) => void) {
     this.typeSelect.addEventListener('change', () => this.syncFields());
     this.fillRoles();
+    this.fillPermissions();
     this.roleSelect.addEventListener('change', () => this.applyRoleDefault());
     $('f-ok').addEventListener('click', (event) => this.submit(event));
     this.syncFields();
@@ -55,10 +58,20 @@ export class NewConnectionDialog implements DialogPort {
     }
   }
 
-  /** 換角色時把「允許修改檔案」帶到那個角色的預設值；只在換的時候動它。*/
+  /** 權限的三檔；「完全放行」的標籤自己帶著警語。*/
+  private fillPermissions(): void {
+    for (const permission of PERMISSIONS) {
+      const option = document.createElement('option');
+      option.value = permission;
+      option.textContent = PERMISSION_LABELS[permission];
+      this.permissionSelect.appendChild(option);
+    }
+  }
+
+  /** 換角色時把「權限」帶到那個角色的預設值；只在換的時候動它。*/
   private applyRoleDefault(): void {
     const role = findRole(this.roleSelect.value);
-    if (role) $<HTMLInputElement>('f-agent-edits').checked = role.defaultAllowEdits;
+    if (role) this.permissionSelect.value = role.defaultPermission;
   }
 
   open(): void {
@@ -145,7 +158,7 @@ export class NewConnectionDialog implements DialogPort {
           cwd,
           kind: $<HTMLSelectElement>('f-agent-kind').value as AgentKind,
           prompt: $<HTMLTextAreaElement>('f-agent-prompt').value.trim(),
-          allowEdits: $<HTMLInputElement>('f-agent-edits').checked,
+          permission: this.permissionSelect.value as AgentPermission,
           role: (this.roleSelect.value as AgentRole) || undefined,
         };
 

@@ -9,6 +9,8 @@ import type {
 } from '../src/shared/workflow';
 import { TEMPLATES } from '../src/main/workflow/templates';
 import type { AgentRole } from '../src/shared/roles';
+import type { AgentPermission } from '../src/shared/agent';
+import { permissionFromAllowEdits } from '../src/shared/agent';
 
 const at = { x: 0, y: 0 };
 
@@ -19,7 +21,7 @@ const agent = (id: string): WorkflowNode => ({
   type: 'agent',
   label: id,
   position: at,
-  config: { kind: 'claude', prompt: 'x', cwd: 'D:/work', allowEdits: false },
+  config: { kind: 'claude', prompt: 'x', cwd: 'D:/work', permission: 'readonly' },
 });
 const condition = (id: string, source: string, rule?: ConditionRule): WorkflowNode => ({
   id,
@@ -144,6 +146,11 @@ describe('validateWorkflow', () => {
     expect(validateWorkflow(twice).join()).toContain('出口 (單一) 重複連線');
   });
 
+  it('舊資料的 allowEdits 兩檔對到三檔的哪兩檔', () => {
+    expect(permissionFromAllowEdits(true)).toBe('edit');
+    expect(permissionFromAllowEdits(false)).toBe('readonly');
+  });
+
   it('agent 節點的角色必須是內建的那五個之一', () => {
     const ok = minimal();
     (ok.nodes[1] as Extract<WorkflowNode, { type: 'agent' }>).config.role = 'reviewer';
@@ -152,6 +159,20 @@ describe('validateWorkflow', () => {
     const bad = minimal();
     (bad.nodes[1] as Extract<WorkflowNode, { type: 'agent' }>).config.role = 'boss' as AgentRole;
     expect(validateWorkflow(bad)).toEqual(['節點 a 的角色不存在：boss']);
+  });
+
+  it('agent 節點的權限必須是三檔之一，沒寫也可以 (預設唯讀)', () => {
+    const ok = minimal();
+    const config = (ok.nodes[1] as Extract<WorkflowNode, { type: 'agent' }>).config;
+    config.permission = 'full';
+    expect(validateWorkflow(ok)).toEqual([]);
+    delete config.permission;
+    expect(validateWorkflow(ok)).toEqual([]);
+
+    const bad = minimal();
+    (bad.nodes[1] as Extract<WorkflowNode, { type: 'agent' }>).config.permission =
+      'yolo' as AgentPermission;
+    expect(validateWorkflow(bad)).toEqual(['節點 a 的權限不存在：yolo']);
   });
 
   it('agent 節點的提示與工作目錄不能是空的', () => {

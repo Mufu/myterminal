@@ -221,14 +221,14 @@ describe('SessionManager 生命週期', () => {
 });
 
 describe('SessionManager 的 agent 任務', () => {
-  const task = { type: 'agent', kind: 'claude', prompt: '只回覆 OK', allowEdits: false } as const;
+  const task = { type: 'agent', kind: 'claude', prompt: '只回覆 OK', permission: 'readonly' } as const;
 
   it('不經過 node-pty，改交給 IAgentRunner', () => {
     const info = manager.create({ ...task, cwd: 'C:/work' }, 80, 24);
 
     expect(spawner.spawned).toEqual([]);
     expect(agents.tasks).toEqual([
-      { kind: 'claude', prompt: '只回覆 OK', cwd: 'C:/work', allowEdits: false },
+      { kind: 'claude', prompt: '只回覆 OK', cwd: 'C:/work', permission: 'readonly' },
     ]);
     expect(info.type).toBe('agent');
     expect(info.name).toBe('Agent 1');

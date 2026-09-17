@@ -1,4 +1,5 @@
-import type { AgentKind } from './agent';
+import type { AgentKind, AgentPermission } from './agent';
+import { isAgentPermission } from './agent';
 import type { BaseShell } from './profile';
 import type { AgentRole } from './roles';
 import { findRole } from './roles';
@@ -32,7 +33,8 @@ export interface AgentNodeConfig {
   /** 提示樣板：`{{<nodeId>.text}}` 代入上游節點的輸出，`{{params.x}}` 代入啟動參數。*/
   prompt: string;
   cwd?: string;
-  allowEdits: boolean;
+  /** 給 CLI 多少權限；沒寫就是最保守的唯讀。*/
+  permission?: AgentPermission;
   /** 畫布上的「手動操作」要在哪個終端機裡開；執行那一側不看它。*/
   shell?: BaseShell;
   /** 角色：前置指示在 shared/roles.ts，這裡只存 id。*/
@@ -115,6 +117,9 @@ export function validateWorkflow(def: WorkflowDefinition): string[] {
       if (!node.config.cwd?.trim()) errors.push(`節點 ${node.id} 的工作目錄不能是空的`);
       if (node.config.role !== undefined && !findRole(node.config.role)) {
         errors.push(`節點 ${node.id} 的角色不存在：${node.config.role}`);
+      }
+      if (node.config.permission !== undefined && !isAgentPermission(node.config.permission)) {
+        errors.push(`節點 ${node.id} 的權限不存在：${node.config.permission}`);
       }
     } else if (node.type === 'condition') {
       // 來源沒設或指到沒有輸出的節點，執行時那個條件永遠走「否」。

@@ -39,7 +39,7 @@ describe('profileMeta 的 agent 任務', () => {
         name: 'a',
         kind: 'claude',
         prompt: '每天早上整理 TODO',
-        allowEdits: false,
+        permission: 'readonly',
       }),
     ).toBe('每天早上整理 TODO');
   });

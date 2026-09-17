@@ -148,7 +148,7 @@ describe('程式碼審查（唯讀）跑一次', () => {
     expect(done.nodes.reviewer.status).toBe('done');
     expect(done.nodes.end.status).toBe('done');
     expect(runner.tasks).toHaveLength(1);
-    expect(runner.tasks[0]).toMatchObject({ cwd: 'D:/work', allowEdits: false });
+    expect(runner.tasks[0]).toMatchObject({ cwd: 'D:/work', permission: 'readonly' });
     expect(runner.tasks[0].prompt).toContain('審查「src/main 的錯誤處理」指定的範圍');
     expect(runner.tasks[0].prompt).toContain('最後一行只輸出 PASS 或 FAIL');
   });
