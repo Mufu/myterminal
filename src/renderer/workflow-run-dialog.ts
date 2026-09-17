@@ -32,11 +32,13 @@ export function parseBudget(raw: string): number | undefined {
 export class WorkflowRunDialog implements DialogPort {
   private readonly dialog = $<HTMLDialogElement>('workflow-run');
   private readonly workflow = $<HTMLSelectElement>('w-template');
+  private readonly description = $<HTMLParagraphElement>('w-description');
   private readonly task = $<HTMLTextAreaElement>('w-task');
   private readonly cwd = $<HTMLInputElement>('w-cwd');
   private readonly budget = $<HTMLInputElement>('w-budget');
   private readonly errors = $<HTMLParagraphElement>('w-errors');
   private mode: BillingMode = 'unknown';
+  private infos: WorkflowInfo[] = [];
 
   constructor(
     private readonly onStart: (
@@ -46,10 +48,12 @@ export class WorkflowRunDialog implements DialogPort {
     ) => void | Promise<void>,
   ) {
     $('w-ok').addEventListener('click', (event) => this.submit(event));
+    this.workflow.addEventListener('change', () => this.showDescription());
   }
 
   /** 內建範本與自訂工作流各自一個分組；沒有自訂的就不要那個空分組。*/
   setWorkflows(infos: WorkflowInfo[]): void {
+    this.infos = infos;
     this.workflow.textContent = '';
     for (const [label, builtin] of [
       ['內建', true],
@@ -67,6 +71,13 @@ export class WorkflowRunDialog implements DialogPort {
       }
       this.workflow.appendChild(optgroup);
     }
+    this.showDescription();
+  }
+
+  /** 選中的那一個的說明；沒有說明的工作流就留白。*/
+  private showDescription(): void {
+    const info = this.infos.find((i) => i.id === this.workflow.value);
+    this.description.textContent = info?.description ?? '';
   }
 
   /** CLI 的登入方式探測完才知道上限要不要先填一個數字。*/
@@ -80,6 +91,7 @@ export class WorkflowRunDialog implements DialogPort {
     // 只有 API 金鑰登入時這個上限才是真的在擋錢，訂閱帳號預設不限制。
     this.budget.value = this.mode === 'api' ? String(DEFAULT_MAX_TOTAL_COST_USD) : '';
     if (workflowId) this.workflow.value = workflowId;
+    this.showDescription();
     this.dialog.showModal();
     this.task.focus();
   }

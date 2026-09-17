@@ -7,7 +7,9 @@ import type { WorkflowStore } from './workflow-store';
  * 不必知道一個 id 是寫死的範本還是使用者存下來的。
  */
 export function listWorkflows(store: WorkflowStore): WorkflowInfo[] {
-  const custom = store.list().map(({ id, name }) => ({ id, name, builtin: false }));
+  const custom = store
+    .list()
+    .map(({ id, name, description }) => ({ id, name, description, builtin: false }));
   return [...templateInfos(), ...custom];
 }
 

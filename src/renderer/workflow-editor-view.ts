@@ -206,10 +206,12 @@ export class WorkflowEditorView {
       if (group.length === 0) continue;
       const optgroup = document.createElement('optgroup');
       optgroup.label = label;
-      for (const { id, name } of group) {
+      for (const { id, name, description } of group) {
         const option = document.createElement('option');
         option.value = id;
         option.textContent = name;
+        // 說明放在 title 上：下拉太窄寫不下，滑鼠停著就看得到。
+        if (description) option.title = description;
         optgroup.appendChild(option);
       }
       this.picker.appendChild(optgroup);

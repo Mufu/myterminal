@@ -81,6 +81,8 @@ export interface WorkflowDefinition {
   version: 1;
   id: string;
   name: string;
+  /** 一句話說明這個工作流在做什麼；清單上顯示，選填。*/
+  description?: string;
   nodes: WorkflowNode[];
   edges: WorkflowEdge[];
 }
@@ -232,5 +234,7 @@ export interface RunState {
 export interface WorkflowInfo {
   id: string;
   name: string;
+  /** 從定義複製過來的一句話說明，沒有就是沒有。*/
+  description?: string;
   builtin: boolean;
 }
