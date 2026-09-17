@@ -6,7 +6,8 @@
 排程器：`GraphCompiler` 把一份 JSON 定義編譯成真的 `StateGraph`，節點之間怎麼走、
 狀態怎麼合併、中斷之後怎麼接回去，全部是 LangGraph 的工作。
 
-內建範本一個，加上一張 **LabVIEW 風格的拖拉畫布**（見下面的[畫布編輯器](#畫布編輯器)）——
+內建範本八份（見下面的[內建範本](#內建範本)），加上一張 **LabVIEW 風格的拖拉畫布**
+（見下面的[畫布編輯器](#畫布編輯器)）——
 畫布編輯的就是下面這份 JSON，所以 schema 一開始就帶著節點座標。
 
 ## JSON schema（version 1）
@@ -18,6 +19,7 @@ type WorkflowDefinition = {
   version: 1;
   id: string;
   name: string;
+  description?: string;      // 一句話說明，執行對話框會顯示；選填
   nodes: WorkflowNode[];
   edges: WorkflowEdge[];
 };
@@ -113,6 +115,32 @@ type WorkflowEdge = {
 | `{{params.<名稱>}}` | 啟動時填的參數（範本是 `task` 與 `cwd`） |
 
 找不到的來源代空字串；看不懂的樣板原樣留著。**沒有其他變數、沒有運算式**。
+
+### 內建範本
+
+八份，寫死在 [`templates.ts`](../src/main/workflow/templates.ts)，跟自訂工作流同一種格式。
+每一份都只吃 `{{params.task}}`（任務）與 `{{params.cwd}}`（工作目錄）兩個啟動參數，
+節點的提示只寫「這一步要做什麼」，職責與語氣交給[角色](#角色)。
+被條件看的節點，提示最後一定有一句「最後一行只輸出 X 或 Y」，
+迴圈一律是 `resumeFrom` ＋ `maxAttempts: 3`。
+
+| id | 名稱 | 節點 | 做什麼 | 順利時幾次 CLI |
+| --- | --- | --- | --- | --- |
+| `implement-review-approve` | 實作 → 審查 → 批准 | 7 | 工程師做、審查者看、停下來讓你決定要不要保留 | 2 |
+| `software-dev` | 軟體開發：需求 → 設計 → 實作 → 測試 → 審查 | 13 | 產品經理拆驗收清單 → 架構師設計 → **批准設計** → 實作 → 補測試 → 審查 → **批准變更** | 5 |
+| `bug-fix` | 修 bug：重現 → 修正 → 驗證 → 審查 | 10 | 先寫一個會失敗的測試重現 bug，再修到它會過、審查、批准；重現不出來就停在「無法重現」那個結束節點 | 3 |
+| `code-review` | 程式碼審查（唯讀） | 3 | 只看不改：審查指定的範圍或目前工作目錄的變更，依嚴重度列出問題與檔案行號。沒有批准節點 | 1 |
+| `write-tests` | 補測試 | 9 | 測試工程師補測試跑到綠（只能改測試），審查者確認那些測試有意義、沒有為了變綠改產品碼 | 2 |
+| `refactor` | 重構：方案 → 批准 → 執行 → 測試 | 11 | 架構師提方案與風險 → **批准方案** → 只改結構不改行為 → 跑既有測試 → 審查 → 批准 | 4 |
+| `plan-only` | 需求分析（只規劃不動碼） | 4 | 兩個唯讀節點：拆工作項目與待釐清的問題，再給實作順序與要動的檔案。一個檔案都不會動 | 2 |
+| `cross-review` | 交叉審查：Claude 實作，Codex 審查 | 7 | 實作是 `claude`、審查是 `codex`，換一雙眼睛看。**兩支 CLI 都要先登入** | 2 |
+
+「順利時幾次 CLI」是一路沒有被打回票的次數；審查或測試每被打回一次，
+就多一次「修正」再加上重跑那個節點。批准節點不呼叫 CLI。
+
+排版的慣例：主列在 `y=0`、水平間距 180，回頭的那一排（修正節點）在 `y=160`。
+`test/templates.spec.ts` 會擋住座標撞在一起、條件來源或 `resumeFrom` 指錯人、
+以及編不起來的範本。
 
 ### 例子
 
@@ -213,7 +241,7 @@ type WorkflowEdge = {
 
 | 頻道 | 參數 | 回傳 |
 | --- | --- | --- |
-| `workflow:list` | — | `WorkflowInfo[]`（`{ id, name, builtin }`） |
+| `workflow:list` | — | `WorkflowInfo[]`（`{ id, name, description?, builtin }`；執行對話框把 `description` 寫在下拉底下那一行） |
 | `workflow:get` | `id` | `WorkflowDefinition` 或 `undefined` |
 | `workflow:save` | `WorkflowDefinition` | — ，不合法就以驗證訊息 reject |
 | `workflow:delete` | `id` | — ，不存在就什麼都不做 |
