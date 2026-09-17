@@ -183,6 +183,10 @@ export function cliStartupCommand(
  * 「接手」：把跑完的 agent 任務接到一個真的互動式工作階段裡。
  * 走的是既有的 Claude / Codex 型別 (PowerShell 起 shell 再送啟動指令)，
  * 所以接手之後跟平常自己開 claude 沒有兩樣。
+ *
+ * 權限跟著那次任務走：本來就是「完全放行」跑出來的，接手之後還是要跑得動指令
+ * (不然接過去第一件事就被權限擋住)，所以啟動指令跟畫布上的「開終端機並啟動」
+ * 用同一個 cliStartupCommand。沒記到權限的舊工作階段當成唯讀。
  */
 export class TakeOverCommand implements ICommand {
   constructor(
@@ -191,14 +195,14 @@ export class TakeOverCommand implements ICommand {
   ) {}
 
   execute(): void {
-    const { agentKind, agentSessionId } = this.session;
+    const { agentKind, agentSessionId, permission } = this.session;
     if (!agentKind || !agentSessionId) return;
     this.connect({
       type: agentKind,
       name: `接手 ${this.session.name}`,
       cwd: this.session.cwd,
       baseShell: 'powershell',
-      startupCommand: resumeCommand(agentKind, agentSessionId),
+      startupCommand: cliStartupCommand(agentKind, permission ?? 'readonly', agentSessionId),
     });
   }
 }

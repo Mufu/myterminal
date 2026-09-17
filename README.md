@@ -122,6 +122,9 @@ AGENT_E2E_OK
   按下去會開一個**真的互動式**工作階段（PowerShell 裡跑 `claude --resume <id>`、
   `codex resume <id>`、`muse resume <uuid>` 或 `opencode --session <id>`），
   接著同一段對話繼續問下去。
+  **權限跟著那次任務走**：本來就是「完全放行」跑出來的，接手開的 CLI 也補上同一個旗標
+  （`claude --resume <id> --dangerously-skip-permissions` 等），不然接過去第一件事又被權限擋住；
+  這種工作階段在右側清單上的類型標籤旁邊會多一個「完全放行」標記。
   app 裡的 agent 任務本身不能追問，追問就是用接手。
 - 這一頁的任務也可以像其他類型一樣勾「儲存此連線設定」存起來重複用。
 

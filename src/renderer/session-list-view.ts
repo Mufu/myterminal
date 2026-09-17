@@ -1,6 +1,7 @@
 import type { AppState } from './app-state';
 import type { SessionInfo } from '../shared/session';
 import { TYPE_LABELS } from '../shared/profile';
+import { PERMISSION_LABELS } from '../shared/agent';
 import { findRole } from '../shared/roles';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -94,6 +95,15 @@ export class SessionListView {
       }
 
       meta.append(tag);
+
+      // 「完全放行」跑出來的任務：接手之後也會帶著同一個旗標，清單上先講清楚。
+      if (session.permission === 'full') {
+        const permTag = document.createElement('span');
+        permTag.className = 'perm-tag';
+        permTag.textContent = '完全放行';
+        permTag.title = PERMISSION_LABELS.full;
+        meta.appendChild(permTag);
+      }
 
       // 選了角色的 agent 任務多貼一個標籤，跟工作流節點那一列同一個樣子。
       const role = session.role ? findRole(session.role) : undefined;

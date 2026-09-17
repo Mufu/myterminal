@@ -102,6 +102,7 @@ export class SessionManager extends EventEmitter<SessionEvents> {
       logging: false,
       cwd: spec.cwd,
       agentKind: spec.kind,
+      permission: spec.permission,
     };
     this.watchAgentSessionId(run, info);
     this.register(
@@ -169,6 +170,7 @@ export class SessionManager extends EventEmitter<SessionEvents> {
     info.cwd = cwd;
     info.agentKind = profile.kind;
     info.role = profile.role;
+    info.permission = profile.permission;
 
     // 工作目錄不存在時 spawn 只會丟 ENOENT，看不出是目錄的問題。
     if (!this.exists(cwd)) {

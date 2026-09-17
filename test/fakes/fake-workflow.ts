@@ -53,6 +53,7 @@ export class FakeSessions implements IWorkflowSessions {
       logging: false,
       cwd: spec.cwd,
       agentKind: spec.kind,
+      permission: spec.permission,
     };
   }
 }

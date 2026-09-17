@@ -1,5 +1,5 @@
 import type { SessionType } from './profile';
-import type { AgentKind } from './agent';
+import type { AgentKind, AgentPermission } from './agent';
 import type { AgentRole } from './roles';
 
 export type SessionState = 'running' | 'exited';
@@ -22,4 +22,6 @@ export interface SessionInfo {
   agentSessionId?: string;
   /** type === 'agent' 時選的角色，清單上貼一個標籤。*/
   role?: AgentRole;
+  /** type === 'agent' 時跑的權限；「接手」要靠它決定啟動指令帶不帶跳過權限的旗標。*/
+  permission?: AgentPermission;
 }

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { SessionManager } from '../src/main/session-manager';
 import { ShellFactory } from '../src/main/shell-factory';
 import { FakePtySpawner } from './fakes/fake-pty';
-import { FakeAgentRunner } from './fakes/fake-agent';
+import { FakeAgentRun, FakeAgentRunner } from './fakes/fake-agent';
 import type { DataEvent, ExitEvent } from '../src/shared/ipc';
 import type { SessionInfo } from '../src/shared/session';
 import { findRole } from '../src/shared/roles';
@@ -236,6 +236,26 @@ describe('SessionManager 的 agent 任務', () => {
     expect(info.cwd).toBe('C:/work');
   });
 
+  /** 「接手」要靠它決定啟動指令帶不帶跳過權限的旗標。*/
+  it('把這次跑的權限記在工作階段上', () => {
+    expect(manager.create(task, 80, 24).permission).toBe('readonly');
+    expect(manager.create({ ...task, permission: 'full' }, 80, 24).permission).toBe('full');
+  });
+
+  it('工作目錄不存在時也記得權限', () => {
+    const missing = new SessionManager(
+      spawner,
+      new ShellFactory((name) => name),
+      (fn) => fn(),
+      () => agents,
+      undefined,
+      () => false,
+    );
+    expect(missing.create({ ...task, cwd: 'C:/nope', permission: 'full' }, 80, 24).permission).toBe(
+      'full',
+    );
+  });
+
   it('選了角色就把前置指示一起交給 CLI，並記在工作階段上', () => {
     const info = manager.create({ ...task, role: 'reviewer' }, 80, 24);
 
@@ -302,5 +322,18 @@ describe('SessionManager 的 agent 任務', () => {
     const info = manager.create(task, 80, 24);
     manager.close(info.id);
     expect(agents.last().cancelled).toBe(true);
+  });
+
+  /** 工作流的節點也是同一件事：接手時要知道那個節點跑的是哪一檔權限。*/
+  it('收編工作流的節點時把權限記在工作階段上', () => {
+    const info = manager.adoptAgentRun(new FakeAgentRun(), {
+      name: '我的流程 · 實作',
+      kind: 'claude',
+      prompt: 'x',
+      cwd: 'C:/work',
+      permission: 'full',
+    });
+    expect(info.permission).toBe('full');
+    expect(manager.list()[0].permission).toBe('full');
   });
 });

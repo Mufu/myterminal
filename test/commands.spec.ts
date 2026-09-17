@@ -363,6 +363,45 @@ describe('TakeOverCommand', () => {
     expect(connect).not.toHaveBeenCalled();
   });
 
+  /** 完全放行跑出來的任務，接手之後也要跑得動指令。*/
+  it('四支 CLI 完全放行時啟動指令帶著跳過權限的旗標', () => {
+    const startup = (over: Partial<SessionInfo>): unknown => {
+      const connect = vi.fn();
+      new TakeOverCommand(connect, finished(over)).execute();
+      return (connect.mock.calls[0][0] as ConnectionProfile & { startupCommand?: string })
+        .startupCommand;
+    };
+
+    expect(startup({ agentKind: 'claude', agentSessionId: 'x', permission: 'full' })).toBe(
+      'claude --resume x --dangerously-skip-permissions',
+    );
+    expect(startup({ agentKind: 'codex', agentSessionId: 'x', permission: 'full' })).toBe(
+      'codex resume x --sandbox danger-full-access',
+    );
+    expect(startup({ agentKind: 'muse', agentSessionId: 'x', permission: 'full' })).toBe(
+      'muse resume x --approval-mode never',
+    );
+    expect(startup({ agentKind: 'opencode', agentSessionId: 'x', permission: 'full' })).toBe(
+      'opencode --session x --auto',
+    );
+  });
+
+  it('不是完全放行 (含沒記到權限的舊工作階段) 就只有接續那一條', () => {
+    const startup = (over: Partial<SessionInfo>): unknown => {
+      const connect = vi.fn();
+      new TakeOverCommand(connect, finished(over)).execute();
+      return (connect.mock.calls[0][0] as ConnectionProfile & { startupCommand?: string })
+        .startupCommand;
+    };
+
+    for (const kind of ['claude', 'codex', 'muse', 'opencode'] as const) {
+      const base = resumeCommand(kind, 'x');
+      expect(startup({ agentKind: kind, agentSessionId: 'x', permission: 'readonly' })).toBe(base);
+      expect(startup({ agentKind: kind, agentSessionId: 'x', permission: 'edit' })).toBe(base);
+      expect(startup({ agentKind: kind, agentSessionId: 'x', permission: undefined })).toBe(base);
+    }
+  });
+
   it('resumeCommand 四支 CLI 的形式', () => {
     expect(resumeCommand('claude', 'x')).toBe('claude --resume x');
     expect(resumeCommand('codex', 'x')).toBe('codex resume x');

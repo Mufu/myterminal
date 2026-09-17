@@ -904,6 +904,20 @@ html[data-theme='warm'] .session-item.active .session-dot {
   text-transform: var(--tag-transform);
 }
 
+/* 「完全放行」標籤：跟角色標籤同一個外形，換成紀錄中那個紅色 ——
+   這一列接手之後也會帶著跳過權限的旗標，要一眼看得出來。*/
+.perm-tag {
+  white-space: nowrap;
+  padding: var(--tag-pad);
+  border: var(--tag-border-width) solid transparent;
+  border-radius: var(--tag-radius);
+  background: color-mix(in srgb, var(--recording) 16%, transparent);
+  color: var(--recording);
+  font-size: var(--tag-size);
+  letter-spacing: var(--tag-tracking);
+  text-transform: var(--tag-transform);
+}
+
 .session-state {
   display: flex;
   align-items: center;

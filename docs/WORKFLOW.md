@@ -84,6 +84,17 @@ muse 只有「擋掉」與「全部放行」兩檔，所以 `edit` 與 `full` �
 | `muse` | `--session-id <uuid>` | `muse resume <uuid>` |
 | `opencode` | `--session <id>` | `opencode --session <id>` |
 
+**接手會帶著那次任務的權限。** 工作階段身上記著它是用哪一檔跑的
+（`SessionInfo.permission`，來自 agent 任務的設定或節點的 `AdoptSpec`），
+本來就是 `full` 跑出來的，接手開的互動式 CLI 也補上同一個旗標
+（`claude --resume <id> --dangerously-skip-permissions`、
+`codex resume <id> --sandbox danger-full-access`、
+`muse resume <id> --approval-mode never`、`opencode --session <id> --auto`）——
+不然接過去第一件事（例如「把測試跑完」）又被權限擋住。
+唯讀與可修改檔案不補旗標，用 CLI 自己的互動式預設；
+沒記到權限的舊工作階段當成唯讀。右側清單上，`full` 跑出來的那一列
+在類型標籤旁邊多一個「完全放行」標記。
+
 #### 為什麼需要 `full`
 
 **無介面的 `claude` 在 `acceptEdits` 下改得了檔案，卻擋掉 Bash 指令。**
