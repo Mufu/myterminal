@@ -155,6 +155,13 @@ function adoptTerminal(id: string): void {
   }
 }
 
+/**
+ * 上一次把焦點交出去的工作階段。syncTerminals() 每次狀態變動都會跑，
+ * 每次都 focus() 會把使用者正在輸入字面板裡打的字 (含 IME 正在組的字) 搶走，
+ * 所以只有真的換了工作階段才搶。
+ */
+let focusedSessionId: string | null = null;
+
 /** 讓畫面上顯示的終端機與 AppState 一致，並清掉已關閉工作階段的檢視。*/
 function syncTerminals(): void {
   const alive = new Set(state.sessions.map((s) => s.id));
@@ -167,9 +174,15 @@ function syncTerminals(): void {
       terminals.delete(id);
       continue;
     }
-    if (id === state.activeSessionId) view.show();
-    else view.hide();
+    if (id === state.activeSessionId) {
+      view.show();
+      if (focusedSessionId !== id) {
+        focusedSessionId = id;
+        view.focus();
+      }
+    } else view.hide();
   }
+  if (state.activeSessionId === null) focusedSessionId = null;
   emptyHint.hidden = state.sessions.length > 0;
 }
 
@@ -192,7 +205,12 @@ const inputPanel = new InputPanel(
   $<HTMLElement>('input-target-name'),
   $<HTMLElement>('input-target-dot'),
   state,
-  () => activeTerminal()?.resize(),
+  (visible) => {
+    const terminal = activeTerminal();
+    terminal?.resize();
+    // 收起來的時候焦點要還給終端機；打開的時候留在輸入區 (面板自己會 focus)。
+    if (!visible) terminal?.focus();
+  },
 );
 
 const themeSelect = $<HTMLSelectElement>('theme-select');

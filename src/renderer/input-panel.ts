@@ -12,7 +12,7 @@ export class InputPanel implements InputPanelPort {
     private readonly targetName: HTMLElement,
     private readonly targetDot: HTMLElement,
     private readonly state: AppState,
-    private readonly onVisibilityChange: () => void,
+    private readonly onVisibilityChange: (visible: boolean) => void,
   ) {
     state.subscribe(() => {
       this.sync(state.inputPanelVisible);
@@ -43,7 +43,7 @@ export class InputPanel implements InputPanelPort {
     if (this.panel.hidden === !visible) return;
     this.panel.hidden = !visible;
     // 面板佔掉高度，終端機要重新量測。
-    this.onVisibilityChange();
+    this.onVisibilityChange(visible);
     if (visible) this.textarea.focus();
   }
 }
