@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { listWorkflows, findWorkflow } from '../src/main/workflow/catalog';
 import { WorkflowStore } from '../src/main/workflow/workflow-store';
+import { TEMPLATES } from '../src/main/workflow/templates';
 import { minimalWorkflow } from './fakes/fake-workflow';
 
 let store: WorkflowStore;
@@ -14,18 +15,24 @@ beforeEach(() => {
 });
 
 describe('工作流目錄', () => {
-  it('只有內建範本時列出內建的', () => {
-    expect(listWorkflows(store)).toEqual([
-      { id: 'implement-review-approve', name: '實作 → 審查 → 批准', builtin: true },
-    ]);
+  it('只有內建範本時列出內建的，順序跟 TEMPLATES 一樣、說明也帶著', () => {
+    const infos = listWorkflows(store);
+    expect(infos.map((w) => w.id)).toEqual(TEMPLATES.map((t) => t.id));
+    expect(infos.every((w) => w.builtin)).toBe(true);
+    expect(infos[0]).toEqual({
+      id: 'implement-review-approve',
+      name: '實作 → 審查 → 批准',
+      description: TEMPLATES[0].description,
+      builtin: true,
+    });
   });
 
   it('自訂的排在內建的後面，而且標成不是內建', () => {
     store.save(minimalWorkflow('mine', '我的'));
-    expect(listWorkflows(store).map((w) => [w.id, w.builtin])).toEqual([
-      ['implement-review-approve', true],
-      ['mine', false],
-    ]);
+    const infos = listWorkflows(store);
+    expect(infos[0]).toMatchObject({ id: 'implement-review-approve', builtin: true });
+    expect(infos.at(-1)).toMatchObject({ id: 'mine', builtin: false });
+    expect(infos).toHaveLength(TEMPLATES.length + 1);
   });
 
   it('findWorkflow 先找內建範本，再找自訂的', () => {
