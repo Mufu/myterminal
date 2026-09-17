@@ -43,6 +43,9 @@ export class TerminalView implements TerminalPort {
     this.term.onData(handlers.onInput);
     this.term.onResize(({ cols, rows }) => handlers.onResize(cols, rows));
 
+    // capture：要在 xterm 自己的 compositionstart 之前跑，見 syncTextAreaToCursor()。
+    this.host.addEventListener('compositionstart', () => this.syncTextAreaToCursor(), true);
+
     this.unsubscribeTheme = theme.subscribe(() => {
       this.term.options.theme = THEMES[theme.get()].terminal;
     });
@@ -92,6 +95,38 @@ export class TerminalView implements TerminalPort {
 
   focus(): void {
     this.term.focus();
+  }
+
+  /**
+   * 開始組字時把 xterm 那個隱藏的輸入區搬回游標那一格 ——
+   * Windows 的 TSF 候選字視窗就是貼著它出現的。
+   *
+   * xterm 自己的 _syncTextArea() 在組字期間會直接 return
+   * (upstream xterm.js #5734、修正在 PR #5759)，所以重畫還在路上時開始組字，
+   * 輸入區就停在舊座標，候選字視窗跟著跑掉。這裡在 xterm 的處理之前補一次。
+   *
+   * 只用公開的 term.textarea 與畫出來的 DOM (.xterm-cursor 就是游標那一格)，
+   * 差多少補多少，不必知道 xterm 把座標算在哪個原點上，也不碰它的內部欄位 ——
+   * 小版本升級時最多是選不到元素，那就什麼都不做。這只是補償，不可以丟例外。
+   */
+  private syncTextAreaToCursor(): void {
+    try {
+      const textarea = this.term.textarea;
+      const cursor = this.host.querySelector('.xterm-cursor');
+      if (!textarea || !cursor) return;
+
+      const style = getComputedStyle(textarea);
+      const left = Number.parseFloat(style.left);
+      const top = Number.parseFloat(style.top);
+      if (!Number.isFinite(left) || !Number.isFinite(top)) return;
+
+      const now = textarea.getBoundingClientRect();
+      const target = cursor.getBoundingClientRect();
+      textarea.style.left = `${left + (target.left - now.left)}px`;
+      textarea.style.top = `${top + (target.top - now.top)}px`;
+    } catch {
+      // 位置沒調到就算了，組字本身不受影響。
+    }
   }
 
   dispose(): void {

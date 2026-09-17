@@ -102,6 +102,48 @@ test('注音組字：中間的注音符號不會送進 shell，選完字整個�
   await app.close();
 });
 
+/**
+ * 候選字視窗是貼著 xterm 那個隱藏輸入區出現的。xterm 自己的
+ * _syncTextArea() 在組字期間會直接 return（upstream xterm.js #5734、
+ * 修正在 PR #5759），所以重畫還在路上時開始組字，輸入區就停在舊座標。
+ * TerminalView 在 compositionstart 的 capture 階段補搬一次；
+ * 這裡把輸入區推到左上角假裝它是舊座標，再發 compositionstart。
+ *
+ * （真正的 IME 症狀在這台機器上重現不出來，這是盡力而為的補償。）
+ */
+test('組字開始時隱藏輸入區會被搬回游標那一格', async () => {
+  const { app, window } = await openWithSession();
+  await window.locator('.term-host:not([hidden]) .xterm-screen').click();
+
+  // 打一長串，讓游標離左上角很遠。
+  await window.keyboard.type(`echo ${'A'.repeat(40)}`);
+  await expect(activeRows(window)).toContainText('AAAA');
+  // 游標那一格是 DOM renderer 畫出來的，等它出現再量。
+  await expect(window.locator('.term-host:not([hidden]) .xterm-cursor')).toHaveCount(1);
+
+  const gap = await window.evaluate((selector) => {
+    const ta = document.querySelector<HTMLTextAreaElement>(selector);
+    const cursor = document.querySelector('.term-host:not([hidden]) .xterm-cursor');
+    if (!ta || !cursor) throw new Error('找不到隱藏輸入區或游標');
+
+    // 假裝重畫還在路上：輸入區停在舊座標。
+    ta.style.left = '0px';
+    ta.style.top = '0px';
+    ta.dispatchEvent(
+      new CompositionEvent('compositionstart', { data: '', bubbles: true, composed: true }),
+    );
+
+    const moved = ta.getBoundingClientRect();
+    const cell = cursor.getBoundingClientRect();
+    return { left: Math.abs(moved.left - cell.left), top: Math.abs(moved.top - cell.top) };
+  }, TERM_TEXTAREA);
+
+  expect(gap.left, `左右差 ${gap.left}px`).toBeLessThanOrEqual(2);
+  expect(gap.top, `上下差 ${gap.top}px`).toBeLessThanOrEqual(2);
+  await shot(window, 'composition-anchor');
+  await app.close();
+});
+
 test('輸入字：面板打開之後焦點留在輸入區，注音打的字不會跑進終端機', async () => {
   const { app, window } = await openWithSession();
 
