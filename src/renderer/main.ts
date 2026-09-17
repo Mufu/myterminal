@@ -28,6 +28,9 @@ import {
   ResumeWorkflowCommand,
   CancelWorkflowCommand,
   SelectSessionCommand,
+  OpenNodeShellCommand,
+  OpenNodeCliCommand,
+  CopyNodePromptCommand,
   OpenEditorCommand,
   CloseEditorCommand,
   SaveWorkflowCommand,
@@ -38,10 +41,20 @@ import {
 } from './commands';
 import { WorkflowEditorModel } from './workflow-editor-model';
 import { WorkflowEditorView } from './workflow-editor-view';
+import { CwdPromptDialog } from './cwd-prompt-dialog';
+import type { AgentNode } from './node-shell';
+import {
+  cliSessionName,
+  nodeShell,
+  renderNodePrompt,
+  resolveNodeCwd,
+  shellSessionName,
+} from './node-shell';
+import { latestRunFor } from './workflow-run-view';
 import { ThemeStore } from './theme';
 import type { ClipboardPort, ConfirmPort } from './ports';
 import type { ConnectionProfile, SavedProfile } from '../shared/profile';
-import type { WorkflowInfo } from '../shared/workflow';
+import type { RunState, WorkflowInfo } from '../shared/workflow';
 
 const $ = <T extends HTMLElement>(id: string): T => {
   const el = document.getElementById(id);
@@ -269,11 +282,75 @@ const editorView = new WorkflowEditorView(
     pick: (id) => void pickWorkflow(id),
     openTerminal: (sessionId) => new SelectSessionCommand(state, sessionId).execute(),
     takeOver: (sessionId) => takeOver(sessionId),
+    openShell: (nodeId) => openNodeShell(nodeId),
+    openCli: (nodeId) => openNodeCli(nodeId),
+    copyPrompt: (nodeId) => copyNodePrompt(nodeId),
     resume: (runId, approved) => void new ResumeWorkflowCommand(api, runId, approved).execute(),
     cancel: (run) => void new CancelWorkflowCommand(api, confirmRemove, run).execute(),
   },
   state,
 );
+
+/**
+ * 畫布上的「手動操作」：不跑無介面的執行，直接在節點的工作目錄開一個
+ * 互動式終端機，prompt 由人自己下。
+ */
+const cwdPrompt = new CwdPromptDialog();
+
+/** 畫布上那份工作流最近一次執行；{{params.x}} 就是從它代出來的。*/
+const editorRun = (): RunState | null => latestRunFor(state.runs, editorModel.definition.id);
+
+function agentNode(nodeId: string): AgentNode | null {
+  const node = editorModel.node(nodeId);
+  return node?.type === 'agent' ? node : null;
+}
+
+/** 工作目錄代不出來 (例如 {{params.cwd}} 但還沒跑過) 就問一次。*/
+function withNodeCwd(node: AgentNode, use: (cwd: string) => void): void {
+  const cwd = resolveNodeCwd(node, editorRun());
+  if (cwd) use(cwd);
+  else cwdPrompt.ask(use);
+}
+
+function openNodeShell(nodeId: string): void {
+  const node = agentNode(nodeId);
+  if (!node) return;
+  withNodeCwd(node, (cwd) =>
+    new OpenNodeShellCommand((profile) => void createSession(profile), {
+      name: shellSessionName(editorModel.definition.name, node),
+      shell: nodeShell(node),
+      cwd,
+    }).execute(),
+  );
+}
+
+function openNodeCli(nodeId: string): void {
+  const node = agentNode(nodeId);
+  if (!node) return;
+  withNodeCwd(node, (cwd) =>
+    new OpenNodeCliCommand((profile) => void createSession(profile), state, inputPanel, {
+      name: cliSessionName(editorModel.definition.name, node),
+      shell: nodeShell(node),
+      cwd,
+      kind: node.config.kind,
+      prompt: renderNodePrompt(node, editorRun()),
+      resumeId: nodeResumeId(node),
+    }).execute(),
+  );
+}
+
+/** 這個節點跑過的話就接續它那段對話；換了一支 CLI 就接不上了。*/
+function nodeResumeId(node: AgentNode): string | undefined {
+  const sessionId = editorRun()?.nodes[node.id]?.sessionId;
+  const session = state.sessions.find((s) => s.id === sessionId);
+  return session?.agentKind === node.config.kind ? session.agentSessionId : undefined;
+}
+
+function copyNodePrompt(nodeId: string): void {
+  const node = agentNode(nodeId);
+  if (!node) return;
+  void new CopyNodePromptCommand(clipboard, renderNodePrompt(node, editorRun())).execute();
+}
 
 /** 畫布上的「接手」：節點的工作階段本身知道是哪一支 CLI、哪一段對話。*/
 function takeOver(sessionId: string): void {

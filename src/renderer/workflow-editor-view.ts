@@ -11,6 +11,7 @@ import type {
 } from '../shared/workflow';
 import { NODE_PORTS } from '../shared/workflow';
 import type { AgentKind } from '../shared/agent';
+import type { BaseShell } from '../shared/profile';
 import { CLI_TYPES, TYPE_LABELS as CLI_LABELS } from '../shared/profile';
 import { ROLES, findRole } from '../shared/roles';
 import type { AppState } from './app-state';
@@ -43,6 +44,12 @@ export const TYPE_LABELS: Record<WorkflowNodeType, string> = {
 
 /** 屬性面板的「執行者」下拉：四支 CLI，跟新連接對話框同一組。*/
 const KIND_OPTIONS = CLI_TYPES.map((cli) => [cli, CLI_LABELS[cli]] as [string, string]);
+
+/** 「手動操作」要在哪個終端機裡開；跟新連接對話框的「基礎 shell」同一組。*/
+const SHELL_OPTIONS: Array<[string, string]> = [
+  ['powershell', 'PowerShell'],
+  ['wsl', 'WSL'],
+];
 
 /**
  * 連線是一條立方貝茲：兩端都先水平拉出去，看起來才像接線而不是折線。
@@ -87,6 +94,12 @@ export interface EditorHandlers {
   openTerminal(sessionId: string): void;
   /** 屬性面板的「接手」：開一個真的互動式 CLI 接續那段對話。*/
   takeOver(sessionId: string): void;
+  /** 「手動操作」：在節點的工作目錄開一個互動式終端機。*/
+  openShell(nodeId: string): void;
+  /** 「手動操作」：同上，再順手把那支 CLI 叫起來、提示填進輸入面板。*/
+  openCli(nodeId: string): void;
+  /** 「手動操作」：代好的提示進剪貼簿。*/
+  copyPrompt(nodeId: string): void;
   /** 卡片上的批准／退回。*/
   resume(runId: string, approved: boolean): void;
   /** 編輯列上的「取消」。*/
@@ -306,11 +319,34 @@ export class WorkflowEditorView {
     if (ports.length > 0) body.appendChild(span('wf-port-space', ''));
     card.appendChild(body);
 
+    // 選起來的 agent 卡片直接給手動操作，不必每次都跑去屬性面板。
+    if (node.type === 'agent' && card.classList.contains('selected')) {
+      card.appendChild(this.manualRow(node.id, node.config.kind));
+    }
+
     if (node.type !== 'start') card.appendChild(this.port(node, 'in'));
     if (node.type === 'start') card.appendChild(this.port(node, undefined));
     for (const port of ports) card.appendChild(this.port(node, port));
 
     return card;
+  }
+
+  /** 卡片上的「手動操作」：三個字以內的短按鈕，全名放在 title 裡。*/
+  private manualRow(id: string, kind: AgentKind): HTMLElement {
+    const row = document.createElement('div');
+    row.className = 'wf-manual';
+    row.append(
+      cardButton('wf-open-shell', '終端', '在這個節點的工作目錄開終端機', () =>
+        this.handlers.openShell(id),
+      ),
+      cardButton('wf-open-cli', '啟動', `開終端機並啟動 ${CLI_LABELS[kind]}`, () =>
+        this.handlers.openCli(id),
+      ),
+      cardButton('wf-copy-prompt', '複製', '複製這個節點的提示', () =>
+        this.handlers.copyPrompt(id),
+      ),
+    );
+    return row;
   }
 
   /** 接點圓心就是 portAnchor，連線才會剛好接在圓點上。*/
@@ -533,7 +569,12 @@ export class WorkflowEditorView {
     const kind = select(
       KIND_OPTIONS,
       config.kind,
-      (value) => this.model.updateNode(id, { config: { kind: value as AgentKind } }),
+      (value) => {
+        this.model.updateNode(id, { config: { kind: value as AgentKind } });
+        // 「開終端機並啟動 <CLI>」那顆按鈕上的名字要跟著換。
+        this.propsKey = '';
+        this.renderProps();
+      },
       'props-kind',
     );
 
@@ -605,6 +646,32 @@ export class WorkflowEditorView {
           'props-timeout',
         ),
       ),
+    );
+
+    this.propsPanel.append(
+      title('手動操作'),
+      row(
+        '終端機',
+        select(
+          SHELL_OPTIONS,
+          config.shell ?? 'powershell',
+          (value) => this.model.updateNode(id, { config: { shell: value as BaseShell } }),
+          'props-shell',
+        ),
+      ),
+      actions(
+        [
+          ['props-open-shell', '開終端機', () => this.handlers.openShell(id)],
+          [
+            'props-open-cli',
+            `開終端機並啟動 ${CLI_LABELS[config.kind]}`,
+            () => this.handlers.openCli(id),
+          ],
+          ['props-copy-prompt', '複製提示', () => this.handlers.copyPrompt(id)],
+        ],
+        'stack',
+      ),
+      note('在這個節點的工作目錄開一個互動式終端機，自己下 prompt。提示會先填進「輸入字」面板，看過再按送出。'),
     );
 
     // 這個節點在目前這次執行裡已經有工作階段了：可以去看它，也可以接手。
@@ -721,10 +788,16 @@ function note(text: string): HTMLParagraphElement {
   return el;
 }
 
-/** 屬性面板下方的一排按鈕 (接手／看輸出)。*/
-function actions(buttons: Array<[id: string, label: string, onClick: () => void]>): HTMLDivElement {
+/**
+ * 屬性面板下方的一排按鈕 (接手／看輸出)。
+ * 'stack' 是直的一疊 —— 「開終端機並啟動 OpenCode」那種長標籤排不進一列。
+ */
+function actions(
+  buttons: Array<[id: string, label: string, onClick: () => void]>,
+  layout?: 'stack',
+): HTMLDivElement {
   const el = document.createElement('div');
-  el.className = 'props-actions';
+  el.className = layout ? `props-actions ${layout}` : 'props-actions';
   for (const [id, text, onClick] of buttons) {
     const button = document.createElement('button');
     button.type = 'button';
@@ -733,6 +806,29 @@ function actions(buttons: Array<[id: string, label: string, onClick: () => void]
     button.addEventListener('click', onClick);
     el.appendChild(button);
   }
+  return el;
+}
+
+/**
+ * 卡片上的按鈕要吃掉 pointerdown —— 畫布是用它開始拖曳的，
+ * 不擋的話按一下會順便把節點拖走 (跟 RunOverlay 那幾顆同一個理由)。
+ */
+function cardButton(
+  className: string,
+  text: string,
+  title: string,
+  onClick: () => void,
+): HTMLButtonElement {
+  const el = document.createElement('button');
+  el.type = 'button';
+  el.className = className;
+  el.textContent = text;
+  el.title = title;
+  el.addEventListener('pointerdown', (event) => event.stopPropagation());
+  el.addEventListener('click', (event) => {
+    event.stopPropagation();
+    onClick();
+  });
   return el;
 }
 

@@ -1387,6 +1387,7 @@ html[data-theme='warm'] .session-item.active .session-dot {
 /* ---- 對話框：新連接與執行範本共用同一套規則 ---- */
 #new-connection,
 #workflow-run,
+#cwd-prompt,
 #cli-settings {
   min-width: 420px;
   padding: 0;
@@ -1398,12 +1399,14 @@ html[data-theme='warm'] .session-item.active .session-dot {
 
 #new-connection::backdrop,
 #workflow-run::backdrop,
+#cwd-prompt::backdrop,
 #cli-settings::backdrop {
   background: var(--backdrop);
 }
 
 #new-connection form,
 #workflow-run form,
+#cwd-prompt form,
 #cli-settings form {
   display: flex;
   flex-direction: column;
@@ -1413,6 +1416,7 @@ html[data-theme='warm'] .session-item.active .session-dot {
 
 #new-connection h2,
 #workflow-run h2,
+#cwd-prompt h2,
 #cli-settings h2 {
   margin: 0;
   font-size: 15px;
@@ -1421,6 +1425,7 @@ html[data-theme='warm'] .session-item.active .session-dot {
 
 #new-connection label,
 #workflow-run label,
+#cwd-prompt label,
 #cli-settings label {
   display: flex;
   gap: 8px;
@@ -1438,8 +1443,11 @@ html[data-theme='warm'] .session-item.active .session-dot {
 #new-connection select,
 #new-connection textarea,
 #workflow-run input,
+#cwd-prompt input,
 #workflow-run select,
+#cwd-prompt select,
 #workflow-run textarea,
+#cwd-prompt textarea,
 #cli-settings input,
 #cli-settings select {
   flex: 1;
@@ -1457,8 +1465,11 @@ html[data-theme='warm'] .session-item.active .session-dot {
 #new-connection select:focus,
 #new-connection textarea:focus,
 #workflow-run input:focus,
+#cwd-prompt input:focus,
 #workflow-run select:focus,
+#cwd-prompt select:focus,
 #workflow-run textarea:focus,
+#cwd-prompt textarea:focus,
 #cli-settings input:focus,
 #cli-settings select:focus {
   outline: none;
@@ -1468,12 +1479,15 @@ html[data-theme='warm'] .session-item.active .session-dot {
 #new-connection input::placeholder,
 #new-connection textarea::placeholder,
 #workflow-run input::placeholder,
+#cwd-prompt input::placeholder,
 #workflow-run textarea::placeholder,
+#cwd-prompt textarea::placeholder,
 #cli-settings input::placeholder {
   color: var(--dim);
 }
 
 #new-connection textarea,
+#cwd-prompt textarea,
 #workflow-run textarea {
   resize: vertical;
 }
@@ -1519,6 +1533,7 @@ html[data-theme='warm'] .session-item.active .session-dot {
    row-reverse 的主軸是從右往左，flex-start 就是靠右。*/
 #new-connection menu,
 #workflow-run menu,
+#cwd-prompt menu,
 #cli-settings menu {
   display: flex;
   flex-direction: row-reverse;
@@ -1530,6 +1545,7 @@ html[data-theme='warm'] .session-item.active .session-dot {
 
 #new-connection menu button,
 #workflow-run menu button,
+#cwd-prompt menu button,
 #cli-settings menu button {
   height: 30px;
   padding: 0 16px;
@@ -1544,12 +1560,14 @@ html[data-theme='warm'] .session-item.active .session-dot {
 
 #new-connection menu button:hover,
 #workflow-run menu button:hover,
+#cwd-prompt menu button:hover,
 #cli-settings menu button:hover {
   background: var(--dialog-hover-bg);
 }
 
 #new-connection menu button.primary:hover,
 #workflow-run menu button.primary:hover,
+#cwd-prompt menu button.primary:hover,
 #cli-settings menu button.primary:hover {
   background: var(--accent-hover);
   border-color: var(--accent-hover);
@@ -1912,6 +1930,35 @@ html[data-theme='warm'] .session-item.active .session-dot {
   color: var(--primary-hover-fg);
 }
 
+/* 卡片上的「手動操作」：選起來才出現，按鈕跟批准／退回同一種但更小。*/
+.wf-manual {
+  display: flex;
+  gap: 4px;
+  padding: 0 34px 6px 8px;
+}
+
+.wf-manual button {
+  flex: 1;
+  height: 20px;
+  min-width: 0;
+  padding: 0 4px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--selected);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--tag-size);
+  letter-spacing: var(--tag-tracking);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.wf-manual button:hover {
+  background: var(--dialog-hover-bg);
+}
+
 /* 接點：圓心就是 portAnchor 算出來的那一點。*/
 .wf-port {
   position: absolute;
@@ -2041,6 +2088,16 @@ html[data-theme='warm'] .session-item.active .session-dot {
 
 .props-actions button:hover {
   background: var(--dialog-hover-bg);
+}
+
+/* 「開終端機並啟動 OpenCode」排不進一列，這一組改直的。*/
+.props-actions.stack {
+  flex-direction: column;
+}
+
+/* 面板裡的區塊標題 (「手動操作」) 前面留一點空。*/
+#editor-props .props-title ~ .props-title {
+  margin-top: 8px;
 }
 
 #editor-props input[type='checkbox'] {

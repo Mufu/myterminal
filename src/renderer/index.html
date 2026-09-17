@@ -282,6 +282,28 @@
       </form>
     </dialog>
 
+    <!-- 節點的工作目錄代不出來時 (例如 {{params.cwd}} 但還沒跑過) 問一次。 -->
+    <dialog id="cwd-prompt">
+      <form method="dialog" novalidate>
+        <h2>工作目錄</h2>
+        <p class="cli-hint">
+          這個節點的工作目錄還代不出來（{{params.cwd}} 要有一次執行才知道）。
+          要在哪裡開終端機？
+        </p>
+
+        <label>
+          工作目錄 <input id="cwd-input" type="text" placeholder="agent 會在這裡修改檔案" />
+        </label>
+
+        <p id="cwd-errors" class="errors"></p>
+
+        <menu>
+          <button id="cwd-ok" value="ok" type="submit" class="primary">確定</button>
+          <button id="cwd-cancel" value="cancel" type="submit" formnovalidate>取消</button>
+        </menu>
+      </form>
+    </dialog>
+
     <dialog id="cli-settings">
       <form method="dialog" novalidate>
         <h2>CLI 設定</h2>

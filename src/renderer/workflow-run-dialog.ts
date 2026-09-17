@@ -2,6 +2,7 @@ import type { WorkflowInfo } from '../shared/workflow';
 import { DEFAULT_MAX_TOTAL_COST_USD } from '../shared/workflow';
 import type { BillingMode } from '../shared/cli-auth';
 import type { DialogPort } from './ports';
+import { rememberCwd } from './cwd-prompt-dialog';
 
 const $ = <T extends HTMLElement>(id: string): T => {
   const el = document.getElementById(id);
@@ -94,6 +95,8 @@ export class WorkflowRunDialog implements DialogPort {
       return;
     }
     this.errors.textContent = '';
+    // 畫布上手動開終端機時要問工作目錄，預設就填這一個。
+    rememberCwd(params.cwd);
     void this.start(params);
   }
 
