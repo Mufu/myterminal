@@ -69,6 +69,16 @@ describe('validateWorkflow', () => {
     }
   });
 
+  /** 「手動操作」要在哪個終端機裡開；執行那一側不看它，所以驗證只要收下。*/
+  it('agent 節點選了終端機也是合法的', () => {
+    for (const shell of ['powershell', 'wsl'] as const) {
+      const one = minimal();
+      const node = one.nodes.find((n) => n.type === 'agent');
+      if (node?.type === 'agent') node.config.shell = shell;
+      expect(validateWorkflow(one)).toEqual([]);
+    }
+  });
+
   it('開始節點必須剛好一個', () => {
     const none = def([agent('a'), end()], []);
     expect(validateWorkflow(none).join()).toContain('剛好有一個開始節點');

@@ -26,6 +26,10 @@ export class InputPanel implements InputPanelPort {
     return this.textarea.value;
   }
 
+  setText(text: string): void {
+    this.textarea.value = text;
+  }
+
   clear(): void {
     this.textarea.value = '';
     this.textarea.focus();

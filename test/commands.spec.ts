@@ -12,6 +12,9 @@ import {
   ConnectFromProfileCommand,
   RemoveProfileCommand,
   TakeOverCommand,
+  OpenNodeShellCommand,
+  OpenNodeCliCommand,
+  CopyNodePromptCommand,
   resumeCommand,
   StartWorkflowCommand,
   ResumeWorkflowCommand,
@@ -79,6 +82,9 @@ class FakeInputPanel implements InputPanelPort {
   cleared = 0;
   getText(): string {
     return this.text;
+  }
+  setText(text: string): void {
+    this.text = text;
   }
   clear(): void {
     this.cleared += 1;
@@ -362,6 +368,72 @@ describe('TakeOverCommand', () => {
     expect(resumeCommand('muse', 'x')).toBe('muse resume x');
     // opencode 沒有 resume 子命令，TUI 是用 --session 開回同一段對話。
     expect(resumeCommand('opencode', 'x')).toBe('opencode --session x');
+  });
+});
+
+describe('畫布上的手動操作', () => {
+  const spec = { name: '我的流程 · 實作 shell', shell: 'powershell' as const, cwd: 'D:/work' };
+
+  it('OpenNodeShellCommand 在節點的工作目錄開一個互動式終端機', () => {
+    const connect = vi.fn();
+    new OpenNodeShellCommand(connect, spec).execute();
+
+    expect(connect).toHaveBeenCalledWith({
+      type: 'powershell',
+      name: '我的流程 · 實作 shell',
+      cwd: 'D:/work',
+    });
+  });
+
+  it('OpenNodeShellCommand 選了 WSL 就開 WSL', () => {
+    const connect = vi.fn();
+    new OpenNodeShellCommand(connect, { ...spec, shell: 'wsl' }).execute();
+    expect(connect).toHaveBeenCalledWith(expect.objectContaining({ type: 'wsl' }));
+  });
+
+  it('OpenNodeCliCommand 開 CLI 工作階段，並把提示填進輸入面板 (不送出)', () => {
+    const connect = vi.fn();
+    const panel = new FakeInputPanel();
+    new OpenNodeCliCommand(connect, state, panel, {
+      ...spec,
+      name: '我的流程 · 實作 Claude',
+      kind: 'claude',
+      prompt: '請做這件事',
+    }).execute();
+
+    expect(connect).toHaveBeenCalledWith({
+      type: 'claude',
+      name: '我的流程 · 實作 Claude',
+      cwd: 'D:/work',
+      baseShell: 'powershell',
+      // 沒有要接續就不指定，讓「CLI 設定」算出來的那一條生效。
+      startupCommand: undefined,
+    });
+    expect(panel.text).toBe('請做這件事');
+    expect(state.inputPanelVisible).toBe(true);
+  });
+
+  it('OpenNodeCliCommand 有上一次的對話時用接手那一條指令', () => {
+    const connect = vi.fn();
+    new OpenNodeCliCommand(connect, state, new FakeInputPanel(), {
+      ...spec,
+      name: '我的流程 · 實作 Codex',
+      kind: 'codex',
+      prompt: 'x',
+      resumeId: 'thread-9',
+    }).execute();
+
+    expect(connect).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'codex', startupCommand: 'codex resume thread-9' }),
+    );
+  });
+
+  it('CopyNodePromptCommand 把代好的提示放進剪貼簿；空的就不動它', async () => {
+    await new CopyNodePromptCommand(clipboard, '請做這件事').execute();
+    expect(clipboard.written).toEqual(['請做這件事']);
+
+    await new CopyNodePromptCommand(clipboard, '').execute();
+    expect(clipboard.written).toEqual(['請做這件事']);
   });
 });
 

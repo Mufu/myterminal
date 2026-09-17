@@ -5,7 +5,7 @@ import type { WorkflowEditorModel } from './workflow-editor-model';
 import { newWorkflowId } from './workflow-editor-model';
 import { latestRunFor } from './workflow-run-view';
 import type { MyTerminalApi } from '../shared/api';
-import type { ConnectionProfile, SavedProfile } from '../shared/profile';
+import type { BaseShell, ConnectionProfile, SavedProfile } from '../shared/profile';
 import type { AgentKind } from '../shared/agent';
 import type { CliAuthSetting, CliId } from '../shared/cli-auth';
 import { validateCliSetting } from '../shared/cli-auth';
@@ -177,6 +177,74 @@ export class TakeOverCommand implements ICommand {
       baseShell: 'powershell',
       startupCommand: resumeCommand(agentKind, agentSessionId),
     });
+  }
+}
+
+/** 畫布上的「手動操作」要開一個什麼樣的工作階段。*/
+export interface NodeShellSpec {
+  name: string;
+  shell: BaseShell;
+  cwd: string;
+}
+
+export interface NodeCliSpec extends NodeShellSpec {
+  kind: AgentKind;
+  /** 代好的提示：開完之後填進「輸入字」面板，送不送由人決定。*/
+  prompt: string;
+  /** 這個節點上一次執行的 CLI 對話；有的話就接續同一段。*/
+  resumeId?: string;
+}
+
+/**
+ * 「開終端機」：在節點的工作目錄開一個互動式 PowerShell / WSL，
+ * 接下來自己下什麼指令、要不要叫 CLI 起來，全部由人決定。
+ */
+export class OpenNodeShellCommand implements ICommand {
+  constructor(
+    private readonly connect: (profile: ConnectionProfile) => void,
+    private readonly spec: NodeShellSpec,
+  ) {}
+  execute(): void {
+    this.connect({ type: this.spec.shell, name: this.spec.name, cwd: this.spec.cwd });
+  }
+}
+
+/**
+ * 「開終端機並啟動 <CLI>」：同一個工作目錄，但順手把那支 CLI 叫起來 ——
+ * 這個節點跑過就接續它那段對話 (跟「接手」同一條指令)。
+ * 提示只是填進「輸入字」面板，看過再自己按送出。
+ */
+export class OpenNodeCliCommand implements ICommand {
+  constructor(
+    private readonly connect: (profile: ConnectionProfile) => void,
+    private readonly state: AppState,
+    private readonly panel: InputPanelPort,
+    private readonly spec: NodeCliSpec,
+  ) {}
+  execute(): void {
+    const { kind, resumeId } = this.spec;
+    this.connect({
+      type: kind,
+      name: this.spec.name,
+      cwd: this.spec.cwd,
+      baseShell: this.spec.shell,
+      // 沒有要接續就不指定，讓 ShellFactory 用「CLI 設定」算出來的那一條。
+      startupCommand: resumeId ? resumeCommand(kind, resumeId) : undefined,
+    });
+    this.panel.setText(this.spec.prompt);
+    this.state.showInputPanel();
+  }
+}
+
+/** 「複製提示」：代好的提示進剪貼簿，要貼到哪裡由人決定。*/
+export class CopyNodePromptCommand implements ICommand {
+  constructor(
+    private readonly clipboard: ClipboardPort,
+    private readonly prompt: string,
+  ) {}
+  async execute(): Promise<void> {
+    if (!this.prompt) return;
+    await this.clipboard.writeText(this.prompt);
   }
 }
 

@@ -110,6 +110,13 @@ export class AppState {
     this.setView('terminal');
   }
 
+  /** 面板要用的時候就打開它；已經開著就什麼都不做。*/
+  showInputPanel(): void {
+    if (this._inputPanelVisible) return;
+    this._inputPanelVisible = true;
+    this.notify();
+  }
+
   toggleInputPanel(): void {
     this._inputPanelVisible = !this._inputPanelVisible;
     this.notify();

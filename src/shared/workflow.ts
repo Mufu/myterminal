@@ -1,4 +1,5 @@
 import type { AgentKind } from './agent';
+import type { BaseShell } from './profile';
 import type { AgentRole } from './roles';
 import { findRole } from './roles';
 
@@ -32,6 +33,8 @@ export interface AgentNodeConfig {
   prompt: string;
   cwd?: string;
   allowEdits: boolean;
+  /** 畫布上的「手動操作」要在哪個終端機裡開；執行那一側不看它。*/
+  shell?: BaseShell;
   /** 角色：前置指示在 shared/roles.ts，這裡只存 id。*/
   role?: AgentRole;
   /** 要接續哪個節點的 CLI 對話 (claude --resume <session_id>)。*/

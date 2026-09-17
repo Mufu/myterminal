@@ -27,6 +27,8 @@ export interface ClipboardPort {
 
 export interface InputPanelPort {
   getText(): string;
+  /** 填好一段文字等人自己按送出 (畫布上的「開終端機並啟動」用)。*/
+  setText(text: string): void;
   clear(): void;
 }
 
