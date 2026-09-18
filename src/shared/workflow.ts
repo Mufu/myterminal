@@ -79,14 +79,55 @@ export interface WorkflowEdge {
   port?: WorkflowPort;
 }
 
+/**
+ * 一個啟動參數：執行對話框上的一個欄位，樣板裡用 {{params.<name>}} 取用。
+ * `kind` 決定那個欄位長什麼樣 —— 單行、多行，還是一個目錄。
+ */
+export interface WorkflowParamDef {
+  name: string;
+  label: string;
+  kind: 'text' | 'multiline' | 'directory';
+  required: boolean;
+  default?: string;
+  hint?: string;
+}
+
 export interface WorkflowDefinition {
   version: 1;
   id: string;
   name: string;
   /** 一句話說明這個工作流在做什麼；清單上顯示，選填。*/
   description?: string;
+  /** 執行時要填的欄位；沒寫就是 DEFAULT_PARAMS (舊的定義都沒有這一欄)。*/
+  params?: WorkflowParamDef[];
   nodes: WorkflowNode[];
   edges: WorkflowEdge[];
+}
+
+/** 一直以來的那兩個：任務與工作目錄。沒宣告參數的定義就是吃這兩個。*/
+export const DEFAULT_PARAMS: readonly WorkflowParamDef[] = [
+  { name: 'task', label: '任務', kind: 'multiline', required: true, hint: '要 agent 做什麼' },
+  { name: 'cwd', label: '工作目錄', kind: 'directory', required: true, hint: 'agent 會在這裡修改檔案' },
+];
+
+/** 這份定義要填哪些參數。WorkflowInfo 也是這個形狀，所以清單上也問得到。*/
+export function paramsOf(def: { params?: readonly WorkflowParamDef[] }): readonly WorkflowParamDef[] {
+  return def.params ?? DEFAULT_PARAMS;
+}
+
+/**
+ * 執行對話框填的值合不合法：必填的不能留白。純函式，
+ * 對話框 (擋在送出之前) 與 main (workflow:start) 看的是同一份。
+ */
+export function validateRunParams(
+  def: { params?: readonly WorkflowParamDef[] },
+  values: Record<string, string>,
+): string[] {
+  const errors: string[] = [];
+  for (const param of paramsOf(def)) {
+    if (param.required && !(values[param.name] ?? '').trim()) errors.push(`請輸入${param.label}`);
+  }
+  return errors;
 }
 
 export const DEFAULT_MAX_ATTEMPTS = 3;
@@ -107,6 +148,20 @@ export function validateWorkflow(def: WorkflowDefinition): string[] {
 
   if (!def.name.trim()) errors.push('工作流名稱不能是空的');
 
+  const params = paramsOf(def);
+  const declared = new Set<string>();
+  const directories = new Set<string>();
+  for (const param of params) {
+    if (!PARAM_NAME.test(param.name)) {
+      errors.push(`參數名稱只能用英文、數字與底線，而且不能以數字開頭：${param.name}`);
+    } else if (declared.has(param.name)) {
+      errors.push(`參數名稱重複：${param.name}`);
+    }
+    if (!param.label.trim()) errors.push(`參數 ${param.name} 的標籤不能是空的`);
+    declared.add(param.name);
+    if (param.kind === 'directory') directories.add(param.name);
+  }
+
   const starts = def.nodes.filter((node) => node.type === 'start');
   if (starts.length !== 1) errors.push(`必須剛好有一個開始節點 (目前 ${starts.length} 個)`);
   if (!def.nodes.some((node) => node.type === 'end')) errors.push('必須至少有一個結束節點');
@@ -120,6 +175,16 @@ export function validateWorkflow(def: WorkflowDefinition): string[] {
       }
       if (node.config.permission !== undefined && !isAgentPermission(node.config.permission)) {
         errors.push(`節點 ${node.id} 的權限不存在：${node.config.permission}`);
+      }
+      for (const name of usedParams(node.config.prompt)) {
+        if (!declared.has(name)) errors.push(`節點 ${node.id} 用到未定義的參數 ${name}`);
+      }
+      for (const name of usedParams(node.config.cwd ?? '')) {
+        // 工作目錄代進去就是一個真的路徑，用的參數得是「目錄」那一種。
+        if (!declared.has(name)) errors.push(`節點 ${node.id} 用到未定義的參數 ${name}`);
+        else if (!directories.has(name)) {
+          errors.push(`節點 ${node.id} 的工作目錄用的參數 ${name} 必須是目錄`);
+        }
       }
     } else if (node.type === 'condition') {
       // 來源沒設或指到沒有輸出的節點，執行時那個條件永遠走「否」。
@@ -155,6 +220,14 @@ export function validateWorkflow(def: WorkflowDefinition): string[] {
   }
 
   return errors;
+}
+
+/** 參數名稱會直接寫進 {{params.x}}，所以限成一個識別字。*/
+const PARAM_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+/** 樣板裡用到的 {{params.x}}；寫法跟 shared/template.ts 的替換是同一種。*/
+function usedParams(template: string): string[] {
+  return [...template.matchAll(/\{\{\s*params\.([^.\s{}]+)\s*\}\}/g)].map((match) => match[1]);
 }
 
 /** 正規式是使用者打的，編不起來的話等到執行時才丟例外就太晚了。*/
@@ -245,5 +318,7 @@ export interface WorkflowInfo {
   name: string;
   /** 從定義複製過來的一句話說明，沒有就是沒有。*/
   description?: string;
+  /** 執行對話框要照著長出欄位，所以清單上就帶著 paramsOf() 的結果。*/
+  params: readonly WorkflowParamDef[];
   builtin: boolean;
 }

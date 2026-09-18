@@ -1586,6 +1586,13 @@ html[data-theme='warm'] .session-item.active .session-dot {
   resize: vertical;
 }
 
+/* 啟動參數的欄位是照著工作流的宣告長出來的，跟表單其他列一樣一列一個。*/
+#w-params {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 /* 勾選框那一列：左對齊，方框不要跟著文字輸入框被拉寬。
    選擇器要帶上 #new-connection，否則權重輸給上面的 #new-connection label。*/
 #new-connection #f-save-row {

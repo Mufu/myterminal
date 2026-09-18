@@ -3,13 +3,14 @@ import type { ElectronApplication, Page } from '@playwright/test';
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { TEMPLATES } from '../src/main/workflow/templates';
+import { DEFAULT_PARAMS } from '../src/shared/workflow';
 
 const root = join(__dirname, '..');
 
 /**
  * 畫布編輯器的深度端到端：範本副本、改接、刪節點連帶清參照、屬性往返、
- * 驗證訊息、儲存並執行、回終端機、未存變更的守門、執行對話框的驗證與持久化。
- * 全程不呼叫 claude / codex，所以不花錢。
+ * 驗證訊息、儲存並執行、回終端機、未存變更的守門、自訂啟動參數、
+ * 執行對話框的驗證與持久化。全程不呼叫 claude / codex，所以不花錢。
  */
 
 interface Definition {
@@ -24,6 +25,7 @@ interface Definition {
     config?: Record<string, unknown>;
   }>;
   edges: Array<{ from: string; to: string; port?: string }>;
+  params?: Array<Record<string, unknown>>;
 }
 
 interface Launched {
@@ -532,7 +534,7 @@ test('執行對話框：任務或工作目錄沒填就不讓開始', async () =>
 
     await window.click('#w-ok');
     await expect(window.locator('#workflow-run')).toBeVisible();
-    await expect(window.locator('#w-errors')).toContainText('請輸入任務內容');
+    await expect(window.locator('#w-errors')).toContainText('請輸入任務');
     await expect(window.locator('#w-errors')).toContainText('請輸入工作目錄');
 
     await window.fill('#w-task', '隨便做點什麼');
@@ -544,7 +546,7 @@ test('執行對話框：任務或工作目錄沒填就不讓開始', async () =>
     await window.fill('#w-cwd', join(root, 'test-results'));
     await window.click('#w-ok');
     await expect(window.locator('#workflow-run')).toBeVisible();
-    await expect(window.locator('#w-errors')).toHaveText('請輸入任務內容');
+    await expect(window.locator('#w-errors')).toHaveText('請輸入任務');
 
     // 一個工作流都沒真的跑起來。
     await expect(window.locator('.workflow-empty')).toHaveText('尚無工作流執行');
@@ -714,6 +716,80 @@ test('執行對話框：內建範本八份都在，說明跟著選擇換', async
 
     await shot(window, 'template-descriptions');
     await window.click('#w-cancel');
+  } finally {
+    await app.close();
+  }
+});
+
+// ---- 13. 自訂的啟動參數 ----
+
+test('自己加一個啟動參數：沒宣告的樣板存不下去，宣告之後執行對話框就多一個欄位', async () => {
+  test.setTimeout(120_000);
+  const userData = userDataFor('params');
+  const { app, window } = await launch(userData);
+
+  try {
+    await window.click('#btn-workflow-edit');
+    await window.click('#btn-add-agent');
+    await dragNodeTo(window, 'agent-1', 300, 120);
+    await window.click(`${card('agent-1')} .wf-node-body`);
+    await window.fill('#props-prompt', '在 {{params.branch}} 上做：{{params.task}}');
+    await wire(window, out('start'), inPort('agent-1'));
+    await wire(window, out('agent-1', 'ok'), inPort('end'));
+    await window.fill('#editor-name', '帶分支的流程');
+
+    // branch 還沒宣告：存不下去。
+    await window.click('#btn-editor-save');
+    await expect(window.locator('#editor-errors')).toBeVisible();
+    await expect(window.locator('#editor-errors')).toContainText(
+      '節點 agent-1 用到未定義的參數 branch',
+    );
+    expect(storedWorkflows(userData)).toHaveLength(0);
+
+    // 點空白處取消選取，屬性面板就是這份工作流的啟動參數。
+    const origin = await viewportOrigin(window);
+    await window.mouse.click(origin.x + 80, origin.y + 420);
+    await expect(window.locator('#editor-props .props-title')).toHaveText('啟動參數');
+    await expect(window.locator('#props-param-name-0')).toHaveValue('task');
+    await expect(window.locator('#props-param-name-1')).toHaveValue('cwd');
+
+    await window.click('#props-param-add');
+    await window.fill('#props-param-name-2', 'branch');
+    await window.fill('#props-param-label-2', '分支');
+    await expect(window.locator('#props-param-kind-2')).toHaveValue('text');
+    await expect(window.locator('#props-param-required-2')).toBeChecked();
+
+    await window.click('#btn-editor-save');
+    await expect(window.locator('#editor-errors')).toBeHidden();
+    const saved = storedWorkflows(userData);
+    expect(saved).toHaveLength(1);
+    expect(saved[0].params).toEqual([
+      ...DEFAULT_PARAMS,
+      { name: 'branch', label: '分支', kind: 'text', required: true },
+    ]);
+    await shot(window, 'params-editor');
+
+    const id = await window.locator('#editor-workflow').inputValue();
+    expect(id).not.toBe('');
+
+    // 執行對話框：多一個「分支」欄位，而且是必填的。
+    await window.click('#btn-editor-close');
+    await window.click('#btn-workflow-run');
+    await window.selectOption('#w-template', id);
+    await expect(window.locator('#w-param-branch')).toBeVisible();
+    await expect(window.locator('#workflow-run label:has(#w-param-branch)')).toContainText('分支');
+
+    await window.fill('#w-task', '改 README');
+    await window.fill('#w-cwd', join(root, 'test-results'));
+    await window.click('#w-ok');
+    await expect(window.locator('#workflow-run')).toBeVisible();
+    await expect(window.locator('#w-errors')).toHaveText('請輸入分支');
+    // 一個工作流都沒真的跑起來。
+    await expect(window.locator('.workflow-empty')).toHaveText('尚無工作流執行');
+    await shot(window, 'params-run-dialog');
+
+    await window.click('#w-cancel');
+    await expect(window.locator('#workflow-run')).toBeHidden();
   } finally {
     await app.close();
   }

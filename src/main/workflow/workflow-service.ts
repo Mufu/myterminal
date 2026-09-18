@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import type { BaseCheckpointSaver } from '@langchain/langgraph';
 import type { RunState, RunStatus, WorkflowDefinition } from '../../shared/workflow';
+import { paramsOf } from '../../shared/workflow';
 import type { IAgentRunnerFactory } from '../agent-runner';
 import type {
   ApprovalAnswer,
@@ -81,9 +82,14 @@ export class WorkflowService extends EventEmitter<WorkflowEvents> {
     params: Record<string, string>,
     options: { maxTotalCostUsd?: number } = {},
   ): string {
-    // 工作目錄不存在時 CLI 只會丟一句 spawn ENOENT，先擋下來把話講清楚。
-    const cwd = params.cwd?.trim();
-    if (cwd && !(this.deps.exists ?? existsSync)(cwd)) throw new Error(`工作目錄不存在：${cwd}`);
+    // 目錄參數不存在時 CLI 只會丟一句 spawn ENOENT，先擋下來把話講清楚。
+    const exists = this.deps.exists ?? existsSync;
+    for (const param of paramsOf(definition)) {
+      const path = params[param.name]?.trim();
+      if (param.kind === 'directory' && path && !exists(path)) {
+        throw new Error(`${param.label}不存在：${path}`);
+      }
+    }
 
     const runId = (this.deps.newRunId ?? randomUUID)();
     const stored: StoredRun = {

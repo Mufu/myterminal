@@ -7,9 +7,10 @@ import type {
   WorkflowEdge,
   WorkflowNode,
   WorkflowNodeType,
+  WorkflowParamDef,
   WorkflowPort,
 } from '../shared/workflow';
-import { NODE_PORTS, validateWorkflow } from '../shared/workflow';
+import { DEFAULT_PARAMS, NODE_PORTS, paramsOf, validateWorkflow } from '../shared/workflow';
 
 /**
  * 畫布編輯器的狀態來源：一份 WorkflowDefinition 加上「選了誰、改過沒」。
@@ -77,6 +78,8 @@ function blankWorkflow(): WorkflowDefinition {
     version: 1,
     id: newWorkflowId(),
     name: '新工作流',
+    // 內建的那兩個先放著，改得動也刪得掉。
+    params: DEFAULT_PARAMS.map((param) => ({ ...param })),
     nodes: [
       { id: 'start', type: 'start', label: '開始', position: { x: 40, y: 120 } },
       { id: 'end', type: 'end', label: '結束', position: { x: 600, y: 120 } },
@@ -144,6 +147,35 @@ export class WorkflowEditorModel {
 
   setName(name: string): void {
     this._definition.name = name;
+    this.touch();
+  }
+
+  /** 這份定義要填哪些啟動參數；舊的 JSON 沒宣告就是內建的那兩個。*/
+  get params(): readonly WorkflowParamDef[] {
+    return paramsOf(this._definition);
+  }
+
+  addParam(): void {
+    const params = this.ownParams();
+    const name = this.nextParamName(params);
+    // 標籤先跟名稱一樣，不然一存檔就被「標籤不能是空的」擋下來。
+    params.push({ name, label: name, kind: 'text', required: true });
+    this.touch();
+  }
+
+  /** 屬性面板的每個輸入框只改自己那一個欄位，其餘保持原樣。*/
+  updateParam(index: number, patch: Partial<WorkflowParamDef>): void {
+    const params = this.ownParams();
+    const param = params[index];
+    if (!param) return;
+    params[index] = { ...param, ...patch };
+    this.touch();
+  }
+
+  removeParam(index: number): void {
+    const params = this.ownParams();
+    if (index < 0 || index >= params.length) return;
+    params.splice(index, 1);
     this.touch();
   }
 
@@ -264,6 +296,23 @@ export class WorkflowEditorModel {
 
   node(id: string): WorkflowNode | undefined {
     return this._definition.nodes.find((n) => n.id === id);
+  }
+
+  /**
+   * 要改參數了才把它寫進定義：舊的 JSON 沒有這一欄，
+   * 這時候補的就是它一直在用的那兩個 (DEFAULT_PARAMS)。
+   */
+  private ownParams(): WorkflowParamDef[] {
+    this._definition.params ??= paramsOf(this._definition).map((param) => ({ ...param }));
+    return this._definition.params;
+  }
+
+  /** `param${n}`，n 從 1 開始找第一個沒被用掉的。*/
+  private nextParamName(params: readonly WorkflowParamDef[]): string {
+    for (let n = 1; ; n += 1) {
+      const name = `param${n}`;
+      if (!params.some((param) => param.name === name)) return name;
+    }
   }
 
   /** `${type}-${n}`，n 從 1 開始找第一個沒被用掉的。*/

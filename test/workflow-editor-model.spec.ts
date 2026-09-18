@@ -9,7 +9,7 @@ import {
   newWorkflowId,
   snap,
 } from '../src/renderer/workflow-editor-model';
-import { NODE_PORTS } from '../src/shared/workflow';
+import { DEFAULT_PARAMS, NODE_PORTS } from '../src/shared/workflow';
 import type { WorkflowDefinition, WorkflowPort } from '../src/shared/workflow';
 
 let model: WorkflowEditorModel;
@@ -385,5 +385,68 @@ describe('PORT_LABELS', () => {
     for (const list of Object.values(NODE_PORTS)) for (const port of list) ports.add(port);
     for (const port of ports) expect(PORT_LABELS[port]).toBeTruthy();
     expect(Object.keys(PORT_LABELS)).toHaveLength(ports.size);
+  });
+});
+
+describe('啟動參數', () => {
+  it('新畫布一開始就是內建的那兩個，而且是自己的一份', () => {
+    expect(model.definition.params).toEqual(DEFAULT_PARAMS);
+    model.updateParam(0, { label: '改過' });
+    expect(DEFAULT_PARAMS[0].label).toBe('任務');
+  });
+
+  it('加一個：名稱自動避開已經有的，型別預設是單行必填', () => {
+    model.addParam();
+    expect(model.definition.params?.at(-1)).toEqual({
+      name: 'param1',
+      label: 'param1',
+      kind: 'text',
+      required: true,
+    });
+    model.addParam();
+    expect(model.definition.params?.map((p) => p.name)).toEqual([
+      'task',
+      'cwd',
+      'param1',
+      'param2',
+    ]);
+  });
+
+  it('改一個：只動 patch 裡有的欄位', () => {
+    model.addParam();
+    model.updateParam(2, { name: 'branch', label: '分支' });
+    expect(model.definition.params?.[2]).toEqual({
+      name: 'branch',
+      label: '分支',
+      kind: 'text',
+      required: true,
+    });
+  });
+
+  it('刪一個', () => {
+    model.removeParam(0);
+    expect(model.definition.params?.map((p) => p.name)).toEqual(['cwd']);
+    // 超出範圍就什麼都不做。
+    model.removeParam(9);
+    expect(model.definition.params).toHaveLength(1);
+  });
+
+  it('改參數會弄髒畫布，也會通知訂閱者', () => {
+    let notified = 0;
+    model.subscribe(() => (notified += 1));
+    model.addParam();
+    model.updateParam(0, { required: false });
+    model.removeParam(0);
+    expect(notified).toBe(3);
+    expect(model.dirty).toBe(true);
+  });
+
+  /** 舊的 JSON 沒有這一欄，改的時候才把內建的那兩個補上去。*/
+  it('載入沒宣告參數的舊定義：先當成內建的那兩個，改了才寫進定義', () => {
+    model.load(saved(), 'custom');
+    expect(model.definition.params).toBeUndefined();
+    expect(model.params).toEqual(DEFAULT_PARAMS);
+    model.addParam();
+    expect(model.definition.params?.map((p) => p.name)).toEqual(['task', 'cwd', 'param1']);
   });
 });

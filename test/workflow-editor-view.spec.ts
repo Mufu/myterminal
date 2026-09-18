@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { edgePath, nodeSummary, TYPE_LABELS } from '../src/renderer/workflow-editor-view';
+import { edgePath, nodeSummary, promptHint, TYPE_LABELS } from '../src/renderer/workflow-editor-view';
 import type { WorkflowNode, WorkflowNodeType } from '../src/shared/workflow';
+import { DEFAULT_PARAMS } from '../src/shared/workflow';
 
 /**
- * 畫布只有這兩個地方不必碰 DOM：連線的路徑與卡片上的摘要。
+ * 畫布只有這幾個地方不必碰 DOM：連線的路徑、卡片上的摘要與提示欄位下面那一行。
  * 其餘的互動看 e2e/editor.spec.ts。
  */
 
@@ -68,5 +69,17 @@ describe('TYPE_LABELS', () => {
   it('每一種節點型別都有中文名稱', () => {
     const types: WorkflowNodeType[] = ['start', 'end', 'agent', 'condition', 'approval'];
     for (const type of types) expect(TYPE_LABELS[type]).toBeTruthy();
+  });
+});
+
+describe('promptHint', () => {
+  it('列出這份工作流宣告的參數，最後補上節點的輸出', () => {
+    expect(promptHint(DEFAULT_PARAMS)).toBe(
+      '可用 {{params.task}}、{{params.cwd}}、{{<節點id>.text}}',
+    );
+    expect(promptHint([{ name: 'branch', label: '分支', kind: 'text', required: true }])).toBe(
+      '可用 {{params.branch}}、{{<節點id>.text}}',
+    );
+    expect(promptHint([])).toBe('可用 {{<節點id>.text}}');
   });
 });

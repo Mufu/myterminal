@@ -56,6 +56,13 @@ describe('resolveNodeCwd', () => {
     expect(resolveNodeCwd(node({ cwd: '  ' }), null)).toBeNull();
   });
 
+  /** 自訂的目錄參數跟 cwd 沒兩樣：有值就代進去，沒值就回 null 去問人。*/
+  it('自訂的目錄參數也代得進去，沒值就是代不出來', () => {
+    const repo = node({ cwd: '{{params.repo}}' });
+    expect(resolveNodeCwd(repo, run({ repo: 'D:/repo' }))).toBe('D:/repo');
+    expect(resolveNodeCwd(repo, run({ cwd: 'D:\work' }))).toBeNull();
+  });
+
   it('只代得出一半 (路徑裡還有別的樣板) 也算代不出來', () => {
     const mixed = node({ cwd: '{{params.cwd}}\{{params.sub}}' });
     expect(resolveNodeCwd(mixed, run({ cwd: 'D:\work' }))).toBeNull();
@@ -72,6 +79,13 @@ describe('renderNodePrompt', () => {
     const agent = node({ prompt: '依照 {{agent-2.text}} 修正 {{params.task}}' });
     expect(renderNodePrompt(agent, null)).toBe('依照 {{agent-2.text}} 修正 {{params.task}}');
     expect(renderNodePrompt(agent, run({ task: '打字' }))).toBe('依照 {{agent-2.text}} 修正 打字');
+  });
+
+  it('工作流自己宣告的參數也代得進去', () => {
+    const agent = node({ prompt: '在 {{params.branch}} 上做：{{params.task}}' });
+    expect(renderNodePrompt(agent, run({ branch: 'main', task: '改 README' }))).toBe(
+      '在 main 上做：改 README',
+    );
   });
 
   it('有角色時前面加上角色的前置指示，中間空一行', () => {

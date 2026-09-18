@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validateWorkflow } from '../src/shared/workflow';
+import { DEFAULT_PARAMS, paramsOf, validateRunParams, validateWorkflow } from '../src/shared/workflow';
 import { CLI_TYPES } from '../src/shared/profile';
 import type {
   ConditionRule,
@@ -247,5 +247,98 @@ describe('validateWorkflow', () => {
       ],
     );
     expect(validateWorkflow(d)).toEqual([]);
+  });
+});
+
+/**
+ * 啟動參數：沒宣告的定義 (舊 JSON) 一律當成 task ＋ cwd 那兩個，
+ * 所以下面的 minimal() 不必自己帶 params。
+ */
+describe('啟動參數', () => {
+  /** 提示與工作目錄都吃樣板的一份定義。*/
+  const withPrompt = (prompt: string, cwd = '{{params.cwd}}'): WorkflowDefinition => {
+    const d = minimal();
+    const config = (d.nodes[1] as Extract<WorkflowNode, { type: 'agent' }>).config;
+    config.prompt = prompt;
+    config.cwd = cwd;
+    return d;
+  };
+
+  it('沒宣告就是內建的 task 與 cwd', () => {
+    expect(paramsOf(minimal())).toEqual(DEFAULT_PARAMS);
+    expect(DEFAULT_PARAMS.map((p) => p.name)).toEqual(['task', 'cwd']);
+    expect(DEFAULT_PARAMS.map((p) => p.kind)).toEqual(['multiline', 'directory']);
+  });
+
+  it('宣告了就用自己那一份', () => {
+    const d = minimal();
+    d.params = [{ name: 'branch', label: '分支', kind: 'text', required: true }];
+    expect(paramsOf(d)).toEqual(d.params);
+  });
+
+  it('名稱要是英文開頭的識別字，而且不能重複', () => {
+    const bad = minimal();
+    bad.params = [
+      { name: '1st', label: '第一個', kind: 'text', required: false },
+      { name: 'task', label: '任務', kind: 'multiline', required: true },
+      { name: 'task', label: '再一個任務', kind: 'text', required: false },
+    ];
+    expect(validateWorkflow(bad)).toEqual([
+      '參數名稱只能用英文、數字與底線，而且不能以數字開頭：1st',
+      '參數名稱重複：task',
+    ]);
+  });
+
+  it('標籤不能是空的', () => {
+    const blank = minimal();
+    blank.params = [{ name: 'task', label: '  ', kind: 'multiline', required: true }];
+    expect(validateWorkflow(blank)).toContain('參數 task 的標籤不能是空的');
+  });
+
+  it('提示裡用到沒宣告的參數就報錯', () => {
+    const d = withPrompt('{{params.task}} 在 {{params.branch}} 上');
+    expect(validateWorkflow(d)).toEqual(['節點 a 用到未定義的參數 branch']);
+
+    d.params = [
+      ...DEFAULT_PARAMS,
+      { name: 'branch', label: '分支', kind: 'text', required: true },
+    ];
+    expect(validateWorkflow(d)).toEqual([]);
+  });
+
+  it('上游節點的輸出 {{a.text}} 不是參數，不必宣告', () => {
+    expect(validateWorkflow(withPrompt('{{b.text}} 與 {{params.task}}'))).toEqual([]);
+  });
+
+  it('工作目錄用的參數必須是「目錄」型別', () => {
+    const d = withPrompt('{{params.task}}', '{{params.task}}');
+    expect(validateWorkflow(d)).toEqual(['節點 a 的工作目錄用的參數 task 必須是目錄']);
+  });
+
+  it('寫死的工作目錄不必是參數', () => {
+    expect(validateWorkflow(withPrompt('{{params.task}}', 'D:/work'))).toEqual([]);
+  });
+});
+
+describe('validateRunParams', () => {
+  it('必填的不能留白，訊息用參數的標籤', () => {
+    const d = minimal();
+    expect(validateRunParams(d, { task: '建立 hello.txt', cwd: 'D:/tmp' })).toEqual([]);
+    expect(validateRunParams(d, { task: '  ', cwd: 'D:/tmp' })).toEqual(['請輸入任務']);
+    expect(validateRunParams(d, { task: 'x', cwd: '' })).toEqual(['請輸入工作目錄']);
+    expect(validateRunParams(d, {})).toEqual(['請輸入任務', '請輸入工作目錄']);
+  });
+
+  it('沒有必填的參數就永遠合法', () => {
+    const d = minimal();
+    d.params = [{ name: 'branch', label: '分支', kind: 'text', required: false }];
+    expect(validateRunParams(d, {})).toEqual([]);
+  });
+
+  it('自訂參數看的是自己那一份宣告', () => {
+    const d = minimal();
+    d.params = [{ name: 'branch', label: '分支', kind: 'text', required: true }];
+    expect(validateRunParams(d, {})).toEqual(['請輸入分支']);
+    expect(validateRunParams(d, { branch: 'main' })).toEqual([]);
   });
 });

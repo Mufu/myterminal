@@ -12,6 +12,7 @@ import type { SavedProfile } from '../shared/profile';
 import type { CliId } from '../shared/cli-auth';
 import { loginProfile, validateCliSetting } from '../shared/cli-auth';
 import type { WorkflowDefinition } from '../shared/workflow';
+import { validateRunParams } from '../shared/workflow';
 import type { SessionManager } from './session-manager';
 import type { SessionLogger } from './session-logger';
 import type { ProfileStore } from './profile-store';
@@ -116,6 +117,9 @@ export function registerIpc(
   ipcMain.handle(IPC.startWorkflow, (_e, req: StartWorkflowRequest) => {
     const definition = findWorkflow(req.workflowId, definitions);
     if (!definition) throw new Error(`找不到工作流 ${req.workflowId}`);
+    // 對話框已經擋過一次，這裡是 IPC 這一側的保險 (每行一條，跟存檔時一樣)。
+    const errors = validateRunParams(definition, req.params);
+    if (errors.length > 0) throw new Error(errors.join('\n'));
     return workflows.start(definition, req.params, { maxTotalCostUsd: req.maxTotalCostUsd });
   });
 
