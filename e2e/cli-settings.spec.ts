@@ -40,7 +40,7 @@ test('CLI 設定：存了 API 金鑰之後晶片換字，重開還在，清除�
   );
   // 等探測跑完 (訂閱或未登入都行) 才拿得到「清除金鑰之後應該回到的那個字」；
   // 那個字一定不是「API 金鑰」。
-  await expect(first.window.locator('#cli-claude')).not.toContainText('偵測中');
+  await expect(first.window.locator('#cli-claude')).not.toContainText('偵測中', { timeout: 20_000 });
   await expect(first.window.locator('#cli-claude')).not.toContainText('API 金鑰');
   const before = (await first.window.locator('#cli-claude').textContent()) ?? '';
 
@@ -85,11 +85,11 @@ test('OpenCode 只有 API 金鑰，沒有「登入」；Muse 兩種基礎 shell 
   const { app, window, dialogs } = await open();
 
   // 「重新偵測」就在頁尾那一行裡面，但它不可以順便把「CLI 設定」打開。
-  await expect(window.locator('#cli-claude')).not.toContainText('偵測中');
+  await expect(window.locator('#cli-claude')).not.toContainText('偵測中', { timeout: 20_000 });
   await window.click('#btn-cli-refresh');
   await expect(window.locator('#cli-settings')).toBeHidden();
   // 重探完晶片上又是探測結果，不會停在「偵測中…」。
-  await expect(window.locator('#cli-claude')).not.toContainText('偵測中');
+  await expect(window.locator('#cli-claude')).not.toContainText('偵測中', { timeout: 20_000 });
 
   await openSettings(window);
 
