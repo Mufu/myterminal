@@ -8,7 +8,7 @@ myterminal 的自動測試分四層，由便宜到昂貴。前三層不需要任
 | 1 單元 | Vitest（`environment: node`） | 邏輯層：SessionManager、ShellFactory、GraphCompiler、各 Store、畫布模型與手動操作的純函式、Command、驗證函式 | `npm test`、`npm run test:coverage` | 無 |
 | 2 功能 e2e | Playwright `_electron` | 真的啟動 app 操作 UI：工作階段、工具列、對話框、畫布、主題、穩定性、打包版 | `npm run e2e` | 已 `npm run dist`（`packaged.spec` 用 `dist/win-unpacked`） |
 | 3 環境 e2e | Playwright | SSH 登入、執行指令、離線 | `npm run e2e:ssh` | 本機 WSL sshd，見 README「本機 SSH 測試環境」 |
-| 4 真實 CLI e2e | Playwright | Agent 任務、工作流範本、自訂工作流（條件 / 退回 / 逾時 / 取消 / Codex / 角色） | `npm run e2e:agent`、`npm run e2e:workflow`、`MYTERMINAL_WORKFLOW_E2E=1 npx playwright test e2e/workflow-custom.spec.ts` | 已登入的 `claude`、`codex` |
+| 4 真實 CLI e2e | Playwright | Agent 任務、工作流範本、自訂工作流（條件 / 退回 / 逾時 / 取消 / Codex / 角色）、助理真的問兩句 | `npm run e2e:agent`、`npm run e2e:workflow`、`MYTERMINAL_WORKFLOW_E2E=1 npx playwright test e2e/workflow-custom.spec.ts`、`MYTERMINAL_ASSISTANT_E2E=1 npx playwright test e2e/assistant.spec.ts` | 已登入的 `claude`、`codex` |
 
 另外有一種不寫成 spec 的**探索性測試**：由 agent 拿一次性的 Playwright 腳本自由操作 app 找邊界問題，
 只產出缺陷報告，不進 repo。2026-09-14 那一輪的腳本已經隨 worktree 刪除，發現的問題列在下面。
@@ -23,7 +23,8 @@ myterminal 的自動測試分四層，由便宜到昂貴。前三層不需要任
 - 每次 Playwright 執行都會先清空 `test-results/`。
 - 工作目錄一律用真實長路徑，不要用 8.3 短路徑（`C:\Users\ROBERT~1\…`），無介面的 `claude` 會拒絕在那裡寫檔。
 - 需要帳號或環境的 spec 用環境變數當開關（`MYTERMINAL_SSH_E2E`、`MYTERMINAL_AGENT_E2E`、
-  `MYTERMINAL_AGENT_E2E_CODEX`、`MYTERMINAL_AGENT_E2E_OPENCODE`、`MYTERMINAL_WORKFLOW_E2E`），
+  `MYTERMINAL_AGENT_E2E_CODEX`、`MYTERMINAL_AGENT_E2E_OPENCODE`、`MYTERMINAL_WORKFLOW_E2E`、
+  `MYTERMINAL_ASSISTANT_E2E`），
   沒設就 `test.skip`。`MYTERMINAL_AGENT_E2E_OPENCODE` 那兩個只要網路：用的是免費模型
   `opencode/mimo-v2.5-free`（`MYTERMINAL_OPENCODE_MODEL` 指定）。
 
@@ -43,6 +44,7 @@ myterminal 的自動測試分四層，由便宜到昂貴。前三層不需要任
 | `editor.spec.ts` | 1 | 無 | 畫布拉一個流程、接線、存檔、出現在執行對話框 |
 | `editor-deep.spec.ts` | 16 | 無 | 範本另存副本與刪除、換線、刪節點連帶清參照、Delete 在輸入框不刪節點、條件 / 批准屬性重啟後還在、驗證錯誤、儲存並執行、回終端機、未儲存確認、自訂啟動參數（沒宣告的樣板存不下去、宣告後執行對話框多一個欄位）、執行對話框驗證、工作目錄不存在的錯誤 |
 | `roles.spec.ts` | 3 | 無 | 角色庫：選擇器掃出兩個角色並略過 README、Agent 任務選角色庫的角色（權限跳唯讀）並存成設定檔、重啟後設定檔那一列還貼著角色標籤、畫布節點選角色庫的角色（`workflows.json` 寫的是 `lib:engineering/x`）、資料夾砍掉後「重新掃描」再存檔被擋下來。不碰 CLI（Agent 任務的工作目錄指到不存在的地方，spawn 之前就被擋掉）。「瀏覽…」是原生對話框，Playwright 點不到，留給手動測試 G14 |
+| `assistant.spec.ts` | 3 | 第三個要 `MYTERMINAL_ASSISTANT_E2E` | 助理：✨ 按鈕開關的是同一格（`aria-pressed`、關掉再開輸入框的字還在）、三顆建議只填進輸入框；把 `claude` 從 `PATH` 上拿掉之後問一句會說「Claude 尚未登入…」，按「新對話」訊息清光、空狀態回來（前兩個不呼叫任何 CLI）。第三個真的問「怎麼開一個 WSL 工作階段？」再追問「那 SSH 呢？」，驗證知識檔答得出「新連接」／「WSL」而且 `--resume` 接得上（會用 Claude 額度） |
 | `editor-shell.spec.ts` | 2 | 無 | 節點的「手動操作」：開終端機（PowerShell 起在節點的工作目錄）、複製提示（角色前言 + 代好的提示）、開終端機並啟動 Claude（TUI 起得來、「輸入字」面板已填好但沒送出）；工作目錄代不出來時先問一次，取消就什麼都不開 |
 | `editor-run.spec.ts` | 1 | `MYTERMINAL_AGENT_E2E_OPENCODE` | 畫布上的執行檢視：儲存並執行後留在畫布、卡片顯示執行中→完成、卡片的「輸出」切到節點的終端機、回畫布後覆蓋層還在、屬性面板的接手 / 看輸出、卡片上的批准。只要網路不要金鑰（OpenCode 免費模型） |
 | `ssh.spec.ts` | 1 | `MYTERMINAL_SSH_E2E` | 登入本機 sshd、執行指令、離線 |
