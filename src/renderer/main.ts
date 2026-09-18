@@ -37,6 +37,7 @@ import {
   DeleteWorkflowCommand,
   SaveAndRunWorkflowCommand,
   OpenCliSettingsCommand,
+  RefreshCliAuthCommand,
   errorText,
 } from './commands';
 import { WorkflowEditorModel } from './workflow-editor-model';
@@ -415,6 +416,14 @@ new WorkflowListView(
   (sessionId) => state.setActive(sessionId),
 );
 
+const refreshCliAuth = new RefreshCliAuthCommand(api, state);
+const refreshCliButton = $<HTMLButtonElement>('btn-cli-refresh');
+// 整條頁尾就是「CLI 設定」的入口，所以這顆按鈕不能讓事件冒上去開對話框。
+refreshCliButton.addEventListener('click', (event) => {
+  event.stopPropagation();
+  void refreshCliAuth.execute();
+});
+
 new CliStatusView(
   {
     claude: $<HTMLElement>('cli-claude'),
@@ -422,6 +431,7 @@ new CliStatusView(
     muse: $<HTMLElement>('cli-muse'),
     opencode: $<HTMLElement>('cli-opencode'),
   },
+  refreshCliButton,
   state,
 );
 

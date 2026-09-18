@@ -38,6 +38,8 @@ export interface MyTerminalApi {
 
   /** 四支 CLI 實際的登入狀態；開機探測一次，登入流程跑完會再探一次。*/
   cliAuth(): Promise<CliAuthStatus>;
+  /** 「重新偵測」：在外面的終端機登入 / 登出之後重探一次，不必重開 app。*/
+  cliRefresh(): Promise<CliAuthStatus>;
   /** 使用者在「CLI 設定」裡選的登入方式；金鑰本身不會過來。*/
   cliSettings(): Promise<Record<CliId, CliAuthSetting>>;
   /** 存起來並回傳更新後的整份設定；驗證沒過會以訊息 reject。*/

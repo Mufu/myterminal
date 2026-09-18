@@ -31,6 +31,7 @@ const api: MyTerminalApi = {
   cancelWorkflow: (runId) => ipcRenderer.invoke(IPC.cancelWorkflow, runId),
   workflowRuns: () => ipcRenderer.invoke(IPC.workflowRuns),
   cliAuth: () => ipcRenderer.invoke(IPC.cliAuth),
+  cliRefresh: () => ipcRenderer.invoke(IPC.cliRefresh),
   cliSettings: () => ipcRenderer.invoke(IPC.cliSettings),
   saveCliSetting: (request) => ipcRenderer.invoke(IPC.saveCliSetting, request),
   clearCliKey: (id) => ipcRenderer.invoke(IPC.clearCliKey, id),

@@ -26,6 +26,7 @@ export const IPC = {
   cancelWorkflow: 'workflow:cancel',
   workflowRuns: 'workflow:runs',
   cliAuth: 'cli:auth',
+  cliRefresh: 'cli:refresh',
   cliSettings: 'cli:settings',
   saveCliSetting: 'cli:save-setting',
   clearCliKey: 'cli:clear-key',

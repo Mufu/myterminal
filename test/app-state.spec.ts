@@ -165,6 +165,18 @@ describe('AppState CLI 登入方式', () => {
     expect(state.cliAuth).toEqual(status);
     expect(notified).toBe(1);
   });
+
+  it('探測中的旗標會通知訂閱者，重複設成同一個值則不會', () => {
+    let notified = 0;
+    state.subscribe(() => (notified += 1));
+
+    expect(state.cliProbing).toBe(false);
+    state.setCliProbing(true);
+    state.setCliProbing(true);
+
+    expect(state.cliProbing).toBe(true);
+    expect(notified).toBe(1);
+  });
 });
 
 describe('AppState 工作流', () => {

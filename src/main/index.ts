@@ -8,11 +8,12 @@ import { fileProfileStore } from './profile-store';
 import { agentRunners } from './agent-runner';
 import { NodeProcessSpawner } from './process-spawner';
 import { probeCliAuth } from './cli-auth-probe';
+import { cliAuthBridge } from './cli-auth-bridge';
 import { fileCliAuthStore } from './cli-auth-store';
 import { safeStorageCipher } from './safe-storage-cipher';
 import { cliSecrets } from './cli-secrets';
 import type { AgentKind } from '../shared/agent';
-import type { BillingMode, CliAuthStatus } from '../shared/cli-auth';
+import type { BillingMode } from '../shared/cli-auth';
 import { fileCheckpointSaver } from './workflow/json-file-saver';
 import { WorkflowService, fileRunStore } from './workflow/workflow-service';
 import { fileWorkflowStore } from './workflow/workflow-store';
@@ -31,14 +32,14 @@ ensureLogDir(logDir);
 const cliStore = fileCliAuthStore(join(app.getPath('userData'), 'cli-auth.json'), safeStorageCipher());
 
 // CLI 是用訂閱還是 API 金鑰登入：開機問一次就好，不擋啟動 (探測不出來也照跑)。
-// 金額要不要標成估算看它，所以 agent 的結果行與 renderer 都拿同一份結果。
-const probe = (): Promise<CliAuthStatus> =>
-  probeCliAuth(new NodeProcessSpawner(), (id) => cliStore.get(id).hasKey);
-let cliAuth = probe();
-let auth: CliAuthStatus | null = null;
-const remember = (status: CliAuthStatus): CliAuthStatus => (auth = status);
-void cliAuth.then(remember);
-const billingMode = (kind: AgentKind): BillingMode => auth?.[kind].mode ?? 'unknown';
+// 金額要不要標成估算看它，所以 agent 的結果行與 renderer 都拿同一份結果；
+// 使用者按「重新偵測」或跑完登入流程時會重探，探測中再按也只會探一輪。
+const cli = cliAuthBridge(
+  () => probeCliAuth(new NodeProcessSpawner(), (id) => cliStore.get(id).hasKey),
+  cliStore,
+);
+void cli.refresh();
+const billingMode = (kind: AgentKind): BillingMode => cli.latest()?.[kind].mode ?? 'unknown';
 
 // 組裝：正式環境注入真的 node-pty spawner 與真的檔案 sink。
 // ShellFactory 與 agent runner 共用同一條金鑰縫線，所以選了 API 金鑰的 CLI
@@ -74,12 +75,7 @@ registerIpc(
   profiles,
   workflows,
   workflowDefinitions,
-  {
-    status: () => cliAuth,
-    // 登入流程跑完之後重探一次，之後問到的就是新的結果。
-    refresh: () => (cliAuth = probe().then(remember)),
-    store: cliStore,
-  },
+  cli,
   () => (win && !win.isDestroyed() ? win.webContents : null),
 );
 

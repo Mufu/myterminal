@@ -4,7 +4,12 @@ import type { SaveCliSettingRequest } from '../shared/ipc';
 import type { MyTerminalApi } from '../shared/api';
 import type { AppState } from './app-state';
 import { statusLabel } from './cli-status-view';
-import { ClearCliKeyCommand, LoginCliCommand, SaveCliSettingCommand } from './commands';
+import {
+  ClearCliKeyCommand,
+  LoginCliCommand,
+  RefreshCliAuthCommand,
+  SaveCliSettingCommand,
+} from './commands';
 import type { DialogPort } from './ports';
 
 const $ = <T extends HTMLElement>(id: string): T => {
@@ -25,6 +30,7 @@ const maybe = <T extends HTMLElement>(id: string): T | null =>
 export class CliSettingsDialog implements DialogPort {
   private readonly dialog = $<HTMLDialogElement>('cli-settings');
   private readonly errors = $<HTMLParagraphElement>('cli-errors');
+  private readonly refresh = $<HTMLButtonElement>('cli-refresh');
 
   constructor(
     private readonly state: AppState,
@@ -33,6 +39,11 @@ export class CliSettingsDialog implements DialogPort {
     private readonly onLogin: (sessionId: string) => void | Promise<void>,
   ) {
     for (const id of CLI_IDS) this.wire(id);
+    // 在外面的終端機登入 / 登出之後按這顆，不必關掉 app 再開。
+    this.refresh.addEventListener(
+      'click',
+      () => void new RefreshCliAuthCommand(this.api, this.state).execute(),
+    );
     // 探測結果或設定變了就換狀態文字；使用者正在打的金鑰不會被動到。
     this.state.subscribe(() => this.renderStatus());
     this.renderStatus();
@@ -136,9 +147,15 @@ export class CliSettingsDialog implements DialogPort {
   }
 
   private renderStatus(): void {
+    const probing = this.state.cliProbing;
     for (const id of CLI_IDS) {
-      $(`cli-${id}-status`).textContent = statusLabel(this.state.cliAuth?.[id], this.setting(id));
+      $(`cli-${id}-status`).textContent = statusLabel(
+        this.state.cliAuth?.[id],
+        this.setting(id),
+        probing,
+      );
     }
+    this.refresh.disabled = probing;
   }
 
   private collect(id: CliId): SaveCliSettingRequest {

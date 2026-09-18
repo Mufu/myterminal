@@ -7,10 +7,17 @@ import { TYPE_LABELS } from '../shared/profile';
  * 這一支 CLI 現在算什麼狀態。
  * 選了「API 金鑰」而且金鑰存得住的時候，工作階段一定是拿那把金鑰跑的，
  * 所以以設定為準 —— CLI 自己的登入狀態 (探測結果) 反而不是實際會用的那個。
+ * 正在探 (含開機第一次) 的時候只寫「偵測中…」：「找不到指令」「未登入」
+ * 都是探測的結論，不能拿來當還沒探完的佔位字。
  */
-export function statusLabel(auth: CliAuth | undefined, setting?: CliAuthSetting): string {
+export function statusLabel(
+  auth: CliAuth | undefined,
+  setting?: CliAuthSetting,
+  probing = false,
+): string {
+  if (probing || !auth) return '偵測中…';
   if (setting?.mode === 'apiKey' && setting.hasKey) return 'API 金鑰';
-  return auth?.label ?? '檢查中…';
+  return auth.label;
 }
 
 /** 這一支 CLI 現在有沒有東西可以用 (沒有的話晶片畫暗一階)。*/
@@ -19,9 +26,14 @@ export function statusUsable(auth: CliAuth | undefined, setting?: CliAuthSetting
   return auth?.loggedIn ?? false;
 }
 
-/** 晶片上的字：「Claude · Max 訂閱」。還沒探測完 (或探測不到) 就先寫檢查中。*/
-export function chipLabel(name: string, auth: CliAuth | undefined, setting?: CliAuthSetting): string {
-  return `${name} · ${statusLabel(auth, setting)}`;
+/** 晶片上的字：「Claude · Max 訂閱」。還沒探測完就先寫偵測中。*/
+export function chipLabel(
+  name: string,
+  auth: CliAuth | undefined,
+  setting?: CliAuthSetting,
+  probing = false,
+): string {
+  return `${name} · ${statusLabel(auth, setting, probing)}`;
 }
 
 /**
@@ -31,6 +43,8 @@ export function chipLabel(name: string, auth: CliAuth | undefined, setting?: Cli
 export class CliStatusView {
   constructor(
     private readonly chips: Record<CliId, HTMLElement>,
+    /** 「重新偵測」；探測中要停用，不然連按就是好幾輪。*/
+    private readonly refreshButton: HTMLButtonElement,
     private readonly state: AppState,
   ) {
     this.state.subscribe(() => this.render());
@@ -40,11 +54,13 @@ export class CliStatusView {
   private render(): void {
     const auth = this.state.cliAuth;
     const settings = this.state.cliSettings;
+    const probing = this.state.cliProbing;
     for (const id of CLI_IDS) {
       const el = this.chips[id];
       const setting = settings?.[id];
-      el.textContent = chipLabel(TYPE_LABELS[id], auth?.[id], setting);
+      el.textContent = chipLabel(TYPE_LABELS[id], auth?.[id], setting, probing);
       el.classList.toggle('muted', !statusUsable(auth?.[id], setting));
     }
+    this.refreshButton.disabled = probing;
   }
 }

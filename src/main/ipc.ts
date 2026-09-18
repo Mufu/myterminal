@@ -9,13 +9,13 @@ import type {
   StartWorkflowRequest,
 } from '../shared/ipc';
 import type { SavedProfile } from '../shared/profile';
-import type { CliAuthStatus, CliId } from '../shared/cli-auth';
+import type { CliId } from '../shared/cli-auth';
 import { loginProfile, validateCliSetting } from '../shared/cli-auth';
 import type { WorkflowDefinition } from '../shared/workflow';
 import type { SessionManager } from './session-manager';
 import type { SessionLogger } from './session-logger';
 import type { ProfileStore } from './profile-store';
-import type { CliAuthStore } from './cli-auth-store';
+import type { CliAuthBridge } from './cli-auth-bridge';
 import type { WorkflowService } from './workflow/workflow-service';
 import type { WorkflowStore } from './workflow/workflow-store';
 import { findWorkflow, listWorkflows } from './workflow/catalog';
@@ -23,15 +23,6 @@ import { findWorkflow, listWorkflows } from './workflow/catalog';
 /** 登入用的工作階段開出來時還沒有終端機，先給一個尺寸，show() 時會量過重設。*/
 const LOGIN_COLS = 120;
 const LOGIN_ROWS = 30;
-
-/** CLI 設定與登入狀態：誰存的、怎麼重探，由 index.ts 組起來。*/
-export interface CliAuthBridge {
-  /** 目前這一份探測結果 (開機探一次，登入完重探)。*/
-  status(): Promise<CliAuthStatus>;
-  /** 重探一次，並成為新的 status()。*/
-  refresh(): Promise<CliAuthStatus>;
-  store: CliAuthStore;
-}
 
 /**
  * IPC 橋接層：刻意保持很薄。
@@ -135,6 +126,14 @@ export function registerIpc(
   ipcMain.handle(IPC.workflowRuns, () => workflows.list());
   // 探測是開機時就開始的，這裡等的是同一個 Promise。
   ipcMain.handle(IPC.cliAuth, () => cli.status());
+
+  // 「重新偵測」：在外面的終端機登入 / 登出之後不必重開 app。
+  // 別的地方 (例如畫布) 也在看晶片，所以重探完一樣推一次。
+  ipcMain.handle(IPC.cliRefresh, async () => {
+    const status = await cli.refresh();
+    send(IPC.cliAuthChanged, status);
+    return status;
+  });
 
   ipcMain.handle(IPC.cliSettings, () => cli.store.settings());
 

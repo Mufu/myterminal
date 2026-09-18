@@ -520,6 +520,26 @@ export class LoginCliCommand implements ICommand {
 }
 
 /**
+ * 「重新偵測」：在外面的終端機登入 / 登出之後，不重開 app 就換掉晶片上的字。
+ * 探測期間把 AppState 標成偵測中 —— 兩顆按鈕都會停用，晶片也不會停在舊答案上。
+ */
+export class RefreshCliAuthCommand implements ICommand {
+  constructor(
+    private readonly api: MyTerminalApi,
+    private readonly state: AppState,
+  ) {}
+
+  async execute(): Promise<void> {
+    this.state.setCliProbing(true);
+    try {
+      this.state.setCliAuth(await this.api.cliRefresh());
+    } finally {
+      this.state.setCliProbing(false);
+    }
+  }
+}
+
+/**
  * IPC 丟回來的通常是 Error，但也可能是別的東西。
  * Electron 還會把 main 丟的例外包成
  * `Error invoking remote method 'session:create': Error: <原因>`，

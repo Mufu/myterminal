@@ -21,6 +21,7 @@ export class AppState {
   private _runs: RunState[] = [];
   private _cliAuth: CliAuthStatus | null = null;
   private _cliSettings: Record<CliId, CliAuthSetting> | null = null;
+  private _cliProbing = false;
   private _view: MainView = 'terminal';
 
   get sessions(): SessionInfo[] {
@@ -51,6 +52,11 @@ export class AppState {
   /** 使用者在「CLI 設定」裡選的登入方式；讀回來之前是 null。*/
   get cliSettings(): Record<CliId, CliAuthSetting> | null {
     return this._cliSettings;
+  }
+
+  /** 正在探四支 CLI 的登入狀態；這段期間晶片上寫「偵測中…」。*/
+  get cliProbing(): boolean {
+    return this._cliProbing;
   }
 
   get view(): MainView {
@@ -99,6 +105,12 @@ export class AppState {
 
   setCliSettings(settings: Record<CliId, CliAuthSetting>): void {
     this._cliSettings = settings;
+    this.notify();
+  }
+
+  setCliProbing(probing: boolean): void {
+    if (probing === this._cliProbing) return;
+    this._cliProbing = probing;
     this.notify();
   }
 

@@ -155,6 +155,9 @@
           <span id="cli-codex" class="cli-chip"></span>
           <span id="cli-muse" class="cli-chip"></span>
           <span id="cli-opencode" class="cli-chip"></span>
+          <button id="btn-cli-refresh" type="button" title="重新偵測四支 CLI 的登入狀態">
+            重新偵測
+          </button>
           <button id="btn-cli-settings" type="button" title="CLI 設定" aria-label="CLI 設定">
             ⚙
           </button>
@@ -314,7 +317,12 @@
 
     <dialog id="cli-settings">
       <form method="dialog" novalidate>
-        <h2>CLI 設定</h2>
+        <header class="cli-title">
+          <h2>CLI 設定</h2>
+          <button id="cli-refresh" type="button" title="重新偵測四支 CLI 的登入狀態">
+            重新偵測
+          </button>
+        </header>
         <p class="cli-hint">
           選「登入」就用那支 CLI 自己的帳號；選「API 金鑰」時金鑰會加密存在本機，
           只以環境變數送進該支 CLI 的工作階段。

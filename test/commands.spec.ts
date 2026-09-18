@@ -30,6 +30,7 @@ import {
   SaveCliSettingCommand,
   ClearCliKeyCommand,
   LoginCliCommand,
+  RefreshCliAuthCommand,
   errorText,
 } from '../src/renderer/commands';
 import { WorkflowEditorModel } from '../src/renderer/workflow-editor-model';
@@ -38,6 +39,7 @@ import type { TerminalPort, ClipboardPort, InputPanelPort, DialogPort } from '..
 import type { MyTerminalApi } from '../src/shared/api';
 import type { SessionInfo } from '../src/shared/session';
 import type { ConnectionProfile, SavedProfile } from '../src/shared/profile';
+import type { CliAuthStatus } from '../src/shared/cli-auth';
 
 const session = (id: string, over: Partial<SessionInfo> = {}): SessionInfo => ({
   id,
@@ -744,17 +746,27 @@ describe('errorText', () => {
 });
 
 describe('CLI 設定', () => {
+  /** 重新偵測回來的那一份；內容不重要，能認出是同一份就好。*/
+  const CLI_STATUS: CliAuthStatus = {
+    claude: { loggedIn: true, mode: 'subscription', plan: 'max', label: 'Max 訂閱' },
+    codex: { loggedIn: false, mode: 'unknown', label: '未登入' },
+    muse: { loggedIn: false, mode: 'unknown', label: '找不到指令' },
+    opencode: { loggedIn: false, mode: 'unknown', label: '未登入' },
+  };
+
   /** 這一組 Command 只用到這幾個方法，就不拉進上面那份 fakeApi。*/
   const cliApi = (over: Partial<Record<string, unknown>> = {}) =>
     ({
       saveCliSetting: vi.fn().mockResolvedValue({ claude: { mode: 'apiKey', hasKey: true } }),
       clearCliKey: vi.fn().mockResolvedValue({ claude: { mode: 'apiKey', hasKey: false } }),
       cliLogin: vi.fn().mockResolvedValue('s9'),
+      cliRefresh: vi.fn().mockResolvedValue(CLI_STATUS),
       ...over,
     }) as unknown as MyTerminalApi & {
       saveCliSetting: ReturnType<typeof vi.fn>;
       clearCliKey: ReturnType<typeof vi.fn>;
       cliLogin: ReturnType<typeof vi.fn>;
+      cliRefresh: ReturnType<typeof vi.fn>;
     };
 
   it('⚙ 打開對話框', () => {
@@ -837,5 +849,31 @@ describe('CLI 設定', () => {
     const errors: string[][] = [];
     await new LoginCliCommand(cli, 'opencode', () => {}, (m) => errors.push(m)).execute();
     expect(errors).toEqual([['OpenCode 只能使用 API 金鑰']]);
+  });
+
+  it('重新偵測：探測中先標成偵測中，結果回來才換上去', async () => {
+    let finish!: (status: CliAuthStatus) => void;
+    const cli = cliApi({
+      cliRefresh: vi.fn(() => new Promise<CliAuthStatus>((resolve) => (finish = resolve))),
+    });
+    const state = new AppState();
+
+    const done = new RefreshCliAuthCommand(cli, state).execute();
+    expect(state.cliProbing).toBe(true);
+    expect(state.cliAuth).toBeNull();
+
+    finish(CLI_STATUS);
+    await done;
+
+    expect(state.cliProbing).toBe(false);
+    expect(state.cliAuth).toEqual(CLI_STATUS);
+  });
+
+  it('重新偵測失敗也要把「偵測中」收回來，按鈕才不會一直停用', async () => {
+    const cli = cliApi({ cliRefresh: vi.fn().mockRejectedValue(new Error('探不到')) });
+    const state = new AppState();
+
+    await expect(new RefreshCliAuthCommand(cli, state).execute()).rejects.toThrow('探不到');
+    expect(state.cliProbing).toBe(false);
   });
 });

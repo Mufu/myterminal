@@ -1324,8 +1324,31 @@ html[data-theme='warm'] .session-item.active .session-dot {
   cursor: pointer;
 }
 
-#btn-cli-settings {
+/* 頁尾的「重新偵測」：跟 ⚙ 一起靠右，所以靠右的 margin 換到它身上。*/
+#btn-cli-refresh {
   margin-left: auto;
+  padding: var(--tag-pad);
+  border: var(--tag-border-width) solid var(--tag-border);
+  border-radius: var(--tag-radius);
+  background: var(--tag-bg);
+  color: var(--muted);
+  font-family: var(--meta-font);
+  font-size: var(--tag-size);
+  letter-spacing: var(--tag-tracking);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+#btn-cli-refresh:hover:enabled {
+  color: var(--text);
+}
+
+#btn-cli-refresh:disabled {
+  color: var(--dim);
+  cursor: default;
+}
+
+#btn-cli-settings {
   padding: 0 4px;
   border: 0;
   background: transparent;
@@ -1340,6 +1363,17 @@ html[data-theme='warm'] .session-item.active .session-dot {
 }
 
 /* ---- CLI 設定對話框：一支 CLI 一列 ---- */
+/* 標題那一列：標題在左，「重新偵測」靠右。*/
+#cli-settings .cli-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+#cli-settings .cli-title h2 {
+  margin-right: auto;
+}
+
 #cli-settings {
   min-width: 460px;
   max-height: 86vh;

@@ -110,10 +110,19 @@ describe('usageTitle', () => {
 });
 
 describe('chipLabel', () => {
-  it('名稱加上登入方式，還沒探測完先寫檢查中', () => {
+  it('名稱加上登入方式，還沒探測完先寫偵測中', () => {
     expect(chipLabel('Claude', parseClaudeAuth(MAX_LOGIN))).toBe('Claude · Max 訂閱');
     expect(chipLabel('Codex', parseCodexAuth('Not logged in'))).toBe('Codex · 未登入');
-    expect(chipLabel('Codex', undefined)).toBe('Codex · 檢查中…');
+    expect(chipLabel('Codex', undefined)).toBe('Codex · 偵測中…');
+  });
+
+  /** 按了「重新偵測」之後，上一輪的結論 (例如「找不到指令」) 不該留在晶片上。*/
+  it('重新探的時候不論上一輪探到什麼都寫偵測中', () => {
+    const auth = parseCodexAuth('Not logged in');
+    expect(chipLabel('Codex', auth, undefined, true)).toBe('Codex · 偵測中…');
+    expect(chipLabel('Claude', parseClaudeAuth(MAX_LOGIN), { mode: 'apiKey', hasKey: true }, true)).toBe(
+      'Claude · 偵測中…',
+    );
   });
 
   /** 工作階段是拿那把金鑰跑的，所以晟片上要寫金鑰，不是 CLI 自己的登入狀態。*/
