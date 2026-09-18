@@ -111,6 +111,18 @@ describe('WorkflowStore 讀取', () => {
     expect(store.list().map((w) => w.id)).toEqual(['好的']);
   });
 
+  /** 參數的形狀不對的話，執行對話框長欄位時會整個炸掉。*/
+  it('啟動參數的形狀不對也忽略，沒宣告的照收', () => {
+    file.content = JSON.stringify([
+      { ...minimalWorkflow('不是陣列'), params: 'task' },
+      { ...minimalWorkflow('沒有標籤'), params: [{ name: 'task', kind: 'text', required: true }] },
+      { ...minimalWorkflow('型別不認得'), params: [{ name: 'a', label: 'a', kind: 'file', required: true }] },
+      { ...minimalWorkflow('沒宣告') },
+      { ...minimalWorkflow('宣告了'), params: [{ name: 'a', label: '甲', kind: 'text', required: false }] },
+    ]);
+    expect(store.list().map((w) => w.id)).toEqual(['沒宣告', '宣告了']);
+  });
+
   /** 意義上的錯（提示留白）不能讓它消失 —— 使用者要看得到才改得了。*/
   it('只是驗證不過的定義仍然列得出來', () => {
     const blankPrompt = minimalWorkflow('沒提示');

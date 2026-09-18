@@ -7,6 +7,7 @@ import type {
   WorkflowInfo,
   WorkflowNode,
   WorkflowNodeType,
+  WorkflowParamDef,
   WorkflowPort,
 } from '../shared/workflow';
 import { NODE_PORTS } from '../shared/workflow';
@@ -50,6 +51,19 @@ const KIND_OPTIONS = CLI_TYPES.map((cli) => [cli, CLI_LABELS[cli]] as [string, s
 const PERMISSION_OPTIONS = PERMISSIONS.map(
   (permission) => [permission, PERMISSION_LABELS[permission]] as [string, string],
 );
+
+/** 「啟動參數」面板的「型別」下拉：執行對話框照它決定欄位長什麼樣。*/
+const PARAM_KIND_OPTIONS: Array<[string, string]> = [
+  ['text', '單行'],
+  ['multiline', '多行'],
+  ['directory', '目錄'],
+];
+
+/** 提示欄位下面那一行：可以用的樣板變數，跟著宣告的參數走。*/
+export function promptHint(params: readonly WorkflowParamDef[]): string {
+  const names = params.map((param) => `{{params.${param.name}}}`);
+  return `可用 ${[...names, '{{<節點id>.text}}'].join('、')}`;
+}
 
 /** 「手動操作」要在哪個終端機裡開；跟新連接對話框的「基礎 shell」同一組。*/
 const SHELL_OPTIONS: Array<[string, string]> = [
@@ -531,7 +545,8 @@ export class WorkflowEditorView {
   private renderProps(): void {
     const selection = this.model.selection;
     const key = !selection
-      ? 'none'
+      ? // 沒選東西時面板是「啟動參數」：加或刪一列才重建，打字不重建。
+        `none:${this.model.params.length}`
       : selection.kind === 'node'
         ? // 工作階段也算進鑰匙：節點跑起來之後面板才長得出「接手」。
           `node:${selection.id}:${this.sessionFor(selection.id) ?? ''}`
@@ -541,6 +556,7 @@ export class WorkflowEditorView {
     this.propsPanel.textContent = '';
 
     if (!selection) {
+      this.paramsProps();
       this.propsPanel.appendChild(
         note('拖拉節點換位置；從右側的出口拉到另一個節點的左側入口就是一條連線；選起來按 Delete 刪掉。'),
       );
@@ -571,6 +587,74 @@ export class WorkflowEditorView {
     if (node.type === 'agent') this.agentProps(node.id, node.config);
     if (node.type === 'condition') this.conditionProps(node.id, node.config);
     if (node.type === 'approval') this.approvalProps(node.id, node.config);
+  }
+
+  /**
+   * 沒選任何東西時的面板：這份工作流的啟動參數。
+   * 執行對話框的欄位就是照著這一份長出來的，節點的提示用 {{params.<名稱>}} 取用。
+   */
+  private paramsProps(): void {
+    this.propsPanel.append(title('啟動參數'), note('執行對話框會照著這一份長出欄位。'));
+
+    this.model.params.forEach((param, index) => {
+      this.propsPanel.append(
+        row(
+          '名稱',
+          input(
+            param.name,
+            (value) => this.model.updateParam(index, { name: value }),
+            `props-param-name-${index}`,
+          ),
+        ),
+        row(
+          '標籤',
+          input(
+            param.label,
+            (value) => this.model.updateParam(index, { label: value }),
+            `props-param-label-${index}`,
+          ),
+        ),
+        row(
+          '型別',
+          select(
+            PARAM_KIND_OPTIONS,
+            param.kind,
+            (value) =>
+              this.model.updateParam(index, { kind: value as WorkflowParamDef['kind'] }),
+            `props-param-kind-${index}`,
+          ),
+        ),
+        row(
+          '必填',
+          checkbox(
+            param.required,
+            (value) => this.model.updateParam(index, { required: value }),
+            `props-param-required-${index}`,
+          ),
+        ),
+        row(
+          '預設',
+          input(
+            param.default ?? '',
+            (value) => this.model.updateParam(index, { default: value || undefined }),
+            `props-param-default-${index}`,
+          ),
+        ),
+        row(
+          '提示',
+          input(
+            param.hint ?? '',
+            (value) => this.model.updateParam(index, { hint: value || undefined }),
+            `props-param-hint-${index}`,
+          ),
+        ),
+        actions([[`props-param-remove-${index}`, '刪除', () => this.model.removeParam(index)]]),
+      );
+    });
+
+    this.propsPanel.append(
+      actions([['props-param-add', '＋ 加一個參數', () => this.model.addParam()]]),
+    );
   }
 
   private agentProps(id: string, config: AgentNodeConfig): void {
@@ -618,7 +702,7 @@ export class WorkflowEditorView {
           'props-prompt',
         ),
       ),
-      note('可用 {{params.task}}、{{params.cwd}}、{{<節點id>.text}}'),
+      note(promptHint(this.model.params)),
       row(
         '工作目錄',
         input(config.cwd ?? '', (value) => this.model.updateNode(id, { config: { cwd: value } }), 'props-cwd'),
@@ -857,6 +941,15 @@ function input(value: string, onInput: (value: string) => void, id: string): HTM
   el.id = id;
   el.value = value;
   el.addEventListener('input', () => onInput(el.value));
+  return el;
+}
+
+function checkbox(value: boolean, onChange: (value: boolean) => void, id: string): HTMLInputElement {
+  const el = document.createElement('input');
+  el.type = 'checkbox';
+  el.id = id;
+  el.checked = value;
+  el.addEventListener('change', () => onChange(el.checked));
   return el;
 }
 

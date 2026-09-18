@@ -81,6 +81,7 @@ function migrateNode(node: WorkflowNode): WorkflowNode {
 }
 
 const NODE_TYPES: readonly string[] = ['start', 'end', 'agent', 'condition', 'approval'];
+const PARAM_KINDS: readonly string[] = ['text', 'multiline', 'directory'];
 
 /**
  * 手動編輯過的 JSON 也可能少欄位，形狀不對的項目直接忽略 ——
@@ -90,7 +91,7 @@ const NODE_TYPES: readonly string[] = ['start', 'end', 'agent', 'condition', 'ap
  */
 function isWorkflowDefinition(value: unknown): value is WorkflowDefinition {
   if (typeof value !== 'object' || value === null) return false;
-  const { version, id, name, nodes, edges } = value as Partial<WorkflowDefinition>;
+  const { version, id, name, nodes, edges, params } = value as Partial<WorkflowDefinition>;
   return (
     version === 1 &&
     typeof id === 'string' &&
@@ -98,7 +99,21 @@ function isWorkflowDefinition(value: unknown): value is WorkflowDefinition {
     Array.isArray(nodes) &&
     nodes.every(isNode) &&
     Array.isArray(edges) &&
-    edges.every(isEdge)
+    edges.every(isEdge) &&
+    // 沒宣告啟動參數是合法的 (舊檔案都沒有)，宣告了就要是一份參數清單。
+    (params === undefined || (Array.isArray(params) && params.every(isParam)))
+  );
+}
+
+function isParam(value: unknown): boolean {
+  if (typeof value !== 'object' || value === null) return false;
+  const { name, label, kind, required } = value as Record<string, unknown>;
+  return (
+    typeof name === 'string' &&
+    typeof label === 'string' &&
+    typeof kind === 'string' &&
+    PARAM_KINDS.includes(kind) &&
+    typeof required === 'boolean'
   );
 }
 
