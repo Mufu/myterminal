@@ -4,6 +4,7 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { AgentKind } from '../src/shared/agent';
+import { freshUserData } from './helpers';
 
 const root = join(__dirname, '..');
 
@@ -43,7 +44,10 @@ for (const kind of ['claude', 'codex'] as const) {
     // 冷啟動 + 一次真的模型呼叫，給很寬鬆的時間。
     test.setTimeout(300_000);
 
-    const app: ElectronApplication = await electron.launch({ args: ['.'], cwd: root });
+    const app: ElectronApplication = await electron.launch({
+      args: ['.', `--user-data-dir=${freshUserData(`agent-${kind}`)}`],
+      cwd: root,
+    });
     const window = await app.firstWindow();
     await window.waitForLoadState('domcontentloaded');
 
@@ -93,7 +97,7 @@ test('opencode：Agent 任務跑得完，清單上可以接手', async () => {
   test.setTimeout(300_000);
 
   const app: ElectronApplication = await electron.launch({
-    args: ['.'],
+    args: ['.', `--user-data-dir=${freshUserData('agent-opencode')}`],
     cwd: root,
     env: { ...process.env, MYTERMINAL_OPENCODE_MODEL: 'opencode/mimo-v2.5-free' },
   });
@@ -134,7 +138,10 @@ test('muse：Agent 任務跑得完，清單上可以接手', async () => {
   );
   test.setTimeout(300_000);
 
-  const app: ElectronApplication = await electron.launch({ args: ['.'], cwd: root });
+  const app: ElectronApplication = await electron.launch({
+    args: ['.', `--user-data-dir=${freshUserData('agent-muse')}`],
+    cwd: root,
+  });
   const window = await app.firstWindow();
   await window.waitForLoadState('domcontentloaded');
 

@@ -2,6 +2,7 @@ import { test, expect, _electron as electron } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
+import { freshUserData } from './helpers';
 
 const root = join(__dirname, '..');
 
@@ -42,7 +43,10 @@ test('用新連接開一個 SSH 工作階段，登入、執行指令、離線', 
   test.setTimeout(240_000);
 
   const before = plinkPids();
-  const app = await electron.launch({ args: ['.'], cwd: root });
+  const app = await electron.launch({
+    args: ['.', `--user-data-dir=${freshUserData('ssh')}`],
+    cwd: root,
+  });
   const window = await app.firstWindow();
   await window.waitForLoadState('domcontentloaded');
 
