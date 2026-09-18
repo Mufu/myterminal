@@ -435,11 +435,12 @@ npm run dist
 
 先跑 `electron-vite build`，再交給 `electron-builder --win`，產物都在 `dist/`：
 
-| 檔案 | 說明 |
-| --- | --- |
-| `myterminal-<版本>-portable.exe` | 免安裝單檔，雙擊就跑 |
-| `myterminal-<版本>-setup.exe` | NSIS 安裝檔，安裝到目前使用者（不需要系統管理員），會建立桌面與開始功能表捷徑，並可從「應用程式與功能」移除 |
-| `dist/win-unpacked/` | 未壓縮的目錄版，開發時最方便直接測 |
+| 檔案 | 每次啟動要等 | 說明 |
+| --- | --- | --- |
+| `myterminal-<版本>-win.zip` | 約 3～4 秒 | 解壓一次到任何資料夾，之後跑裡面的 `myterminal.exe`。不必安裝，也沒有每次啟動的解壓等待 |
+| `myterminal-<版本>-setup.exe` | 幾乎不用等 | NSIS 安裝檔，安裝到目前使用者（不需要系統管理員），會建立桌面與開始功能表捷徑，並可從「應用程式與功能」移除 |
+| `myterminal-<版本>-portable.exe` | **約 40 秒** | 免安裝單檔，雙擊就跑；代價是每次啟動都要重新解壓約 250 MB（見下面） |
+| `dist/win-unpacked/` | 約 3～4 秒 | 未壓縮的目錄版，開發時最方便直接測（zip 裝的就是這個目錄） |
 
 打包設定在 [`electron-builder.yml`](electron-builder.yml)。`dist/` 已經在 `.gitignore` 裡，不要 commit 產物。
 
@@ -451,9 +452,11 @@ npm run dist
 - **`asarUnpack: node_modules/node-pty/**`**：`pty.node`、`conpty.dll`、`OpenConsole.exe`
   以及 node-pty 會 fork 出來的 `conpty_console_list_agent.js` 都必須是真實檔案，
   留在 asar 裡會載入失敗。
-- **portable 版第一次啟動要等**：單檔 exe 會先把約 250 MB 的內容解壓到
-  `%TEMP%\<亂數目錄>\` 再啟動，實測從啟動到視窗出現約 30～60 秒（之後關掉會自己清乾淨）。
-  安裝版與 `win-unpacked` 沒有這段等待。
+- **portable 版每次啟動都要等**：單檔 exe 會先把約 250 MB 的內容解壓到
+  `%TEMP%\<亂數目錄>\` 再啟動，實測從雙擊到視窗出現約 40 秒，而且**不只第一次** ——
+  關掉時那個目錄會被清乾淨，所以下次啟動整段重來。這是 electron-builder 的
+  portable 目標本來的行為，不是 app 裡的東西。想要單檔就接受這 40 秒；
+  不想等就用 zip 或安裝版，它們啟動都是 3～4 秒。
 - **沒有簽章、沒有自訂圖示**：用 Electron 預設圖示；未簽章的 exe 第一次執行
   Windows SmartScreen 會跳警告，選「仍要執行」即可。
 

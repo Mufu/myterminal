@@ -16,6 +16,10 @@ win:
   target:
     - portable
     - nsis
+    - zip
+  # zip 沒有自己的設定區塊，就用 win 這一層的名字；
+  # portable 與 nsis 各自蓋掉它 (見下面)。
+  artifactName: ${name}-${version}-win.${ext}
 portable:
   artifactName: ${name}-${version}-portable.${ext}
 nsis:
