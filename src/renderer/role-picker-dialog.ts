@@ -124,11 +124,10 @@ export class RolePickerDialog implements RolePickerPort {
     // 一列很窄，說明會被 … 收掉，滑過去看全文。
     button.title = role.description ? `${roleTagText(role)}\n${role.description}` : roleTagText(role);
 
-    button.append(
-      span('role-row-name', roleTagText(role)),
-      span('role-row-desc', role.description ?? ''),
-      span('role-row-division', role.division ?? ''),
-    );
+    // 沒有說明 / 沒有分類 (內建的五個) 就不要留一個空殼在那裡。
+    button.appendChild(span('role-row-name', roleTagText(role)));
+    if (role.description) button.appendChild(span('role-row-desc', role.description));
+    if (role.division) button.appendChild(span('role-row-division', role.division));
     button.addEventListener('click', () => this.choose(role));
     return button;
   }
