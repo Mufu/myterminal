@@ -7,7 +7,7 @@ import { TEMPLATES, findTemplate, templateInfos } from '../src/main/workflow/tem
 import { compile } from '../src/main/workflow/graph-compiler';
 import { WorkflowService } from '../src/main/workflow/workflow-service';
 import { fileCheckpointSaver } from '../src/main/workflow/json-file-saver';
-import { validateWorkflow } from '../src/shared/workflow';
+import { DEFAULT_PARAMS, validateWorkflow } from '../src/shared/workflow';
 import type { RunState } from '../src/shared/workflow';
 import {
   FakeSessions,
@@ -51,6 +51,7 @@ describe('內建範本', () => {
       id: 'implement-review-approve',
       name: '實作 → 審查 → 批准',
       description: TEMPLATES[0].description,
+      params: DEFAULT_PARAMS,
       builtin: true,
     });
   });
@@ -83,6 +84,8 @@ describe('內建範本', () => {
       });
 
       it('只吃 task 與 cwd 兩個啟動參數，agent 節點都有工作目錄', () => {
+        // 明寫出來，畫布的「啟動參數」面板才看得到。
+        expect(template.params).toEqual(DEFAULT_PARAMS);
         for (const node of template.nodes) {
           if (node.type !== 'agent') continue;
           expect(node.config.cwd).toBe('{{params.cwd}}');

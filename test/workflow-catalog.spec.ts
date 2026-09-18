@@ -3,6 +3,7 @@ import { listWorkflows, findWorkflow } from '../src/main/workflow/catalog';
 import { WorkflowStore } from '../src/main/workflow/workflow-store';
 import { TEMPLATES } from '../src/main/workflow/templates';
 import { minimalWorkflow } from './fakes/fake-workflow';
+import { DEFAULT_PARAMS } from '../src/shared/workflow';
 
 let store: WorkflowStore;
 
@@ -23,6 +24,7 @@ describe('工作流目錄', () => {
       id: 'implement-review-approve',
       name: '實作 → 審查 → 批准',
       description: TEMPLATES[0].description,
+      params: DEFAULT_PARAMS,
       builtin: true,
     });
   });
@@ -32,6 +34,8 @@ describe('工作流目錄', () => {
     const infos = listWorkflows(store);
     expect(infos[0]).toMatchObject({ id: 'implement-review-approve', builtin: true });
     expect(infos.at(-1)).toMatchObject({ id: 'mine', builtin: false });
+    // 沒宣告參數的自訂工作流，清單上補的是內建的那兩個。
+    expect(infos.at(-1)?.params).toEqual(DEFAULT_PARAMS);
     expect(infos).toHaveLength(TEMPLATES.length + 1);
   });
 

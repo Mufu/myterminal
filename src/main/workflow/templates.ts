@@ -1,11 +1,13 @@
 import type { WorkflowDefinition, WorkflowInfo } from '../../shared/workflow';
+import { DEFAULT_PARAMS, paramsOf } from '../../shared/workflow';
 
 /**
  * 內建範本。就是一份 WorkflowDefinition —— 跟使用者在畫布上拉出來的東西
  * 是同一種資料，沒有第二套格式。position 是給畫布用的，
  * 由左到右排，只有「修正」掉到下面那一排 (它是回頭的那條線)。
  *
- * 每一份都只吃 {{params.task}} 與 {{params.cwd}} 兩個啟動參數，
+ * 每一份都只吃 {{params.task}} 與 {{params.cwd}} 兩個啟動參數 (明寫成 params，
+ * 畫布的「啟動參數」面板才看得到)，
  * 節點的提示只補「這一步要做什麼」，職責與語氣留給 shared/roles.ts 的角色。
  * 會被條件看的節點，提示最後一定有一句「最後一行只輸出 X 或 Y」。
  */
@@ -14,6 +16,7 @@ const IMPLEMENT_REVIEW_APPROVE: WorkflowDefinition = {
   id: 'implement-review-approve',
   name: '實作 → 審查 → 批准',
   description: '把任務丟給工程師做，審查者看過，最後停下來讓你決定要不要保留。',
+  params: [...DEFAULT_PARAMS],
   nodes: [
     { id: 'start', type: 'start', label: '開始', position: { x: 0, y: 0 } },
     {
@@ -93,6 +96,7 @@ const SOFTWARE_DEV: WorkflowDefinition = {
   id: 'software-dev',
   name: '軟體開發：需求 → 設計 → 實作 → 測試 → 審查',
   description: '把一句需求走完整條線：拆驗收清單、設計、實作、補測試、審查，中間批准兩次。',
+  params: [...DEFAULT_PARAMS],
   nodes: [
     { id: 'start', type: 'start', label: '開始', position: { x: 0, y: 0 } },
     {
@@ -249,6 +253,7 @@ const BUG_FIX: WorkflowDefinition = {
   id: 'bug-fix',
   name: '修 bug：重現 → 修正 → 驗證 → 審查',
   description: '先寫一個會失敗的測試把 bug 重現出來，再修到它會過；重現不出來就停下來。',
+  params: [...DEFAULT_PARAMS],
   nodes: [
     { id: 'start', type: 'start', label: '開始', position: { x: 0, y: 0 } },
     {
@@ -350,6 +355,7 @@ const CODE_REVIEW: WorkflowDefinition = {
   id: 'code-review',
   name: '程式碼審查（唯讀）',
   description: '只看不改：審查指定的範圍或目前工作目錄的變更，依嚴重度列出問題。',
+  params: [...DEFAULT_PARAMS],
   nodes: [
     { id: 'start', type: 'start', label: '開始', position: { x: 0, y: 0 } },
     {
@@ -382,6 +388,7 @@ const WRITE_TESTS: WorkflowDefinition = {
   id: 'write-tests',
   name: '補測試',
   description: '為指定的範圍補測試並跑到綠，再確認測試有意義、沒有為了變綠改產品程式碼。',
+  params: [...DEFAULT_PARAMS],
   nodes: [
     { id: 'start', type: 'start', label: '開始', position: { x: 0, y: 0 } },
     {
@@ -480,6 +487,7 @@ const REFACTOR: WorkflowDefinition = {
   id: 'refactor',
   name: '重構：方案 → 批准 → 執行 → 測試',
   description: '架構師先提重構方案與風險，你點頭之後才動手，改完跑既有測試確認行為沒變。',
+  params: [...DEFAULT_PARAMS],
   nodes: [
     { id: 'start', type: 'start', label: '開始', position: { x: 0, y: 0 } },
     {
@@ -605,6 +613,7 @@ const PLAN_ONLY: WorkflowDefinition = {
   id: 'plan-only',
   name: '需求分析（只規劃不動碼）',
   description: '只規劃不動程式碼：拆出可驗收的工作項目與待釐清的問題，再給實作順序。',
+  params: [...DEFAULT_PARAMS],
   nodes: [
     { id: 'start', type: 'start', label: '開始', position: { x: 0, y: 0 } },
     {
@@ -648,6 +657,7 @@ const CROSS_REVIEW: WorkflowDefinition = {
   id: 'cross-review',
   name: '交叉審查：Claude 實作，Codex 審查',
   description: '實作交給 Claude、審查交給 Codex，換一雙眼睛看。兩支 CLI 都要先登入。',
+  params: [...DEFAULT_PARAMS],
   nodes: [
     { id: 'start', type: 'start', label: '開始', position: { x: 0, y: 0 } },
     {
@@ -731,7 +741,13 @@ export const TEMPLATES: readonly WorkflowDefinition[] = [
 ];
 
 export function templateInfos(): WorkflowInfo[] {
-  return TEMPLATES.map(({ id, name, description }) => ({ id, name, description, builtin: true }));
+  return TEMPLATES.map((template) => ({
+    id: template.id,
+    name: template.name,
+    description: template.description,
+    params: paramsOf(template),
+    builtin: true,
+  }));
 }
 
 export function findTemplate(id: string): WorkflowDefinition | undefined {
