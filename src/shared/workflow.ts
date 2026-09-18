@@ -106,7 +106,7 @@ export interface WorkflowDefinition {
 
 /** 一直以來的那兩個：任務與工作目錄。沒宣告參數的定義就是吃這兩個。*/
 export const DEFAULT_PARAMS: readonly WorkflowParamDef[] = [
-  { name: 'task', label: '任務', kind: 'multiline', required: true },
+  { name: 'task', label: '任務', kind: 'multiline', required: true, hint: '要 agent 做什麼' },
   { name: 'cwd', label: '工作目錄', kind: 'directory', required: true, hint: 'agent 會在這裡修改檔案' },
 ];
 
