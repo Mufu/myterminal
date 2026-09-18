@@ -1,7 +1,6 @@
 import type { RunNodeStatus, RunState } from '../shared/workflow';
 import type { CliAuthStatus } from '../shared/cli-auth';
-import { usageLabel, usageTitle } from '../shared/cli-auth';
-import { nodeDotClass, runStatusLabel, usageMode } from './workflow-list-view';
+import { nodeDotClass, runStatusLabel, usageBadge, usageMode } from './workflow-list-view';
 
 /**
  * 畫布上的「執行檢視」：把一次執行的狀態蓋在既有的節點卡片上。
@@ -69,9 +68,8 @@ export function cardOverlay(
     label: nodeStatusLabel(node.status),
     waitingApproval: node.status === 'waiting' && run.status === 'waiting_approval',
   };
-  if (node.costUsd !== undefined) {
-    overlay.usage = usageLabel(node.costUsd, usageMode(auth, node.kind));
-  }
+  const usage = usageBadge(node.costUsd, node.tokens, usageMode(auth, node.kind));
+  if (usage) overlay.usage = usage.text;
   if (node.sessionId) overlay.sessionId = node.sessionId;
   return overlay;
 }
@@ -103,11 +101,11 @@ export class RunOverlay {
     status.className = `workflow-status ${run.status}`;
     status.textContent = runStatusLabel(run.status);
 
-    const mode = usageMode(auth);
+    const usage = usageBadge(run.totalCostUsd, run.totalTokens, usageMode(auth));
     const cost = document.createElement('span');
     cost.className = 'workflow-cost';
-    cost.textContent = usageLabel(run.totalCostUsd, mode);
-    cost.title = usageTitle(mode);
+    cost.textContent = usage?.text ?? '';
+    cost.title = usage?.title ?? '';
 
     this.strip.append(label('wf-run-title', '執行：'), status, cost);
     if (run.status === 'running') {

@@ -110,6 +110,13 @@ describe('cardOverlay', () => {
     expect(cardOverlay(state, 'agent-1')?.usage).toBe('≈$0.090');
   });
 
+  it('沒有金額的節點 (Codex) 寫 token 數', () => {
+    const state = run({
+      nodes: { 'agent-1': node({ status: 'done', kind: 'codex', tokens: 11_943 }) },
+    });
+    expect(cardOverlay(state, 'agent-1', auth)?.usage).toBe('11.9k tokens');
+  });
+
   it('有工作階段才給得出「輸出」按鈕', () => {
     const state = run({ nodes: { 'agent-1': node({ status: 'done', sessionId: 's-1' }) } });
     expect(cardOverlay(state, 'agent-1')?.sessionId).toBe('s-1');

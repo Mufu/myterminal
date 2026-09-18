@@ -1,6 +1,7 @@
 import type { AppState } from './app-state';
 import type { RunNodeStatus, RunState, RunStatus } from '../shared/workflow';
 import type { AgentKind } from '../shared/agent';
+import { formatTokens } from '../shared/agent';
 import type { BillingMode, CliAuthStatus } from '../shared/cli-auth';
 import { usageLabel, usageTitle } from '../shared/cli-auth';
 import { findRole } from '../shared/roles';
@@ -35,6 +36,24 @@ export function nodeDotClass(status: RunNodeStatus): string {
  */
 export function usageMode(auth: CliAuthStatus | null, kind?: AgentKind): BillingMode {
   return auth?.[kind ?? 'claude'].mode ?? 'unknown';
+}
+
+const TOKENS_TITLE = 'CLI 回報的 token 總數（輸入 + 輸出）';
+
+/**
+ * 「用掉多少」在畫面上的那一小塊：有金額就寫金額，沒有金額 (Codex 只回報
+ * token 數) 就寫 token 數，兩個都沒有就不寫。
+ */
+export function usageBadge(
+  costUsd: number | undefined,
+  tokens: number | undefined,
+  mode: BillingMode,
+): { text: string; title: string } | null {
+  if (tokens !== undefined && !costUsd) {
+    return { text: `${formatTokens(tokens)} tokens`, title: TOKENS_TITLE };
+  }
+  if (costUsd === undefined) return null;
+  return { text: usageLabel(costUsd, mode), title: usageTitle(mode) };
 }
 
 /**
@@ -89,12 +108,14 @@ export class WorkflowListView {
 
     const meta = document.createElement('div');
     meta.className = 'workflow-meta';
-    const cost = document.createElement('span');
-    cost.className = 'workflow-cost';
-    const mode = usageMode(this.state.cliAuth);
-    cost.textContent = usageLabel(run.totalCostUsd, mode);
-    cost.title = usageTitle(mode);
-    meta.appendChild(cost);
+    const usage = usageBadge(run.totalCostUsd, run.totalTokens, usageMode(this.state.cliAuth));
+    if (usage) {
+      const cost = document.createElement('span');
+      cost.className = 'workflow-cost';
+      cost.textContent = usage.text;
+      cost.title = usage.title;
+      meta.appendChild(cost);
+    }
     if (run.error) {
       const error = document.createElement('span');
       error.className = 'workflow-error';
@@ -150,12 +171,16 @@ export class WorkflowListView {
         row.appendChild(tag);
       }
 
-      if (node.costUsd !== undefined) {
-        const mode = usageMode(this.state.cliAuth, node.kind);
+      const usage = usageBadge(
+        node.costUsd,
+        node.tokens,
+        usageMode(this.state.cliAuth, node.kind),
+      );
+      if (usage) {
         const cost = document.createElement('span');
         cost.className = 'workflow-node-cost';
-        cost.textContent = usageLabel(node.costUsd, mode);
-        cost.title = usageTitle(mode);
+        cost.textContent = usage.text;
+        cost.title = usage.title;
         row.appendChild(cost);
       }
 

@@ -42,6 +42,21 @@ export function readPermission(raw: Record<string, unknown>): AgentPermission | 
   return undefined;
 }
 
+/**
+ * CLI 回報的 token 用量。`total` 用各家自己算的總數 —— 算法不一樣
+ * (opencode 的 total 含快取讀寫)，在這裡重算只會跟它畫面上的數字對不起來。
+ */
+export interface TokenUsage {
+  input?: number;
+  output?: number;
+  total: number;
+}
+
+/** token 數在畫面上的寫法：1000 以下照原樣，1000 以上縮成 12.3k。*/
+export function formatTokens(total: number): string {
+  return total < 1000 ? `${total}` : `${(total / 1000).toFixed(1)}k`;
+}
+
 export interface AgentTask {
   kind: AgentKind;
   /** 要交給 CLI 的提示；走 stdin 或暫存檔，不放命令列，避免 Windows 的引號問題。*/
@@ -66,6 +81,8 @@ export type AgentEvent =
       sessionId?: string;
       durationMs?: number;
       costUsd?: number;
+      /** Codex 只回報這個，不回報金額。*/
+      tokens?: TokenUsage;
       exitCode: number;
     }
   | { type: 'error'; message: string };

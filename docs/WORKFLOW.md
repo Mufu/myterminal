@@ -482,6 +482,13 @@ CLI 回報的 `total_cost_usd` **不一定是錢**：用訂閱登入（claude.ai
 [`src/main/cli-auth-probe.ts`](../src/main/cli-auth-probe.ts)），結果顯示在右側面板
 最下面那一行（`#cli-status`），並決定金額怎麼寫：估算是 `≈$0.175`，真的費用是 `$0.175`。
 
+不是每支 CLI 都回報金額：**Codex 只回報 token 數**（`turn.completed` 的 `usage`）。
+所以畫面上那一格是「有金額就寫金額，沒有就寫 token 數」——`≈$0.175` 或
+`11.9k tokens`（`usageBadge()`，見
+[`workflow-list-view.ts`](../src/renderer/workflow-list-view.ts)）。token 數存在
+`RunNodeState.tokens` 與 `RunState.totalTokens`，跟金額一樣是節點回報時累加上去的。
+下面的用量上限只看金額，所以對 Codex 節點沒有作用。
+
 用量上限因此是**這一次執行的**選項，不是寫死的預算：
 
 | 在哪裡 | 行為 |

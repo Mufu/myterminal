@@ -102,6 +102,8 @@ describe('ClaudeCodeRunner 解析真實輸出', () => {
         sessionId: 'a7c9c5c6-ae75-4090-9d47-13fc2c0f23b7',
         durationMs: 2664,
         costUsd: 0.07480450000000001,
+        // 輸入是 2 (新的) + 6576 (寫進快取) + 15397 (從快取讀)。
+        tokens: { input: 21975, output: 15, total: 21990 },
         exitCode: 0,
       },
     ]);
@@ -232,8 +234,34 @@ describe('CodexRunner 解析真實輸出', () => {
       { type: 'tool', name: 'command', summary: 'ls -la' },
       { type: 'text', text: 'AGENT_SPIKE_OK' },
       // turn.completed 沒有結果文字，用最後一段 assistant 文字補上。
-      { type: 'result', ok: true, text: 'AGENT_SPIKE_OK', sessionId: 't-1', exitCode: 0 },
+      {
+        type: 'result',
+        ok: true,
+        text: 'AGENT_SPIKE_OK',
+        sessionId: 't-1',
+        tokens: { input: 12, output: 3, total: 15 },
+        exitCode: 0,
+      },
     ]);
+  });
+
+  it('把 test/fixtures/codex-exec-json-tokens.jsonl 的 usage 轉成 token 數 (沒有金額)', () => {
+    const events = run(
+      new CodexRunner(spawner),
+      task({ kind: 'codex' }),
+      fixture('codex-exec-json-tokens.jsonl'),
+    );
+
+    expect(events.at(-1)).toEqual({
+      type: 'result',
+      ok: true,
+      text: 'TOKENS_OK',
+      sessionId: '01a0b298-0b4b-7e03-9120-8c3fd0d42bff',
+      // cached_input_tokens (1408) 是 input_tokens 的一部分，不另外加。
+      tokens: { input: 11936, output: 7, total: 11943 },
+      exitCode: 0,
+    });
+    expect((events.at(-1) as { costUsd?: number }).costUsd).toBeUndefined();
   });
 });
 
@@ -402,6 +430,8 @@ describe('OpenCodeRunner 解析真實輸出', () => {
         sessionId: 'ses_f5bdbfb99ffeS2oNNEfWwMlzP9',
         // 免費模型的 cost 是 0，不要在頁尾寫一個 $0.000。
         costUsd: undefined,
+        // total 是 opencode 自己算的，含快取讀的 1792。
+        tokens: { input: 6318, output: 23, total: 8133 },
         exitCode: 0,
       },
     ]);

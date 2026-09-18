@@ -97,13 +97,14 @@ test('畫布上看得到執行狀態、切得到節點的終端機、批准得�
     const runLine = window.locator(`${card('agent-1')} .wf-run-label`);
     await expect(runLine).toHaveText('執行中', { timeout: 60_000 });
     await expect(window.locator('#editor-run .workflow-status')).toHaveText('執行中');
-    await expect(window.locator('#editor-run .workflow-cost')).toContainText('$');
+    // 還沒有任何用量時是 ≈$0.000，CLI 回報之後免費模型會換成 token 數。
+    await expect(window.locator('#editor-run .workflow-cost')).toContainText(/\$|tokens/);
     await window.screenshot({ path: join(root, 'test-results', 'editor-run-running.png') });
 
     await expect(runLine).toHaveText('完成', { timeout: 240_000 });
     await expect(window.locator(card('agent-1'))).toHaveAttribute('data-run-status', 'done');
-    // 免費模型的 cost 是 0，所以節點上不會寫一個 $0.000 (見 opencodeEvents)。
-    await expect(window.locator(`${card('agent-1')} .wf-run-cost`)).toHaveCount(0);
+    // 免費模型的 cost 是 0，所以節點上寫的是 token 數，不是 $0.000 (見 opencodeEvents)。
+    await expect(window.locator(`${card('agent-1')} .wf-run-cost`)).toHaveText(/ tokens$/);
 
     // 4. 卡片上的「輸出」：切到那個節點的終端機
     await window.click(`${card('agent-1')} .wf-open-terminal`);

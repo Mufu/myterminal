@@ -2,7 +2,13 @@ import { randomUUID } from 'node:crypto';
 import { rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { AgentEvent, AgentKind, AgentPermission, AgentTask } from '../shared/agent';
+import type {
+  AgentEvent,
+  AgentKind,
+  AgentPermission,
+  AgentTask,
+  TokenUsage,
+} from '../shared/agent';
 import type { IChildProcess, IProcessSpawner, ProcessSpec } from './process-spawner';
 import { NodeProcessSpawner } from './process-spawner';
 import type { CliSecrets } from './shell-factory';
@@ -165,6 +171,21 @@ export function oneLine(text: string): string {
   return flat.length > 60 ? `${flat.slice(0, 59)}…` : flat;
 }
 
+/**
+ * claude 的 result.usage：輸入分成三欄 (新的、寫進快取的、從快取讀的)，
+ * 三個都是這次真的吃掉的 token，所以加起來才是輸入量。
+ */
+function claudeTokens(raw: unknown): TokenUsage | undefined {
+  const usage = obj(raw);
+  if (!usage) return undefined;
+  const input =
+    (num(usage.input_tokens) ?? 0) +
+    (num(usage.cache_creation_input_tokens) ?? 0) +
+    (num(usage.cache_read_input_tokens) ?? 0);
+  const output = num(usage.output_tokens) ?? 0;
+  return input + output > 0 ? { input, output, total: input + output } : undefined;
+}
+
 /** claude -p --output-format stream-json --verbose 的事件。*/
 export const claudeEvents: EventMapper = (line) => {
   switch (line.type) {
@@ -203,6 +224,7 @@ export const claudeEvents: EventMapper = (line) => {
           sessionId: str(line.session_id),
           durationMs: num(line.duration_ms),
           costUsd: num(line.total_cost_usd),
+          tokens: claudeTokens(line.usage),
           exitCode: 0, // JsonlRun 會用真正的 exit code 覆寫。
         },
       ];
@@ -211,6 +233,21 @@ export const claudeEvents: EventMapper = (line) => {
       return [];
   }
 };
+
+/**
+ * codex 的 turn.completed 帶著 usage (實際抓下來的一次在
+ * test/fixtures/codex-exec-json-tokens.jsonl)：
+ * {"input_tokens":11936,"cached_input_tokens":1408,"output_tokens":7,"reasoning_output_tokens":0}
+ * cached_input_tokens 與 reasoning_output_tokens 分別是那兩個數字的一部分，
+ * 所以總數就是 input + output。codex 不回報金額，畫面上寫的就是這個。
+ */
+function codexTokens(raw: unknown): TokenUsage | undefined {
+  const usage = obj(raw);
+  const input = num(usage?.input_tokens);
+  const output = num(usage?.output_tokens);
+  if (input === undefined && output === undefined) return undefined;
+  return { input, output, total: (input ?? 0) + (output ?? 0) };
+}
 
 /**
  * codex exec --json 的事件。
@@ -243,7 +280,7 @@ export const codexEvents: EventMapper = (line) => {
     }
 
     case 'turn.completed':
-      return [{ type: 'result', ok: true, text: '', exitCode: 0 }];
+      return [{ type: 'result', ok: true, text: '', tokens: codexTokens(line.usage), exitCode: 0 }];
 
     case 'turn.failed':
       return [
@@ -318,13 +355,14 @@ export const museEvents: EventMapper = (line) => {
  * opencode run --format json 的事件。
  *
  * 它沒有「這次跑完了」那種事件 —— 串流結束就是結束 —— 所以結果是在每個
- * step_finish 上重新湊一份，最後留下來的那筆就是最終結果。費用要跨 step 累加、
- * 結果文字要把每段回覆接起來，所以這個 mapper 有狀態，一次執行配一個
+ * step_finish 上重新湊一份，最後留下來的那筆就是最終結果。費用與 token 要跨 step
+ * 累加、結果文字要把每段回覆接起來，所以這個 mapper 有狀態，一次執行配一個
  * (claude / codex 的沒有狀態，是模組常數)。
  */
 export function opencodeEvents(): EventMapper {
   let started = false;
   let costUsd = 0;
+  const tokens: TokenUsage = { input: 0, output: 0, total: 0 };
   const texts: string[] = [];
 
   return (line) => {
@@ -355,8 +393,13 @@ export function opencodeEvents(): EventMapper {
         });
         break;
 
-      case 'step_finish':
+      case 'step_finish': {
         costUsd += num(part?.cost) ?? 0;
+        const step = obj(part?.tokens);
+        tokens.input = (tokens.input ?? 0) + (num(step?.input) ?? 0);
+        tokens.output = (tokens.output ?? 0) + (num(step?.output) ?? 0);
+        // total 是 opencode 自己算的 (含快取讀寫)，所以用它的，不要拿 input + output。
+        tokens.total += num(step?.total) ?? 0;
         events.push({
           type: 'result',
           // reason 是 stop (講完了) 或 tool-calls (還要再跑一輪)；error 才是真的壞了。
@@ -365,9 +408,11 @@ export function opencodeEvents(): EventMapper {
           sessionId,
           // 免費模型的 cost 是 0，這時不要在頁尾寫一個 $0.000。
           costUsd: costUsd > 0 ? costUsd : undefined,
+          tokens: tokens.total > 0 ? { ...tokens } : undefined,
           exitCode: 0,
         });
         break;
+      }
 
       case 'error': {
         const error = obj(line.error);

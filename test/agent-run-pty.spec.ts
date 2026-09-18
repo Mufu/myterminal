@@ -86,6 +86,35 @@ describe('AgentRunPty 把事件變成終端機看得懂的文字', () => {
     expect(out.lines().at(-1)).toBe('✔ 完成 · 2.4 s · $0.091');
   });
 
+  it('沒有金額 (Codex) 的時候頁尾寫 token 數', () => {
+    const out = attach();
+    run.emit({
+      type: 'result',
+      ok: true,
+      text: 'TOKENS_OK',
+      durationMs: 2400,
+      tokens: { input: 11936, output: 7, total: 11943 },
+      exitCode: 0,
+    });
+
+    expect(out.lines().at(-1)).toBe('✔ 完成 · 2.4 s · 11.9k tokens');
+  });
+
+  it('兩個都有就兩個都寫', () => {
+    const out = attach('只回覆 AGENT_SPIKE_OK', 'api');
+    run.emit({
+      type: 'result',
+      ok: true,
+      text: 'OK',
+      durationMs: 2400,
+      costUsd: 0.0908,
+      tokens: { total: 21990 },
+      exitCode: 0,
+    });
+
+    expect(out.lines().at(-1)).toBe('✔ 完成 · 2.4 s · $0.091 · 22.0k tokens');
+  });
+
   it('失敗時印出原因與離開碼', () => {
     const out = attach();
     run.emit({ type: 'result', ok: false, text: '沒有這個模型', exitCode: 1 });

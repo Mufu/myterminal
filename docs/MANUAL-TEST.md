@@ -769,7 +769,8 @@
 1. Agent 任務，執行者 Codex，任務 `Reply with exactly CODEX_OK`。
 
 預期：
-- 約 1 到 2 分鐘內 `CODEX_OK` 與 `✔ 完成`；金額顯示 `≈$0.000`（Codex 只回 token 數，已知）。
+- 約 1 到 2 分鐘內 `CODEX_OK` 與 `✔ 完成`；結果行寫的是 token 數（例如 `11.9k tokens`），
+  不是 `≈$0.000`（Codex 只回報 token 數）。
 
 結果：☐ 通過 ☐ 失敗 ☐ 略過　備註：
 

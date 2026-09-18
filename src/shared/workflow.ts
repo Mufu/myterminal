@@ -216,6 +216,8 @@ export interface RunNodeState {
   /** 這個節點的 CLI 執行在畫面上對應的工作階段，點一下可以切過去看。*/
   sessionId?: string;
   costUsd?: number;
+  /** CLI 回報的 token 總數；Codex 只回報這個，不回報金額。*/
+  tokens?: number;
   attempts: number;
 }
 
@@ -230,6 +232,8 @@ export interface RunState {
   question?: string;
   nodes: Record<string, RunNodeState>;
   totalCostUsd: number;
+  /** 這次執行累計的 token 數；CLI 沒回報就沒有。*/
+  totalTokens?: number;
   startedAt: number;
   finishedAt?: number;
   error?: string;

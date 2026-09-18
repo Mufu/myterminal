@@ -1,4 +1,5 @@
 import type { AgentEvent, AgentKind, AgentPermission } from '../shared/agent';
+import { formatTokens } from '../shared/agent';
 import type { BillingMode } from '../shared/cli-auth';
 import { usageLabel } from '../shared/cli-auth';
 import type { IAgentRun } from './agent-runner';
@@ -95,6 +96,7 @@ function footer(event: Extract<AgentEvent, { type: 'result' }>, mode: BillingMod
   const parts: string[] = [];
   if (event.durationMs !== undefined) parts.push(`${(event.durationMs / 1000).toFixed(1)} s`);
   if (event.costUsd !== undefined) parts.push(usageLabel(event.costUsd, mode));
+  if (event.tokens) parts.push(`${formatTokens(event.tokens.total)} tokens`);
   if (event.sessionId) parts.push(`session ${event.sessionId.slice(0, 8)}…`);
 
   if (event.ok) return `${GREEN}${['✔ 完成', ...parts].join(' · ')}${RESET}`;

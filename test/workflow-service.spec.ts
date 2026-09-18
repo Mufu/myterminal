@@ -241,6 +241,19 @@ describe('WorkflowService', () => {
     expect(second.list()[0].nodes.skipme.status).toBe('skipped');
   });
 
+  it('CLI 回報的 token 數累加進節點與整次執行', async () => {
+    const service = new WorkflowService(
+      disk.deps({
+        runnerFactory: () => new ScriptedRunner(() => agentResult({ tokens: { total: 1_200 } })),
+      }),
+    );
+    service.start(linear(), {});
+
+    const waiting = await waitFor(service, 'waiting_approval');
+    expect(waiting.nodes.impl.tokens).toBe(1_200);
+    expect(waiting.totalTokens).toBe(1_200);
+  });
+
   it('cancel 會砍掉正在跑的 CLI 並把執行標成已取消', async () => {
     const runner = new ScriptedRunner(() => null);
     const service = new WorkflowService(disk.deps({ runnerFactory: () => runner }));

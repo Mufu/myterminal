@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { nodeDotClass, runStatusLabel, usageMode } from '../src/renderer/workflow-list-view';
+import {
+  nodeDotClass,
+  runStatusLabel,
+  usageBadge,
+  usageMode,
+} from '../src/renderer/workflow-list-view';
 import { parseBudget, validateRunParams } from '../src/renderer/workflow-run-dialog';
 import type { RunNodeStatus, RunStatus } from '../src/shared/workflow';
 import type { CliAuthStatus } from '../src/shared/cli-auth';
@@ -18,6 +23,24 @@ describe('runStatusLabel', () => {
     for (const [status, label] of Object.entries(labels)) {
       expect(runStatusLabel(status as RunStatus)).toBe(label);
     }
+  });
+});
+
+describe('usageBadge', () => {
+  it('有金額就寫金額，訂閱是估算、API 金鑰是真的費用', () => {
+    expect(usageBadge(0.09, undefined, 'subscription')?.text).toBe('≈$0.090');
+    expect(usageBadge(0.09, 12_000, 'api')?.text).toBe('$0.090');
+  });
+
+  it('沒有金額 (Codex) 就寫 token 數', () => {
+    expect(usageBadge(undefined, 11_943, 'unknown')?.text).toBe('11.9k tokens');
+    // 金額是 0 也算沒有金額 —— 寫 ≈$0.000 等於什麼都沒說。
+    expect(usageBadge(0, 11_943, 'unknown')?.text).toBe('11.9k tokens');
+  });
+
+  it('兩個都沒有就不寫；只有 0 元也還是寫金額', () => {
+    expect(usageBadge(undefined, undefined, 'unknown')).toBeNull();
+    expect(usageBadge(0, undefined, 'unknown')?.text).toBe('≈$0.000');
   });
 });
 

@@ -99,6 +99,8 @@ export type NodeReport = (event: {
   status: RunNodeStatus;
   sessionId?: string;
   costUsd?: number;
+  /** CLI 回報的 token 總數 (Codex 只回報這個)。*/
+  tokens?: number;
   attempts?: number;
 }) => void;
 
@@ -306,6 +308,7 @@ async function runAgent(
     status: ok ? 'done' : 'failed',
     sessionId: session.id,
     costUsd: outcome.costUsd,
+    tokens: outcome.tokens,
     attempts,
   });
 
@@ -330,6 +333,8 @@ interface Outcome {
   text: string;
   sessionId?: string;
   costUsd?: number;
+  /** token 總數；畫面上只寫總數，所以進到這裡就壓成一個數字。*/
+  tokens?: number;
   durationMs?: number;
 }
 
@@ -357,6 +362,7 @@ function waitForResult(run: IAgentRun, timeoutSec: number, timers: Timers): Prom
           text: event.text,
           sessionId: event.sessionId,
           costUsd: event.costUsd,
+          tokens: event.tokens?.total,
           durationMs: event.durationMs,
         });
       } else if (event.type === 'error') {

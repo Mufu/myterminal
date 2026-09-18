@@ -220,6 +220,10 @@ export class WorkflowService extends EventEmitter<WorkflowEvents> {
       node.costUsd = (node.costUsd ?? 0) + event.costUsd;
       stored.state.totalCostUsd += event.costUsd;
     }
+    if (event.tokens !== undefined) {
+      node.tokens = (node.tokens ?? 0) + event.tokens;
+      stored.state.totalTokens = (stored.state.totalTokens ?? 0) + event.tokens;
+    }
     this.changed();
   }
 
