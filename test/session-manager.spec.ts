@@ -39,10 +39,13 @@ describe('SessionManager 建立工作階段', () => {
     expect(spawner.last().rows).toBe(24);
   });
 
-  it('自動產生遞增名稱，並可被 profile.name 覆寫', () => {
+  it('自動產生的名稱每種型別各自編號，並可被 profile.name 覆寫', () => {
     expect(manager.create({ type: 'powershell' }, 80, 24).name).toBe('PowerShell 1');
-    expect(manager.create({ type: 'wsl' }, 80, 24).name).toBe('WSL 2');
+    expect(manager.create({ type: 'wsl' }, 80, 24).name).toBe('WSL 1');
+    expect(manager.create({ type: 'powershell' }, 80, 24).name).toBe('PowerShell 2');
+    // 取了名字的不佔號碼。
     expect(manager.create({ type: 'powershell', name: '打包用' }, 80, 24).name).toBe('打包用');
+    expect(manager.create({ type: 'powershell' }, 80, 24).name).toBe('PowerShell 3');
   });
 
   it('每個工作階段的 id 都不同', () => {

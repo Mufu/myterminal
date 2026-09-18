@@ -1,7 +1,7 @@
 import { EventEmitter } from 'node:events';
 import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
-import type { AgentTaskProfile, ConnectionProfile } from '../shared/profile';
+import type { AgentTaskProfile, ConnectionProfile, SessionType } from '../shared/profile';
 import { TYPE_LABELS } from '../shared/profile';
 import type { AgentEvent, AgentKind, AgentPermission } from '../shared/agent';
 import type { BillingMode } from '../shared/cli-auth';
@@ -51,6 +51,8 @@ const STARTUP_DELAY_MS = 600;
 export class SessionManager extends EventEmitter<SessionEvents> {
   private readonly sessions = new Map<string, Session>();
   private counter = 0;
+  /** 自動命名的號碼，一種標籤各自一組 (PowerShell 1、WSL 1、PowerShell 2)。*/
+  private readonly numbers = new Map<string, number>();
 
   constructor(
     private readonly spawner: IPtySpawner,
@@ -71,7 +73,7 @@ export class SessionManager extends EventEmitter<SessionEvents> {
     const id = this.nextId();
     const info: SessionInfo = {
       id,
-      name: profile.name?.trim() || `${TYPE_LABELS[profile.type]} ${this.counter}`,
+      name: profile.name?.trim() || this.autoName(profile.type),
       type: profile.type,
       state: 'running',
       logging: false,
@@ -116,6 +118,14 @@ export class SessionManager extends EventEmitter<SessionEvents> {
   private nextId(): string {
     this.counter += 1;
     return `s${this.counter}`;
+  }
+
+  /** 沒取名字時的名字。號碼是那個標籤自己的，取了名字的不佔號碼。*/
+  private autoName(type: SessionType): string {
+    const label = TYPE_LABELS[type];
+    const next = (this.numbers.get(label) ?? 0) + 1;
+    this.numbers.set(label, next);
+    return `${label} ${next}`;
   }
 
   /** 把 pty 接上事件流並收進清單；create 與 adoptAgentRun 共用。*/
