@@ -47,6 +47,21 @@ export interface RolePickerPort {
   open(currentId: string | undefined, onPick: (role: RoleInfo) => void): void;
 }
 
+/**
+ * 「助理」面板：Command 只需要拿到問題、開一輪問答、把失敗寫出來、清掉對話。
+ * 答案本身是 main 推過來的事件，面板自己接，不經過 Command。
+ */
+export interface AssistantPort {
+  /** 輸入框現在的字。*/
+  question(): string;
+  /** 開一輪：清空輸入框、加一顆使用者泡泡、備好一顆等著接答案的助理泡泡。*/
+  start(question: string): void;
+  /** 這一輪失敗了 (沒登入、上一個還在回答、IPC 壞了)。*/
+  fail(message: string): void;
+  /** 「新對話」：畫面上的訊息全部清掉。*/
+  clear(): void;
+}
+
 /** 刪除前的確認；正式環境是 window.confirm，測試直接回傳 true / false。*/
 export type ConfirmPort = (message: string) => boolean;
 

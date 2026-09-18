@@ -12,6 +12,7 @@ import { CliSettingsDialog } from './cli-settings-dialog';
 import { WorkflowRunDialog } from './workflow-run-dialog';
 import { RolePickerDialog } from './role-picker-dialog';
 import { InputPanel } from './input-panel';
+import { AssistantPanel } from './assistant-panel';
 import { Toolbar } from './toolbar';
 import {
   NewConnectionCommand,
@@ -39,6 +40,10 @@ import {
   SaveAndRunWorkflowCommand,
   OpenCliSettingsCommand,
   RefreshCliAuthCommand,
+  ToggleAssistantCommand,
+  AskAssistantCommand,
+  ResetAssistantCommand,
+  CancelAssistantCommand,
   errorText,
 } from './commands';
 import { WorkflowEditorModel } from './workflow-editor-model';
@@ -241,6 +246,36 @@ const inputPanel = new InputPanel(
 
 const sendInput = new SendInputCommand(state, api, inputPanel, activeTerminal);
 
+/**
+ * 助理：右下角那一格。同一個元素開開關關，關掉不會清掉對話。
+ * askAssistant 在下面才建得出來 (它需要這個面板)，所以用晚一點才呼叫的函式繞開。
+ */
+const assistantPanel = new AssistantPanel(
+  {
+    panel: $<HTMLElement>('assistant-panel'),
+    messages: $<HTMLElement>('assistant-messages'),
+    empty: $<HTMLElement>('assistant-empty'),
+    chips: [...document.querySelectorAll<HTMLButtonElement>('.assistant-chip')],
+    input: $<HTMLTextAreaElement>('assistant-input'),
+    send: $<HTMLButtonElement>('assistant-send'),
+    cancel: $<HTMLButtonElement>('assistant-cancel'),
+    status: $<HTMLElement>('assistant-status'),
+  },
+  state,
+  () => void askAssistant.execute(),
+);
+
+const askAssistant = new AskAssistantCommand(api, state, assistantPanel);
+const toggleAssistant = new ToggleAssistantCommand(state);
+
+$<HTMLButtonElement>('assistant-close').addEventListener('click', () => toggleAssistant.execute());
+$<HTMLButtonElement>('assistant-reset').addEventListener('click', () => {
+  void new ResetAssistantCommand(api, assistantPanel).execute();
+});
+$<HTMLButtonElement>('assistant-cancel').addEventListener('click', () => {
+  void new CancelAssistantCommand(api).execute();
+});
+
 const themeSelect = $<HTMLSelectElement>('theme-select');
 themeSelect.value = themeStore.get();
 
@@ -253,6 +288,7 @@ new Toolbar(state, {
   clear: new ClearScreenCommand(activeTerminal),
   send: sendInput,
   switchTheme: new SwitchThemeCommand(themeStore, () => themeSelect.value),
+  toggleAssistant,
 });
 
 new SessionListView(
@@ -464,6 +500,7 @@ api.onProfilesChanged((profiles) => state.setProfiles(profiles));
 api.onWorkflowChanged((runs) => state.setRuns(runs));
 // 登入流程跑完之後 main 重探的結果。
 api.onCliAuthChanged((auth) => state.setCliAuth(auth));
+api.onAssistantEvent((event) => assistantPanel.handle(event));
 api.onData(({ id, data }) => {
   const view = terminals.get(id);
   if (view) view.write(data);

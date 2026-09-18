@@ -380,7 +380,9 @@ body {
   color: var(--text);
 }
 
+/* position: relative 是給助理那一格定位用的，它浮在終端機區上面。*/
 #app {
+  position: relative;
   display: grid;
   grid-template-columns: 1fr var(--panel-width);
   grid-template-rows: var(--toolbar-height) 1fr;
@@ -2435,4 +2437,234 @@ html[data-theme='warm'] .session-item.active .session-dot {
 
 #workflow-panel-head h2 {
   margin-right: auto;
+}
+
+/* ---- 助理 ----
+   浮在終端機區右下角的一格，不蓋到右側面板 (right 讓開一個面板寬)。
+   顏色全部走 token，所以三個主題不必各寫一份。*/
+#assistant-panel {
+  position: absolute;
+  right: calc(var(--panel-width) + 12px);
+  bottom: 12px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  width: 360px;
+  height: 480px;
+  max-height: calc(100% - var(--toolbar-height) - 24px);
+  background: var(--chrome);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 10px 28px var(--backdrop);
+}
+
+#assistant-panel[hidden] {
+  display: none;
+}
+
+/* 工具列的 ✨ 跟其他圖示一樣，暖色主題的純文字工具列把它收起來。*/
+#toolbar .btn-icon {
+  display: var(--btn-icon-display);
+  font-size: 14px;
+  line-height: 1;
+}
+
+#assistant-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 8px 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+#assistant-head h2 {
+  flex: 1;
+  margin: 0;
+  font-size: var(--head-size);
+  font-weight: var(--head-weight);
+  letter-spacing: var(--head-tracking);
+  color: var(--head-color);
+}
+
+#assistant-head button {
+  height: 24px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-button);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+#assistant-head button:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+#assistant-messages {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 10px 12px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar) transparent;
+}
+
+#assistant-empty {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+#assistant-empty[hidden] {
+  display: none;
+}
+
+#assistant-empty p {
+  margin: 0 0 8px;
+}
+
+#assistant-chips {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+.assistant-chip {
+  max-width: 100%;
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-button);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.assistant-chip:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+/* 一則訊息。使用者的靠右、助理的靠左，內容由 renderAssistantText 產生。*/
+.assistant-msg {
+  margin-bottom: 8px;
+  padding: 7px 10px;
+  border-radius: var(--radius);
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.assistant-msg.user {
+  margin-left: 32px;
+  background: var(--selected);
+  color: var(--text-strong);
+}
+
+.assistant-msg.bot {
+  margin-right: 12px;
+  background: var(--hover);
+  color: var(--text);
+}
+
+.assistant-msg.error {
+  background: var(--recording-soft);
+  color: var(--recording);
+}
+
+.assistant-msg p {
+  margin: 0 0 6px;
+}
+
+.assistant-msg p:last-child,
+.assistant-msg ul:last-child,
+.assistant-msg ol:last-child {
+  margin-bottom: 0;
+}
+
+.assistant-msg ul,
+.assistant-msg ol {
+  margin: 0 0 6px;
+  padding-left: 20px;
+}
+
+.assistant-msg code {
+  padding: 1px 4px;
+  border-radius: var(--radius-sm);
+  background: var(--terminal-bg);
+  color: var(--terminal-fg);
+  font: 12px 'Cascadia Mono', Consolas, monospace;
+}
+
+#assistant-status {
+  margin: 0;
+  padding: 0 12px 6px;
+  color: var(--muted);
+  font-family: var(--meta-font);
+  font-size: 11px;
+  letter-spacing: var(--meta-tracking);
+  min-height: 14px;
+}
+
+#assistant-input-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 0 12px 12px;
+}
+
+#assistant-input {
+  flex: 1;
+  min-width: 0;
+  max-height: 120px;
+  padding: 7px 9px;
+  border: 1px solid var(--field-border);
+  border-radius: var(--radius);
+  background: var(--field-bg);
+  color: var(--field-fg);
+  font: 13px/1.5 'Segoe UI Variable Text', 'Microsoft JhengHei', sans-serif;
+  resize: vertical;
+}
+
+#assistant-input::placeholder {
+  color: var(--dim);
+}
+
+#assistant-input:disabled {
+  opacity: 0.6;
+}
+
+#assistant-input-row button {
+  height: 32px;
+  padding: 0 14px;
+  border: var(--send-border-width) solid var(--btn-alt-border);
+  border-radius: var(--radius);
+  background: var(--btn-alt-bg);
+  color: var(--text-button);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+#assistant-input-row button.primary {
+  background: var(--primary-bg);
+  color: var(--primary-fg);
+  font-weight: var(--primary-weight);
+}
+
+#assistant-input-row button.primary:hover:not(:disabled) {
+  background: var(--primary-hover-bg);
+  color: var(--primary-hover-fg);
+}
+
+#assistant-input-row button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+#assistant-input-row button[hidden] {
+  display: none;
 }

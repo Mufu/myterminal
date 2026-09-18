@@ -1,4 +1,5 @@
 import type { AppState } from './app-state';
+import { buildAssistantContext } from './assistant-text';
 import type { ThemeStore } from './theme';
 import { parseTheme } from './theme';
 import type { WorkflowEditorModel } from './workflow-editor-model';
@@ -16,6 +17,7 @@ import type { SessionInfo } from '../shared/session';
 import type {
   ICommand,
   ActiveTerminal,
+  AssistantPort,
   ClipboardPort,
   InputPanelPort,
   DialogPort,
@@ -598,6 +600,63 @@ export class SetRolesDirCommand extends RolesCommand {
 
   protected fetch(): Promise<RolesResult> {
     return this.api.setRolesDir(this.dir);
+  }
+}
+
+/** ✨ 助理：開關右下角那一格。關起來不會清掉對話。*/
+export class ToggleAssistantCommand implements ICommand {
+  constructor(private readonly state: AppState) {}
+  execute(): void {
+    this.state.toggleAssistant();
+  }
+}
+
+/**
+ * 問助理一句。答案是 main 一段一段推回來的 (面板自己接)，
+ * 這裡只負責「送出去、標成回答中、失敗就寫出來」。
+ * 回答中不受理第二句 —— main 那邊本來就會拒絕，這裡先擋是為了不讓畫面亂跳。
+ */
+export class AskAssistantCommand implements ICommand {
+  constructor(
+    private readonly api: MyTerminalApi,
+    private readonly state: AppState,
+    private readonly panel: AssistantPort,
+  ) {}
+
+  async execute(): Promise<void> {
+    if (this.state.assistantBusy) return;
+    const question = this.panel.question().trim();
+    if (!question) return;
+
+    this.panel.start(question);
+    this.state.setAssistantBusy(true);
+    try {
+      await this.api.askAssistant(question, buildAssistantContext(this.state));
+    } catch (error) {
+      this.panel.fail(errorText(error));
+    } finally {
+      this.state.setAssistantBusy(false);
+    }
+  }
+}
+
+/** 「新對話」：main 忘掉 session id，畫面上的訊息也清掉。*/
+export class ResetAssistantCommand implements ICommand {
+  constructor(
+    private readonly api: MyTerminalApi,
+    private readonly panel: AssistantPort,
+  ) {}
+  async execute(): Promise<void> {
+    await this.api.resetAssistant();
+    this.panel.clear();
+  }
+}
+
+/** 回答到一半按「取消」：砍掉 CLI，事件會是「已取消」，ask 那個 Promise 跟著結束。*/
+export class CancelAssistantCommand implements ICommand {
+  constructor(private readonly api: MyTerminalApi) {}
+  async execute(): Promise<void> {
+    await this.api.cancelAssistant();
   }
 }
 

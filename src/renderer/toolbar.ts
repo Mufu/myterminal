@@ -16,6 +16,7 @@ export interface ToolbarCommands {
   clear: ICommand;
   send: ICommand;
   switchTheme: ICommand;
+  toggleAssistant: ICommand;
 }
 
 /**
@@ -41,6 +42,7 @@ export class Toolbar {
     bind('btn-new', commands.newConnection);
     bind('btn-input', commands.toggleInput);
     bind('btn-send', commands.send);
+    bind('btn-assistant', commands.toggleAssistant);
 
     this.needSession = [
       bind('btn-copy', commands.copy),
@@ -66,5 +68,10 @@ export class Toolbar {
     this.logButton.classList.toggle('on', session?.logging === true);
     if (this.logLabel) this.logLabel.textContent = session?.logging ? '紀錄中' : '紀錄';
     $<HTMLButtonElement>('btn-input').classList.toggle('on', this.state.inputPanelVisible);
+
+    // 助理是開關型的按鈕，所以按下去的狀態走 aria-pressed (不是 disabled)。
+    const assistant = $<HTMLButtonElement>('btn-assistant');
+    assistant.classList.toggle('on', this.state.assistantOpen);
+    assistant.setAttribute('aria-pressed', String(this.state.assistantOpen));
   }
 }

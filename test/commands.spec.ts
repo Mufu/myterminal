@@ -33,11 +33,21 @@ import {
   RefreshCliAuthCommand,
   RescanRolesCommand,
   SetRolesDirCommand,
+  ToggleAssistantCommand,
+  AskAssistantCommand,
+  ResetAssistantCommand,
+  CancelAssistantCommand,
   errorText,
 } from '../src/renderer/commands';
 import { WorkflowEditorModel } from '../src/renderer/workflow-editor-model';
 import { ThemeStore } from '../src/renderer/theme';
-import type { TerminalPort, ClipboardPort, InputPanelPort, DialogPort } from '../src/renderer/ports';
+import type {
+  TerminalPort,
+  AssistantPort,
+  ClipboardPort,
+  InputPanelPort,
+  DialogPort,
+} from '../src/renderer/ports';
 import type { MyTerminalApi } from '../src/shared/api';
 import type { SessionInfo } from '../src/shared/session';
 import type { ConnectionProfile, SavedProfile } from '../src/shared/profile';
@@ -947,5 +957,122 @@ describe('角色庫', () => {
 
     expect(errors).toEqual(['角色資料夾不存在：D:\\沒有']);
     expect(state.roles).toEqual([...ROLES]);
+  });
+});
+
+describe('助理', () => {
+  const assistantApi = (over: Partial<Record<string, unknown>> = {}) =>
+    ({
+      askAssistant: vi.fn().mockResolvedValue(undefined),
+      resetAssistant: vi.fn().mockResolvedValue(undefined),
+      cancelAssistant: vi.fn().mockResolvedValue(undefined),
+      ...over,
+    }) as unknown as MyTerminalApi & {
+      askAssistant: ReturnType<typeof vi.fn>;
+      resetAssistant: ReturnType<typeof vi.fn>;
+      cancelAssistant: ReturnType<typeof vi.fn>;
+    };
+
+  class FakePanel implements AssistantPort {
+    text = '';
+    started: string[] = [];
+    failures: string[] = [];
+    clears = 0;
+    question(): string {
+      return this.text;
+    }
+    start(question: string): void {
+      this.started.push(question);
+      this.text = '';
+    }
+    fail(message: string): void {
+      this.failures.push(message);
+    }
+    clear(): void {
+      this.clears += 1;
+    }
+  }
+
+  it('✨ 助理：開關同一格，關起來不動對話', () => {
+    const state = new AppState();
+    new ToggleAssistantCommand(state).execute();
+    expect(state.assistantOpen).toBe(true);
+    new ToggleAssistantCommand(state).execute();
+    expect(state.assistantOpen).toBe(false);
+  });
+
+  it('送出：問題與畫面狀態一起送過去，回答期間標成回答中', async () => {
+    const api = assistantApi();
+    const state = new AppState();
+    state.setSessions([session('s1', { name: 'PowerShell 1' })]);
+    const panel = new FakePanel();
+    panel.text = '  怎麼開 WSL 工作階段？  ';
+
+    let busyDuringAsk = false;
+    api.askAssistant.mockImplementation(async () => {
+      busyDuringAsk = state.assistantBusy;
+    });
+    await new AskAssistantCommand(api, state, panel).execute();
+
+    expect(panel.started).toEqual(['怎麼開 WSL 工作階段？']);
+    const [question, context] = api.askAssistant.mock.calls[0];
+    expect(question).toBe('怎麼開 WSL 工作階段？');
+    expect(context).toContain('[目前狀態]');
+    expect(context).toContain('PowerShell 1');
+    expect(busyDuringAsk).toBe(true);
+    expect(state.assistantBusy).toBe(false);
+  });
+
+  it('空白的問題不送', async () => {
+    const api = assistantApi();
+    const panel = new FakePanel();
+    panel.text = '   ';
+
+    await new AskAssistantCommand(api, new AppState(), panel).execute();
+
+    expect(api.askAssistant).not.toHaveBeenCalled();
+    expect(panel.started).toEqual([]);
+  });
+
+  it('還在回答中就不受理第二句', async () => {
+    const api = assistantApi();
+    const state = new AppState();
+    state.setAssistantBusy(true);
+    const panel = new FakePanel();
+    panel.text = '再問一句';
+
+    await new AskAssistantCommand(api, state, panel).execute();
+
+    expect(api.askAssistant).not.toHaveBeenCalled();
+  });
+
+  it('main 拒絕時把原因寫在面板上，回答中的旗標也要收回來', async () => {
+    const api = assistantApi({
+      askAssistant: vi.fn().mockRejectedValue(new Error('Claude 尚未登入，請先在「CLI 設定」登入')),
+    });
+    const state = new AppState();
+    const panel = new FakePanel();
+    panel.text = '怎麼開 WSL 工作階段？';
+
+    await new AskAssistantCommand(api, state, panel).execute();
+
+    expect(panel.failures).toEqual(['Claude 尚未登入，請先在「CLI 設定」登入']);
+    expect(state.assistantBusy).toBe(false);
+  });
+
+  it('新對話：main 忘掉那段對話，畫面上的訊息也清掉', async () => {
+    const api = assistantApi();
+    const panel = new FakePanel();
+
+    await new ResetAssistantCommand(api, panel).execute();
+
+    expect(api.resetAssistant).toHaveBeenCalled();
+    expect(panel.clears).toBe(1);
+  });
+
+  it('取消：轉給 main 去砍行程', async () => {
+    const api = assistantApi();
+    await new CancelAssistantCommand(api).execute();
+    expect(api.cancelAssistant).toHaveBeenCalled();
   });
 });

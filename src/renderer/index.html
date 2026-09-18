@@ -59,6 +59,11 @@
           <option value="warm">暖色</option>
         </select>
 
+        <button id="btn-assistant" type="button" title="助理" aria-pressed="false">
+          <span class="btn-icon" aria-hidden="true">✨</span>
+          <span class="btn-label">助理</span>
+        </button>
+
         <button id="btn-clear" type="button">
           <svg viewBox="0 0 16 16" aria-hidden="true">
             <path d="M4.5 12.5l6-6a1.5 1.5 0 0 1 2.1 0l.4.4a1.5 1.5 0 0 1 0 2.1l-3.5 3.5H4.5z"></path>
@@ -162,6 +167,38 @@
             ⚙
           </button>
         </footer>
+      </aside>
+
+      <!-- 助理：浮在終端機區右下角的一格，同一個元素開開關關 (關掉不會清掉對話)。 -->
+      <aside id="assistant-panel" hidden aria-label="助理">
+        <header id="assistant-head">
+          <h2>✨ 助理 · Sonnet</h2>
+          <button id="assistant-reset" type="button" title="忘掉這段對話重新開始">新對話</button>
+          <button id="assistant-close" type="button" title="關閉" aria-label="關閉助理">✕</button>
+        </header>
+
+        <div id="assistant-messages">
+          <div id="assistant-empty">
+            <p>問我 myterminal 怎麼用。</p>
+            <div id="assistant-chips">
+              <button type="button" class="assistant-chip">怎麼開 WSL 工作階段？</button>
+              <button type="button" class="assistant-chip">工作流怎麼批准？</button>
+              <button type="button" class="assistant-chip">角色庫怎麼設定？</button>
+            </div>
+          </div>
+        </div>
+
+        <p id="assistant-status"></p>
+
+        <div id="assistant-input-row">
+          <textarea
+            id="assistant-input"
+            rows="2"
+            placeholder="Enter 送出，Shift+Enter 換行"
+          ></textarea>
+          <button id="assistant-send" type="button" class="primary">送出</button>
+          <button id="assistant-cancel" type="button" hidden>取消</button>
+        </div>
       </aside>
     </div>
 

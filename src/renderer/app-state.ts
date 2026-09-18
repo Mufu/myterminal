@@ -25,6 +25,8 @@ export class AppState {
   private _cliSettings: Record<CliId, CliAuthSetting> | null = null;
   private _cliProbing = false;
   private _view: MainView = 'terminal';
+  private _assistantOpen = false;
+  private _assistantBusy = false;
   // 開機時先給內建那五個，roles:list 回來之後才接上角色庫。
   private _roles: RoleInfo[] = [...ROLES];
 
@@ -70,6 +72,16 @@ export class AppState {
 
   get view(): MainView {
     return this._view;
+  }
+
+  /** 「助理」那一格開著沒有；關起來不會清掉對話。*/
+  get assistantOpen(): boolean {
+    return this._assistantOpen;
+  }
+
+  /** 助理正在回答：這段期間輸入框與「送出」停用，改成顯示「取消」。*/
+  get assistantBusy(): boolean {
+    return this._assistantBusy;
   }
 
   subscribe(listener: Listener): () => void {
@@ -145,6 +157,17 @@ export class AppState {
 
   toggleInputPanel(): void {
     this._inputPanelVisible = !this._inputPanelVisible;
+    this.notify();
+  }
+
+  toggleAssistant(): void {
+    this._assistantOpen = !this._assistantOpen;
+    this.notify();
+  }
+
+  setAssistantBusy(busy: boolean): void {
+    if (busy === this._assistantBusy) return;
+    this._assistantBusy = busy;
     this.notify();
   }
 

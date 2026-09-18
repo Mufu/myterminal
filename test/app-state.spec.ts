@@ -104,6 +104,29 @@ describe('AppState 輸入面板', () => {
   });
 });
 
+describe('AppState 助理', () => {
+  it('預設關著，toggle 會切換並通知', () => {
+    let notified = 0;
+    state.subscribe(() => (notified += 1));
+    expect(state.assistantOpen).toBe(false);
+    state.toggleAssistant();
+    expect(state.assistantOpen).toBe(true);
+    state.toggleAssistant();
+    expect(state.assistantOpen).toBe(false);
+    expect(notified).toBe(2);
+  });
+
+  it('回答中的旗標只有真的變了才通知', () => {
+    let notified = 0;
+    state.subscribe(() => (notified += 1));
+    expect(state.assistantBusy).toBe(false);
+    state.setAssistantBusy(true);
+    state.setAssistantBusy(true);
+    expect(state.assistantBusy).toBe(true);
+    expect(notified).toBe(1);
+  });
+});
+
 describe('AppState 主畫面', () => {
   it('預設是終端機，切到畫布編輯器會通知', () => {
     let notified = 0;
