@@ -87,8 +87,8 @@ describe('matches', () => {
 });
 
 describe('compile', () => {
-  it('定義不合法就不編譯', () => {
-    expect(() => compile(def([start()], []), deps())).toThrow('工作流定義不合法');
+  it('定義不合法就不編譯', async () => {
+    await expect(compile(def([start()], []), deps())).rejects.toThrow('工作流定義不合法');
   });
 
   it('agent 節點跑完會寫進 outputs / attempts / lastPort 並累加費用', async () => {
@@ -101,7 +101,7 @@ describe('compile', () => {
         { from: 'impl', to: 'end', port: 'fail' },
       ],
     );
-    const compiled = compile(workflow, deps({ sessions }));
+    const compiled = await compile(workflow, deps({ sessions }));
     const state = await compiled.app.invoke({}, thread());
 
     expect(state.outputs.impl).toMatchObject({ ok: true, text: 'ok', sessionId: 'cli-1' });
@@ -114,7 +114,7 @@ describe('compile', () => {
   it('每個 agent 節點都會登記成一個工作階段，名字是「工作流 · 節點」', async () => {
     const sessions = new FakeSessions();
     const reports: Parameters<NodeReport>[0][] = [];
-    const compiled = compile(
+    const compiled = await compile(
       def(
         [start(), agent('impl'), end()],
         [
@@ -143,7 +143,7 @@ describe('compile', () => {
     const runner = new ScriptedRunner((_task, index) =>
       result({ text: index === 0 ? '做好了' : '修好了', sessionId: `cli-${index}` }),
     );
-    const compiled = compile(
+    const compiled = await compile(
       def(
         [
           start(),
@@ -169,7 +169,7 @@ describe('compile', () => {
 
   it('角色會變成 CLI 的前置指示，沒選角色就沒有', async () => {
     const runner = new ScriptedRunner(() => result());
-    const compiled = compile(
+    const compiled = await compile(
       def(
         [start(), agent('review', { role: 'reviewer' }), agent('plain'), end()],
         [
@@ -199,7 +199,7 @@ describe('compile', () => {
         { from: 'rescue', to: 'end', port: 'ok' },
       ],
     );
-    const compiled = compile(workflow, deps({ runnerFactory: () => runner }));
+    const compiled = await compile(workflow, deps({ runnerFactory: () => runner }));
     const state = await compiled.app.invoke({}, thread());
 
     expect(runner.tasks).toHaveLength(2);
@@ -238,11 +238,11 @@ describe('compile', () => {
         deps({ runnerFactory: () => new ScriptedRunner(() => result({ text })) }),
       );
 
-    const passed = await build('看起來沒問題\nPASS').app.invoke({}, thread('pass'));
+    const passed = await (await build('看起來沒問題\nPASS')).app.invoke({}, thread('pass'));
     expect(passed.lastPort.check).toBe('yes');
     expect(passed.outputs.fix).toBeUndefined();
 
-    const failed = await build('少了一個檔\nFAIL').app.invoke({}, thread('fail'));
+    const failed = await (await build('少了一個檔\nFAIL')).app.invoke({}, thread('fail'));
     expect(failed.lastPort.check).toBe('no');
     expect(failed.outputs.fix).toBeDefined();
   });
@@ -275,7 +275,7 @@ describe('compile', () => {
         { from: 'fix', to: 'end', port: 'fail' },
       ],
     );
-    const compiled = compile(workflow, deps({ runnerFactory: () => runner }));
+    const compiled = await compile(workflow, deps({ runnerFactory: () => runner }));
     const state = await compiled.app.invoke({}, thread());
 
     expect(state.attempts.fix).toBe(2);
@@ -285,7 +285,7 @@ describe('compile', () => {
 
   it('超出用量上限的節點算失敗並收尾', async () => {
     const workflow = twoAgents();
-    const compiled = compile(workflow, deps({ budget: { maxTotalCostUsd: 0.15 } }));
+    const compiled = await compile(workflow, deps({ budget: { maxTotalCostUsd: 0.15 } }));
     const state = await compiled.app.invoke({}, thread());
 
     expect(state.outputs.a.ok).toBe(true);
@@ -297,7 +297,7 @@ describe('compile', () => {
   it('沒有設上限就不會因為金額收尾 (訂閱帳號的預設)', async () => {
     const workflow = twoAgents();
     const runner = new ScriptedRunner(() => result({ costUsd: 999 }));
-    const compiled = compile(workflow, deps({ runnerFactory: () => runner }));
+    const compiled = await compile(workflow, deps({ runnerFactory: () => runner }));
     const state = await compiled.app.invoke({}, thread());
 
     expect(state.totalCostUsd).toBe(1998);
@@ -315,7 +315,7 @@ describe('compile', () => {
         { from: 'slow', to: 'end', port: 'ok' },
       ],
     );
-    const compiled = compile(workflow, deps({ runnerFactory: () => runner, timers }));
+    const compiled = await compile(workflow, deps({ runnerFactory: () => runner, timers }));
     const running = compiled.app.invoke({}, thread());
 
     await until(() => timers.delays.includes(30_000));
@@ -329,7 +329,7 @@ describe('compile', () => {
 
   it('沒設 timeoutSec 時是 600 秒', async () => {
     const timers = new ManualTimers();
-    const compiled = compile(
+    const compiled = await compile(
       def(
         [start(), agent('impl'), end()],
         [
@@ -358,7 +358,7 @@ describe('compile', () => {
     );
     const saver = new MemorySaver();
     const reports: Parameters<NodeReport>[0][] = [];
-    const compiled = compile(
+    const compiled = await compile(
       workflow,
       deps({ checkpointer: saver, report: (event) => reports.push(event) }),
     );
@@ -384,7 +384,7 @@ describe('compile', () => {
         { from: 'ask', to: 'end', port: 'approved' },
       ],
     );
-    const compiled = compile(workflow, deps());
+    const compiled = await compile(workflow, deps());
     await compiled.app.invoke({}, thread());
     const state = await compiled.app.invoke(new Command({ resume: { approved: false } }), thread());
 
@@ -403,7 +403,7 @@ describe('compile', () => {
         { from: 'b', to: 'end', port: 'ok' },
       ],
     );
-    const compiled = compile(workflow, deps({ runnerFactory: () => runner }));
+    const compiled = await compile(workflow, deps({ runnerFactory: () => runner }));
     const running = compiled.app.invoke({}, thread());
 
     await until(() => runner.runs.length === 1);

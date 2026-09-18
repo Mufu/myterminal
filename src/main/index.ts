@@ -14,8 +14,7 @@ import { safeStorageCipher } from './safe-storage-cipher';
 import { cliSecrets } from './cli-secrets';
 import type { AgentKind } from '../shared/agent';
 import type { BillingMode } from '../shared/cli-auth';
-import { fileCheckpointSaver } from './workflow/json-file-saver';
-import { WorkflowService, fileRunStore } from './workflow/workflow-service';
+import { WorkflowService, fileRunStore, lazyCheckpointSaver } from './workflow/workflow-service';
 import { fileWorkflowStore } from './workflow/workflow-store';
 import { registerIpc } from './ipc';
 
@@ -64,7 +63,7 @@ const profiles = fileProfileStore(join(app.getPath('userData'), 'profiles.json')
 const workflows = new WorkflowService({
   runnerFactory: runners,
   sessions: manager,
-  checkpointer: fileCheckpointSaver(join(app.getPath('userData'), 'workflow-runs')),
+  checkpointer: lazyCheckpointSaver(join(app.getPath('userData'), 'workflow-runs')),
   ...fileRunStore(join(app.getPath('userData'), 'workflow-runs.json')),
 });
 

@@ -93,8 +93,8 @@ describe('內建範本', () => {
         }
       });
 
-      it('編譯得起來', () => {
-        expect(() =>
+      it('編譯得起來', async () => {
+        await expect(
           compile(template, {
             runnerFactory: () => new ScriptedRunner(() => agentResult()),
             sessions: new FakeSessions(),
@@ -103,7 +103,7 @@ describe('內建範本', () => {
             params: {},
             timers: new ManualTimers(),
           }),
-        ).not.toThrow();
+        ).resolves.toBeDefined();
       });
     });
   }
@@ -129,7 +129,7 @@ describe('程式碼審查（唯讀）跑一次', () => {
     const service = new WorkflowService({
       runnerFactory: () => runner,
       sessions: new FakeSessions(),
-      checkpointer: fileCheckpointSaver(dir),
+      checkpointer: async () => fileCheckpointSaver(dir),
       read: () => runs,
       write: (content) => {
         runs = content;

@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { WorkflowService } from '../src/main/workflow/workflow-service';
+import { WorkflowService, lazyCheckpointSaver } from '../src/main/workflow/workflow-service';
 import type { WorkflowServiceDeps } from '../src/main/workflow/workflow-service';
+import { emptyCheckpoint } from '@langchain/langgraph-checkpoint';
 import { fileCheckpointSaver } from '../src/main/workflow/json-file-saver';
 import { findTemplate } from '../src/main/workflow/templates';
 import type { RunState, WorkflowDefinition, WorkflowNode } from '../src/shared/workflow';
@@ -56,7 +57,7 @@ class Disk {
     return {
       runnerFactory: () => new ScriptedRunner(() => agentResult()),
       sessions: new FakeSessions(),
-      checkpointer: fileCheckpointSaver(this.dir),
+      checkpointer: async () => fileCheckpointSaver(this.dir),
       read: () => this.runs,
       write: (content) => {
         this.runs = content;
@@ -247,7 +248,8 @@ describe('WorkflowService', () => {
     await until(() => runner.runs.length === 1);
 
     service.cancel('run-1');
-    expect(runner.runs[0].cancelled).toBe(true);
+    // 圖是等 LangGraph 載進來才編的，所以砍 CLI 要等那個 promise (下一個微任務)。
+    await until(() => runner.runs[0].cancelled);
     expect(service.list()[0]).toMatchObject({ status: 'cancelled', finishedAt: 1_000 });
     // 取消不是失敗：正在跑的那個節點標成已取消，沒輪到的還是略過。
     expect(service.list()[0].nodes.impl.status).toBe('cancelled');
@@ -310,5 +312,22 @@ describe('內建範本', () => {
     expect(waiting.nodes.fix).toMatchObject({ status: 'done', attempts: 1 });
     const fix = runner.tasks.find((t) => t.prompt.startsWith('審查意見如下'));
     expect(fix).toMatchObject({ prompt: '審查意見如下，請修正：少了一行\nFAIL', resumeId: 'cli-impl' });
+  });
+});
+
+describe('lazyCheckpointSaver', () => {
+  it('第一次用到才載模組，之後都是同一個 saver', async () => {
+    const load = lazyCheckpointSaver(disk.dir);
+    const first = await load();
+    expect(await load()).toBe(first);
+
+    // 真的是個能用的 checkpointer。
+    await first.put(
+      { configurable: { thread_id: 'run-1', checkpoint_ns: '' } },
+      { ...emptyCheckpoint(), id: 'c1' },
+      { source: 'loop', step: 0, parents: {} },
+      {},
+    );
+    expect(readdirSync(disk.dir)).toEqual(['run-1.json']);
   });
 });

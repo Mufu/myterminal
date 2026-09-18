@@ -350,6 +350,15 @@ renderer 那邊因此多一件事：工作流的工作階段不是 `createSessio
 打進 bundle。`@langchain/langgraph-checkpoint` 同理；`@langchain/core` 與 `zod`
 是 peer，只被型別引用，一起釘成精確版本。
 
+但那個 `require()` 一次要 **1.6 秒**（大頭是 checkpoint 連著拉進來的
+`@langchain/core`），而開機十之八九不會馬上跑工作流 —— 所以主行程改成用到才載：
+[`graph-compiler.ts`](../src/main/workflow/graph-compiler.ts) 的 `loadLangGraph()`
+與 [`workflow-service.ts`](../src/main/workflow/workflow-service.ts) 的
+`lazyCheckpointSaver()` 都是 `import()`，第一次真的要編譯圖（或接續）時才載，
+載過就留著；`compile()` 因此是 `async`。打包後 `out/main/index.js` 的頂端不再有
+`require("@langchain/…")`，`json-file-saver` 被切成 `out/main/chunks/` 底下的獨立
+chunk（`files: out/**/*` 照樣包得到）。視窗出現的時間因此從 3.1 秒降到 1.6 秒。
+
 ## IPC 契約
 
 頻道名稱與 payload 型別都定義在 `src/shared/ipc.ts`，三邊共用同一份。

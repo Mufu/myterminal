@@ -1,5 +1,4 @@
 import { homedir } from 'node:os';
-import { Annotation, END, START, StateGraph, interrupt } from '@langchain/langgraph';
 import type { BaseCheckpointSaver } from '@langchain/langgraph';
 import type {
   ConditionRule,
@@ -38,14 +37,34 @@ const merge = <T>(left: Record<string, T>, right: Record<string, T>): Record<str
   ...right,
 });
 
-export const RunAnnotation = Annotation.Root({
-  outputs: Annotation<Record<string, NodeOutput>>({ reducer: merge, default: () => ({}) }),
-  attempts: Annotation<Record<string, number>>({ reducer: merge, default: () => ({}) }),
-  lastPort: Annotation<Record<string, string>>({ reducer: merge, default: () => ({}) }),
-  totalCostUsd: Annotation<number>({ reducer: (a, b) => a + b, default: () => 0 }),
-});
+/**
+ * require('@langchain/langgraph') 連著 @langchain/core 一次要 1.6 秒，而開機十之八九
+ * 不會馬上跑工作流 —— 所以第一次真的要編譯圖 (或接續) 時才載，載過就留著。
+ */
+type LangGraph = typeof import('@langchain/langgraph');
+let loading: Promise<LangGraph> | undefined;
 
-export type RunGraphState = typeof RunAnnotation.State;
+export function loadLangGraph(): Promise<LangGraph> {
+  return (loading ??= import('@langchain/langgraph'));
+}
+
+/** 圖的狀態。手寫而不是 typeof Annotation.Root(…).State —— Annotation 要等上面那個載入器。*/
+export interface RunGraphState {
+  outputs: Record<string, NodeOutput>;
+  attempts: Record<string, number>;
+  lastPort: Record<string, string>;
+  totalCostUsd: number;
+}
+
+/** 狀態的合併規則，每次編譯現做 (Annotation 要 LangGraph 載進來才有)。*/
+function annotation({ Annotation }: LangGraph) {
+  return Annotation.Root({
+    outputs: Annotation<Record<string, NodeOutput>>({ reducer: merge, default: () => ({}) }),
+    attempts: Annotation<Record<string, number>>({ reducer: merge, default: () => ({}) }),
+    lastPort: Annotation<Record<string, string>>({ reducer: merge, default: () => ({}) }),
+    totalCostUsd: Annotation<number>({ reducer: (a, b) => a + b, default: () => 0 }),
+  });
+}
 
 /** 內部出口：沒有任何連線對應得上，router 一律送到 END。*/
 const ABORT = '__abort__';
@@ -135,14 +154,21 @@ interface Control {
   active?: IAgentRun;
 }
 
-export function compile(def: WorkflowDefinition, deps: CompileDeps): CompiledWorkflow {
+export async function compile(
+  def: WorkflowDefinition,
+  deps: CompileDeps,
+): Promise<CompiledWorkflow> {
   const errors = validateWorkflow(def);
   if (errors.length > 0) throw new Error(`工作流定義不合法：${errors.join('、')}`);
 
+  const lg = await loadLangGraph();
+  const { END, START, StateGraph } = lg;
   const control: Control = { cancelled: false };
-  const graph = new StateGraph(RunAnnotation) as unknown as Builder;
+  const graph = new StateGraph(annotation(lg)) as unknown as Builder;
 
-  for (const node of def.nodes) graph.addNode(node.id, action(node, def, deps, control));
+  for (const node of def.nodes) {
+    graph.addNode(node.id, action(node, def, deps, control, lg.interrupt));
+  }
 
   for (const node of def.nodes) {
     if (node.type === 'start') {
@@ -178,6 +204,7 @@ function action(
   def: WorkflowDefinition,
   deps: CompileDeps,
   control: Control,
+  interrupt: LangGraph['interrupt'],
 ): NodeAction {
   switch (node.type) {
     case 'start':

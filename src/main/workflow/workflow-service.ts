@@ -1,16 +1,24 @@
 import { EventEmitter } from 'node:events';
 import { randomUUID } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { Command } from '@langchain/langgraph';
 import type { BaseCheckpointSaver } from '@langchain/langgraph';
 import type { RunState, RunStatus, WorkflowDefinition } from '../../shared/workflow';
 import type { IAgentRunnerFactory } from '../agent-runner';
-import type { CompiledWorkflow, IWorkflowSessions, NodeReport, Timers } from './graph-compiler';
-import { compile, runOutcome } from './graph-compiler';
+import type {
+  ApprovalAnswer,
+  CompiledWorkflow,
+  IWorkflowSessions,
+  NodeReport,
+  Timers,
+} from './graph-compiler';
+import { compile, loadLangGraph, runOutcome } from './graph-compiler';
 
 /** 讀／寫執行清單摘要的縫線，跟 ProfileStore 同一個手法。*/
 export type RunsReader = () => string | null;
 export type RunsWriter = (content: string) => void;
+
+/** checkpointer 也是要用的時候才給：它一載就連著整包 LangGraph，開機不必付那個錢。*/
+export type CheckpointerLoader = () => Promise<BaseCheckpointSaver>;
 
 /**
  * 存進 workflow-runs.json 的一筆。定義與參數要一起存，
@@ -27,7 +35,7 @@ interface StoredRun {
 export interface WorkflowServiceDeps {
   runnerFactory: IAgentRunnerFactory;
   sessions: IWorkflowSessions;
-  checkpointer: BaseCheckpointSaver;
+  checkpointer: CheckpointerLoader;
   read: RunsReader;
   write: RunsWriter;
   timers?: Timers;
@@ -56,7 +64,7 @@ const TERMINAL: readonly RunStatus[] = ['done', 'failed', 'cancelled', 'rejected
 export class WorkflowService extends EventEmitter<WorkflowEvents> {
   private readonly runs = new Map<string, StoredRun>();
   /** 還在跑 (或等批准) 的執行才需要留著編譯好的圖。*/
-  private readonly graphs = new Map<string, CompiledWorkflow>();
+  private readonly graphs = new Map<string, Promise<CompiledWorkflow>>();
 
   constructor(private readonly deps: WorkflowServiceDeps) {
     super();
@@ -106,7 +114,7 @@ export class WorkflowService extends EventEmitter<WorkflowEvents> {
     };
     this.runs.set(runId, stored);
     this.changed();
-    void this.drive(stored, {});
+    void this.drive(stored);
     return runId;
   }
 
@@ -117,19 +125,26 @@ export class WorkflowService extends EventEmitter<WorkflowEvents> {
     stored.state.status = 'running';
     stored.state.question = undefined;
     this.changed();
-    void this.drive(stored, new Command({ resume: { approved: answer.approved } }));
+    void this.drive(stored, { approved: answer.approved });
   }
 
   cancel(runId: string): void {
     const stored = this.runs.get(runId);
     if (!stored) return;
-    this.graphs.get(runId)?.cancel();
+    // 圖可能還在載 LangGraph，所以等它編好再取消 (編不出來的那次本來就沒東西要取消)。
+    void this.graphs
+      .get(runId)
+      ?.then((graph) => graph.cancel())
+      .catch(() => {});
     this.settle(stored, 'cancelled');
   }
 
-  private async drive(stored: StoredRun, input: unknown): Promise<void> {
+  private async drive(stored: StoredRun, resume?: ApprovalAnswer): Promise<void> {
     try {
-      const result = await this.graph(stored).app.invoke(input, {
+      const compiled = await this.graph(stored);
+      // 接續就是帶著 resume 值再 invoke 一次；圖編好了，LangGraph 一定已經在手上。
+      const { Command } = await loadLangGraph();
+      const result = await compiled.app.invoke(resume ? new Command({ resume }) : {}, {
         configurable: { thread_id: stored.state.runId },
         recursionLimit: RECURSION_LIMIT,
       });
@@ -173,20 +188,25 @@ export class WorkflowService extends EventEmitter<WorkflowEvents> {
     this.changed();
   }
 
-  private graph(stored: StoredRun): CompiledWorkflow {
+  private graph(stored: StoredRun): Promise<CompiledWorkflow> {
     const existing = this.graphs.get(stored.state.runId);
     if (existing) return existing;
-    const compiled = compile(stored.definition, {
+    // 編譯是非同步的 (要先載 LangGraph)，但 promise 同步就放進去，取消才找得到它。
+    const compiled = this.build(stored);
+    this.graphs.set(stored.state.runId, compiled);
+    return compiled;
+  }
+
+  private async build(stored: StoredRun): Promise<CompiledWorkflow> {
+    return compile(stored.definition, {
       runnerFactory: this.deps.runnerFactory,
       sessions: this.deps.sessions,
-      checkpointer: this.deps.checkpointer,
+      checkpointer: await this.deps.checkpointer(),
       budget: { maxTotalCostUsd: stored.maxTotalCostUsd },
       params: stored.params,
       timers: this.deps.timers,
       report: (event) => this.report(stored, event),
     });
-    this.graphs.set(stored.state.runId, compiled);
-    return compiled;
   }
 
   /** 編排層回報的節點進度，直接變成畫面上那一列。*/
@@ -266,4 +286,14 @@ export function fileRunStore(path: string): { read: RunsReader; write: RunsWrite
     },
     write: (content) => writeFileSync(path, content, 'utf8'),
   };
+}
+
+/**
+ * 正式環境的 checkpointer。連 json-file-saver 這個模組本身都是用到才載 —— 它一被
+ * import 就會把 @langchain/langgraph-checkpoint (連著整包 @langchain/core) 拉進來，
+ * 那是開機最貴的 1.4 秒，而開機十之八九不會馬上跑工作流。
+ */
+export function lazyCheckpointSaver(dir: string): CheckpointerLoader {
+  let saver: Promise<BaseCheckpointSaver> | undefined;
+  return () => (saver ??= import('./json-file-saver').then((m) => m.fileCheckpointSaver(dir)));
 }
