@@ -95,21 +95,24 @@ test('助理：真的問兩句，第二句接得上前一句', async () => {
   await expect(window.locator('#assistant-status')).toHaveText('回答中…');
   await expect(bots(window).first()).toContainText('新連接', { timeout: 180_000 });
   await expect(bots(window).first()).toContainText('WSL');
+
+  // 回答完輸入框才解鎖，狀態那一行從「回答中…」換成金額與耗時。
+  await expect(window.locator('#assistant-input')).toBeEnabled({ timeout: 60_000 });
+  await expect(window.locator('#assistant-cancel')).toBeHidden();
+  await expect(window.locator('#assistant-status')).toContainText('$', { timeout: 10_000 });
+
   const first = await bots(window).first().innerText();
   const firstUsage = await window.locator('#assistant-status').innerText();
   console.log(`\n=== 第一題：怎麼開一個 WSL 工作階段？ (${firstUsage}) ===\n${first}\n`);
   await shot(window, 'answer-1');
-
-  // 回答完輸入框才解鎖。
-  await expect(window.locator('#assistant-input')).toBeEnabled({ timeout: 30_000 });
-  await expect(window.locator('#assistant-cancel')).toBeHidden();
 
   // 第二句只有「那 SSH 呢？」—— 接得上前一句才答得出 plink / 主機。
   await window.fill('#assistant-input', '那 SSH 呢？');
   await window.click('#assistant-send');
   await expect(bots(window)).toHaveCount(2, { timeout: 30_000 });
   await expect(bots(window).nth(1)).toContainText(/plink|主機/, { timeout: 180_000 });
-  await expect(window.locator('#assistant-input')).toBeEnabled({ timeout: 30_000 });
+  await expect(window.locator('#assistant-input')).toBeEnabled({ timeout: 60_000 });
+  await expect(window.locator('#assistant-status')).toContainText('$', { timeout: 10_000 });
   const second = await bots(window).nth(1).innerText();
   const secondUsage = await window.locator('#assistant-status').innerText();
   console.log(`\n=== 第二題：那 SSH 呢？ (${secondUsage}) ===\n${second}\n`);

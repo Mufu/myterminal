@@ -177,9 +177,12 @@ export function registerIpc(
   });
 
   // 助理：答案一段一段推回 renderer，invoke 的回覆等它講完才回去。
-  ipcMain.handle(IPC.assistantAsk, (_e, req: AskAssistantRequest) =>
-    assistant.ask(req.question, req.context, (event) => send(IPC.assistantEvent, event)),
-  );
+  // 先等開機那一輪探測 —— 還沒探完的時候問「Claude 登入了沒有」會得到「沒有」，
+  // 剛開 app 就問第一句會被誤判成未登入 (實測 e2e 撞到過)。
+  ipcMain.handle(IPC.assistantAsk, async (_e, req: AskAssistantRequest) => {
+    await cli.status();
+    await assistant.ask(req.question, req.context, (event) => send(IPC.assistantEvent, event));
+  });
   ipcMain.handle(IPC.assistantReset, () => assistant.reset());
   ipcMain.handle(IPC.assistantCancel, () => assistant.cancel());
 
