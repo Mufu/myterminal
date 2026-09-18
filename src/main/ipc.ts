@@ -124,7 +124,7 @@ export function registerIpc(
   );
   ipcMain.handle(IPC.cancelWorkflow, (_e, runId: string) => workflows.cancel(runId));
   ipcMain.handle(IPC.workflowRuns, () => workflows.list());
-  // 探測是開機時就開始的，這裡等的是同一個 Promise。
+  // 探測是視窗出來之後才開始的，這裡等的是同一個 Promise。
   ipcMain.handle(IPC.cliAuth, () => cli.status());
 
   // 「重新偵測」：在外面的終端機登入 / 登出之後不必重開 app。

@@ -21,6 +21,9 @@ import { registerIpc } from './ipc';
 
 let win: BrowserWindow | null = null;
 
+/** 視窗出來之後隔多久才探四支 CLI 的登入狀態 (讓第一個畫面先畫完)。*/
+const PROBE_DELAY_MS = 300;
+
 // 最後一道防線：主行程的未捕捉例外預設會跳出錯誤對話框，改成寫進 stderr。
 process.on('uncaughtException', (error) => console.error('[main] 未捕捉的例外', error));
 
@@ -34,11 +37,11 @@ const cliStore = fileCliAuthStore(join(app.getPath('userData'), 'cli-auth.json')
 // CLI 是用訂閱還是 API 金鑰登入：開機問一次就好，不擋啟動 (探測不出來也照跑)。
 // 金額要不要標成估算看它，所以 agent 的結果行與 renderer 都拿同一份結果；
 // 使用者按「重新偵測」或跑完登入流程時會重探，探測中再按也只會探一輪。
+// 開機那一輪是視窗出來之後才開始的，見 createWindow。
 const cli = cliAuthBridge(
   () => probeCliAuth(new NodeProcessSpawner(), (id) => cliStore.get(id).hasKey),
   cliStore,
 );
-void cli.refresh();
 const billingMode = (kind: AgentKind): BillingMode => cli.latest()?.[kind].mode ?? 'unknown';
 
 // 組裝：正式環境注入真的 node-pty spawner 與真的檔案 sink。
@@ -96,7 +99,12 @@ function createWindow(): void {
     },
   });
 
-  win.once('ready-to-show', () => win?.show());
+  win.once('ready-to-show', () => {
+    win?.show();
+    // 探測是四個 Node 行程，跟 Electron 自己的啟動搶 CPU 會讓第一個視窗晚一秒多
+    // 才出現，所以等視窗畫出來再探。晶片上先寫「偵測中…」，探完才換成結果。
+    setTimeout(() => void cli.refresh(), PROBE_DELAY_MS);
+  });
   win.on('closed', () => (win = null));
 
   const devUrl = process.env.ELECTRON_RENDERER_URL;
