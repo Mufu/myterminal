@@ -45,7 +45,7 @@ const obj = (v: unknown): Record<string, unknown> | undefined =>
  * 行緩衝 (chunk 可能切在一行中間)、跳過不是 JSON 的雜訊行、
  * 以及把終端事件壓到行程真的結束時才發出 —— 因為 exitCode 那時才知道。
  */
-class JsonlRun implements IAgentRun {
+export class JsonlRun implements IAgentRun {
   private readonly listeners: Array<(event: AgentEvent) => void> = [];
   private readonly child: IChildProcess;
   private buffer = '';
