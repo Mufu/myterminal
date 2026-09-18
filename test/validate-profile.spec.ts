@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { validateProfile } from '../src/shared/validate-profile';
 import { CLI_TYPES } from '../src/shared/profile';
-import type { AgentRole } from '../src/shared/roles';
+import type { AgentRole, RoleInfo } from '../src/shared/roles';
+import { ROLES } from '../src/shared/roles';
 
 describe('validateProfile', () => {
   it('PowerShell 不需要額外欄位', () => {
@@ -102,6 +103,25 @@ describe('Agent 任務', () => {
     expect(validateProfile({ ...task, prompt: '只回覆 OK', role: 'reviewer' })).toEqual([]);
     expect(validateProfile({ ...task, prompt: '只回覆 OK', role: 'boss' as AgentRole })).toEqual([
       '角色不存在：boss',
+    ]);
+  });
+
+  it('沒給角色清單時，角色庫的 id 只驗語法', () => {
+    expect(validateProfile({ ...task, prompt: 'x', role: 'lib:engineering/x' })).toEqual([]);
+  });
+
+  it('給了角色清單就以它為準，角色庫裡找不到的要講清楚', () => {
+    const found: RoleInfo = {
+      id: 'lib:engineering/x',
+      label: 'X',
+      systemPrompt: '你是 X',
+      defaultPermission: 'readonly',
+      source: 'library',
+    };
+    const profile = { ...task, prompt: 'x', role: 'lib:engineering/x' } as const;
+    expect(validateProfile(profile, false, [...ROLES, found])).toEqual([]);
+    expect(validateProfile(profile, false, ROLES)).toEqual([
+      '角色不存在：lib:engineering/x（角色庫裡找不到，確認角色資料夾）',
     ]);
   });
 });

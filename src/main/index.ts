@@ -5,6 +5,8 @@ import { SessionLogger, defaultLogDir, ensureLogDir } from './session-logger';
 import { NodePtySpawner } from './node-pty-spawner';
 import { ShellFactory } from './shell-factory';
 import { fileProfileStore } from './profile-store';
+import { fileSettingsStore } from './settings-store';
+import { RoleService, fileRoleLibrary } from './role-library';
 import { agentRunners } from './agent-runner';
 import { NodeProcessSpawner } from './process-spawner';
 import { probeCliAuth } from './cli-auth-probe';
@@ -46,6 +48,14 @@ const billingMode = (kind: AgentKind): BillingMode => cli.latest()?.[kind].mode 
 // 組裝：正式環境注入真的 node-pty spawner 與真的檔案 sink。
 // ShellFactory 與 agent runner 共用同一條金鑰縫線，所以選了 API 金鑰的 CLI
 // 在互動式工作階段、Agent 任務、工作流節點三邊都拿得到金鑰。
+// 角色庫：使用者指一個資料夾 (預設 userData/roles)，裡面的 markdown 就是角色。
+// 一開機不掃 —— 第一次有人問 (renderer 的 roles:list) 才走那一趟磁碟。
+const roles = new RoleService(
+  fileRoleLibrary(),
+  fileSettingsStore(join(app.getPath('userData'), 'settings.json')),
+  join(app.getPath('userData'), 'roles'),
+);
+
 const secrets = cliSecrets(cliStore);
 const runners = agentRunners(secrets);
 const manager = new SessionManager(
@@ -54,6 +64,8 @@ const manager = new SessionManager(
   undefined,
   runners,
   billingMode,
+  undefined,
+  roles.registry,
 );
 const logger = new SessionLogger(logDir);
 const profiles = fileProfileStore(join(app.getPath('userData'), 'profiles.json'));
@@ -64,11 +76,15 @@ const workflows = new WorkflowService({
   runnerFactory: runners,
   sessions: manager,
   checkpointer: lazyCheckpointSaver(join(app.getPath('userData'), 'workflow-runs')),
+  roles: roles.registry,
   ...fileRunStore(join(app.getPath('userData'), 'workflow-runs.json')),
 });
 
 // 自訂工作流的定義：畫布存進去、執行的時候從這裡找。
-const workflowDefinitions = fileWorkflowStore(join(app.getPath('userData'), 'workflows.json'));
+const workflowDefinitions = fileWorkflowStore(
+  join(app.getPath('userData'), 'workflows.json'),
+  roles.registry,
+);
 
 // 關窗之後 pty 的 exit 事件才可能送達，那時 webContents 已經被銷毀。
 registerIpc(
@@ -78,6 +94,7 @@ registerIpc(
   workflows,
   workflowDefinitions,
   cli,
+  roles,
   () => (win && !win.isDestroyed() ? win.webContents : null),
 );
 

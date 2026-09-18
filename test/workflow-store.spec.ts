@@ -1,6 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { WorkflowStore } from '../src/main/workflow/workflow-store';
 import { minimalWorkflow } from './fakes/fake-workflow';
+import type { WorkflowDefinition } from '../src/shared/workflow';
+import type { RoleInfo } from '../src/shared/roles';
+import { ROLES } from '../src/shared/roles';
 
 /** 假的檔案：WorkflowStore 只透過注入的讀／寫函式碰檔案系統。*/
 class FakeFile {
@@ -192,5 +195,46 @@ describe('WorkflowStore 刪除', () => {
     expect(() => store.remove('不存在')).not.toThrow();
     expect(file.writes).toBe(before);
     expect(store.list().map((w) => w.id)).toEqual(['a']);
+  });
+});
+
+describe('WorkflowStore 與角色庫', () => {
+  const libRole: RoleInfo = {
+    id: 'lib:engineering/code-reviewer',
+    label: 'Code Reviewer',
+    systemPrompt: 'You are Code Reviewer.',
+    defaultPermission: 'readonly',
+    source: 'library',
+  };
+
+  /** 有角色庫角色的定義；存檔時就是靠注入的 registry 判斷它在不在。*/
+  const withLibRole = (): WorkflowDefinition => {
+    const definition = minimalWorkflow('w');
+    const node = definition.nodes[1];
+    if (node.type === 'agent') node.config.role = libRole.id;
+    return definition;
+  };
+
+  it('存檔時角色庫裡有那個角色就過', () => {
+    const withRoles = new WorkflowStore(file.read, file.write, () => [...ROLES, libRole]);
+    withRoles.save(withLibRole());
+    expect(file.writes).toBe(1);
+  });
+
+  it('角色庫裡找不到就整份不寫，訊息要說得出是哪裡找不到', () => {
+    const withRoles = new WorkflowStore(file.read, file.write, () => ROLES);
+    expect(() => withRoles.save(withLibRole())).toThrow('角色庫裡找不到');
+    expect(file.writes).toBe(0);
+  });
+
+  it('沒注入 registry 時不驗角色庫的 id (開機讀檔那條路)', () => {
+    store.save(withLibRole());
+    expect(file.writes).toBe(1);
+  });
+
+  it('list 一律不驗角色，資料夾被搬走時還打得開來改', () => {
+    file.content = JSON.stringify([withLibRole()]);
+    const withRoles = new WorkflowStore(file.read, file.write, () => ROLES);
+    expect(withRoles.list()).toHaveLength(1);
   });
 });

@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { RoleLibrary, rolesOf } from '../src/main/role-library';
+import { RoleLibrary, RoleService, rolesOf } from '../src/main/role-library';
 import type { MarkdownFile } from '../src/main/role-library';
+import { SettingsStore } from '../src/main/settings-store';
 import { ROLES } from '../src/shared/roles';
 
 /**
@@ -132,5 +133,66 @@ describe('rolesOf', () => {
     expect(all).toHaveLength(ROLES.length + 1);
     expect(all[0].id).toBe('pm');
     expect(all.at(-1)?.id).toBe('lib:e/x');
+  });
+});
+
+describe('RoleService', () => {
+  /** 設定檔在記憶體裡，目錄存不存在也是注入的。*/
+  function service(files: MarkdownFile[], dirs: string[] = ['D:\\別的地方']) {
+    const { lib, calls } = library(files);
+    let saved: string | null = null;
+    const settings = new SettingsStore(
+      () => saved,
+      (content) => {
+        saved = content;
+      },
+    );
+    const svc = new RoleService(lib, settings, 'D:\\預設', (path) => dirs.includes(path));
+    return { svc, calls, settings };
+  }
+
+  it('沒設定過就是預設資料夾', () => {
+    const { svc } = service([role('e/x.md', 'X')]);
+    expect(svc.dir()).toBe('D:\\預設');
+    expect(svc.list()).toMatchObject({ dir: 'D:\\預設' });
+  });
+
+  it('清單是內建加上掃出來的，skipped 一起回去', () => {
+    const { svc } = service([role('e/x.md', 'X'), { relPath: 'README.md', text: '# 說明' }]);
+    const result = svc.list();
+    expect(result.roles).toHaveLength(ROLES.length + 1);
+    expect(result.skipped).toHaveLength(1);
+    expect(result.scannedAt).toBe(1700000000000);
+  });
+
+  it('list 吃快取，rescan 一定重讀', () => {
+    const { svc, calls } = service([role('e/x.md', 'X')]);
+    svc.list();
+    svc.list();
+    expect(calls.list).toBe(1);
+    svc.rescan();
+    expect(calls.list).toBe(2);
+  });
+
+  it('換資料夾會存起來並重掃', () => {
+    const { svc } = service([role('e/x.md', 'X')]);
+    expect(svc.setDir('D:\\別的地方').dir).toBe('D:\\別的地方');
+    expect(svc.dir()).toBe('D:\\別的地方');
+  });
+
+  it('目錄不存在就整個不動，連設定都不寫', () => {
+    const { svc } = service([role('e/x.md', 'X')]);
+    expect(() => svc.setDir('D:\\沒有這個')).toThrow('角色資料夾不存在：D:\\沒有這個');
+    expect(svc.dir()).toBe('D:\\預設');
+  });
+
+  it('空字串不是「回到預設」，是沒填', () => {
+    const { svc } = service([]);
+    expect(() => svc.setDir('   ')).toThrow('請輸入角色資料夾');
+  });
+
+  it('registry 給的是內建加上角色庫，main 那幾個消費者都靠它查', () => {
+    const { svc } = service([role('e/x.md', 'X')]);
+    expect(svc.registry().map((r) => r.id).at(-1)).toBe('lib:e/x');
   });
 });

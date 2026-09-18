@@ -3,7 +3,8 @@ import { Command, MemorySaver } from '@langchain/langgraph';
 import { compile, matches, render, runOutcome } from '../src/main/workflow/graph-compiler';
 import type { CompileDeps, NodeReport, RunGraphState } from '../src/main/workflow/graph-compiler';
 import type { WorkflowDefinition, WorkflowEdge, WorkflowNode } from '../src/shared/workflow';
-import { findRole } from '../src/shared/roles';
+import type { RoleInfo } from '../src/shared/roles';
+import { ROLES, findRole } from '../src/shared/roles';
 import {
   FakeSessions,
   ManualTimers,
@@ -44,6 +45,14 @@ const deps = (over: Partial<CompileDeps> = {}): CompileDeps => ({
   timers: new ManualTimers(),
   ...over,
 });
+
+const libRole: RoleInfo = {
+  id: 'lib:engineering/code-reviewer',
+  label: 'Code Reviewer',
+  systemPrompt: 'You are Code Reviewer.',
+  defaultPermission: 'readonly',
+  source: 'library',
+};
 
 const thread = (id = 'run-1') => ({ configurable: { thread_id: id }, recursionLimit: 100 });
 
@@ -186,6 +195,26 @@ describe('compile', () => {
 
     expect(runner.tasks[0].systemPrompt).toBe(findRole('reviewer')?.systemPrompt);
     expect(runner.tasks[1].systemPrompt).toBeUndefined();
+  });
+
+  it('角色庫的角色從注入的 registry 查，沒有 registry 就編不起來', async () => {
+    const workflow = def(
+      [start(), agent('review', { role: libRole.id }), end()],
+      [
+        { from: 'start', to: 'review' },
+        { from: 'review', to: 'end', port: 'ok' },
+        { from: 'review', to: 'end', port: 'fail' },
+      ],
+    );
+    const runner = new ScriptedRunner(() => result());
+    const compiled = await compile(
+      workflow,
+      deps({ runnerFactory: () => runner, roles: () => [...ROLES, libRole] }),
+    );
+    await compiled.app.invoke({}, thread());
+    expect(runner.tasks[0].systemPrompt).toBe(libRole.systemPrompt);
+
+    await expect(compile(workflow, deps())).rejects.toThrow('角色庫裡找不到');
   });
 
   it('agent 失敗走 fail 出口；沒有連線的出口就收尾', async () => {

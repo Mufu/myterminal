@@ -5,7 +5,9 @@ import type { AgentTaskProfile, ConnectionProfile, SessionType } from '../shared
 import { TYPE_LABELS } from '../shared/profile';
 import type { AgentEvent, AgentKind, AgentPermission } from '../shared/agent';
 import type { BillingMode } from '../shared/cli-auth';
-import { findRole } from '../shared/roles';
+import { findRoleIn } from '../shared/roles';
+import type { RoleRegistry } from './role-library';
+import { builtinRegistry } from './role-library';
 import type { SessionInfo } from '../shared/session';
 import type { DataEvent, ExitEvent } from '../shared/ipc';
 import type { IPtyProcess, IPtySpawner } from './pty';
@@ -65,6 +67,8 @@ export class SessionManager extends EventEmitter<SessionEvents> {
     private readonly billing: (kind: AgentKind) => BillingMode = () => 'unknown',
     /** 工作目錄存不存在的縫線，測試注入假的。*/
     private readonly exists: (path: string) => boolean = existsSync,
+    /** 角色從哪裡查 (內建 + 角色庫)；省略就是只有內建那五個。*/
+    private readonly roles: RoleRegistry = builtinRegistry,
   ) {
     super();
   }
@@ -199,7 +203,9 @@ export class SessionManager extends EventEmitter<SessionEvents> {
       prompt: profile.prompt,
       cwd,
       permission: profile.permission,
-      systemPrompt: profile.role ? findRole(profile.role)?.systemPrompt : undefined,
+      systemPrompt: profile.role
+        ? findRoleIn(this.roles(), profile.role)?.systemPrompt
+        : undefined,
     });
     this.watchAgentSessionId(run, info);
     return new AgentRunPty(

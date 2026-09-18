@@ -124,6 +124,28 @@ export function filterRoles(roles: readonly RoleInfo[], query: string): RoleInfo
   );
 }
 
+/**
+ * 這個 id 在這份清單裡找不找得到。
+ * roles 省略時只驗內建的 —— 角色庫還沒掃出來的時候 (例如 store 讀檔)
+ * 不能因為「現在還不知道」就把使用者存好的定義判成不合法。
+ */
+export function roleMissing(id: string, roles?: readonly RoleInfo[]): boolean {
+  if (roles) return !findRoleIn(roles, id);
+  return !isLibraryRole(id) && !findRole(id);
+}
+
+/** 錯誤訊息裡的那一段；角色庫的 id 要提醒去確認資料夾。*/
+export function missingRoleReason(id: string): string {
+  return isLibraryRole(id) ? `${id}（角色庫裡找不到，確認角色資料夾）` : id;
+}
+
+/** 掃描時讀不成角色的檔案；選擇器上那條狀態列會把它們列出來。*/
+export interface SkippedRoleFile {
+  /** 相對於角色庫根目錄的路徑。*/
+  relPath: string;
+  reason: string;
+}
+
 export interface RoleGroup {
   division: string;
   roles: RoleInfo[];

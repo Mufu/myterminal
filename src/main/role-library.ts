@@ -1,8 +1,10 @@
-import { readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import type { RoleInfo } from '../shared/roles';
+import type { RoleInfo, SkippedRoleFile } from '../shared/roles';
 import { ROLES, mergeRoles } from '../shared/roles';
 import { parseDivisions, parseRoleFile } from '../shared/role-file';
+import type { RolesResult } from '../shared/ipc';
+import type { SettingsStore } from './settings-store';
 
 /** 掃資料夾的縫線：底下所有 markdown 的相對路徑與內容。目錄不存在時回空陣列。*/
 export type ListMarkdown = (dir: string) => MarkdownFile[];
@@ -15,14 +17,9 @@ export interface MarkdownFile {
   text: string;
 }
 
-export interface SkippedFile {
-  relPath: string;
-  reason: string;
-}
-
 export interface RoleScan {
   roles: RoleInfo[];
-  skipped: SkippedFile[];
+  skipped: SkippedRoleFile[];
   /** 這次掃的是哪個資料夾。*/
   dir: string;
   scannedAt: number;
@@ -60,7 +57,7 @@ export class RoleLibrary {
   rescan(dir: string): RoleScan {
     const divisions = parseDivisions(this.readDivisions(dir) ?? '');
     const roles: RoleInfo[] = [];
-    const skipped: SkippedFile[] = [];
+    const skipped: SkippedRoleFile[] = [];
 
     for (const file of this.listMarkdown(dir)) {
       const relPath = file.relPath.replace(/\\/g, '/');
@@ -92,6 +89,56 @@ export const builtinRegistry: RoleRegistry = () => ROLES;
 /** 把一次掃描的結果接成 registry 要的那份完整清單。*/
 export function rolesOf(scan: RoleScan): RoleInfo[] {
   return mergeRoles(ROLES, scan.roles);
+}
+
+/**
+ * RoleService — 把「設定裡的資料夾」與「掃出來的角色」黏在一起，
+ * 就是 roles:list / roles:rescan / roles:set-dir 這三個頻道的內容。
+ * IPC 那一層只負責轉接，所以規則在這裡測得到。
+ */
+export class RoleService {
+  constructor(
+    private readonly library: RoleLibrary,
+    private readonly settings: SettingsStore,
+    /** 沒設定過角色資料夾時用的預設 (userData/roles)。*/
+    private readonly defaultDir: string,
+    /** 目錄存不存在的縫線，測試注入假的。*/
+    private readonly exists: (path: string) => boolean = existsSync,
+  ) {}
+
+  dir(): string {
+    return this.settings.get().rolesDir ?? this.defaultDir;
+  }
+
+  /** 掃過就給快取的那一份。*/
+  list(): RolesResult {
+    return this.result(this.library.scan(this.dir()));
+  }
+
+  rescan(): RolesResult {
+    return this.result(this.library.rescan(this.dir()));
+  }
+
+  /** 換資料夾：目錄不存在就整個不動，連設定都不寫。*/
+  setDir(dir: string): RolesResult {
+    const wanted = dir.trim();
+    if (!wanted) throw new Error('請輸入角色資料夾');
+    if (!this.exists(wanted)) throw new Error(`角色資料夾不存在：${wanted}`);
+    this.settings.setRolesDir(wanted);
+    return this.rescan();
+  }
+
+  /** 交給 SessionManager 與編排層查角色用的那個縫線。*/
+  registry: RoleRegistry = () => rolesOf(this.library.scan(this.dir()));
+
+  private result(scan: RoleScan): RolesResult {
+    return {
+      roles: rolesOf(scan),
+      dir: scan.dir,
+      skipped: scan.skipped,
+      scannedAt: scan.scannedAt,
+    };
+  }
 }
 
 /** 正式環境：真的走一遍資料夾。讀不到的檔案直接跳過，不讓一顆權限錯誤炸掉掃描。*/

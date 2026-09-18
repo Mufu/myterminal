@@ -11,7 +11,9 @@ import {
   DEFAULT_TIMEOUT_SEC,
   validateWorkflow,
 } from '../../shared/workflow';
-import { findRole } from '../../shared/roles';
+import { findRoleIn } from '../../shared/roles';
+import type { RoleRegistry } from '../role-library';
+import { builtinRegistry } from '../role-library';
 import { renderTemplate } from '../../shared/template';
 import type { AdoptSpec } from '../session-manager';
 import type { IAgentRun, IAgentRunnerFactory } from '../agent-runner';
@@ -114,6 +116,8 @@ export interface CompileDeps {
   params: Record<string, string>;
   report?: NodeReport;
   timers?: Timers;
+  /** 角色從哪裡查；省略就是只有內建那五個。*/
+  roles?: RoleRegistry;
 }
 
 /** invoke 的回傳：狀態再加上 LangGraph 中斷時塞進來的那個 key。*/
@@ -160,7 +164,7 @@ export async function compile(
   def: WorkflowDefinition,
   deps: CompileDeps,
 ): Promise<CompiledWorkflow> {
-  const errors = validateWorkflow(def);
+  const errors = validateWorkflow(def, (deps.roles ?? builtinRegistry)());
   if (errors.length > 0) throw new Error(`工作流定義不合法：${errors.join('、')}`);
 
   const lg = await loadLangGraph();
@@ -281,7 +285,9 @@ async function runAgent(
     cwd,
     permission,
     resumeId: config.resumeFrom ? state.outputs[config.resumeFrom]?.sessionId : undefined,
-    systemPrompt: config.role ? findRole(config.role)?.systemPrompt : undefined,
+    systemPrompt: config.role
+      ? findRoleIn((deps.roles ?? builtinRegistry)(), config.role)?.systemPrompt
+      : undefined,
   });
   control.active = run;
 

@@ -1,6 +1,6 @@
 import type { ConnectionProfile, SavedProfile } from './profile';
 import type { SessionInfo } from './session';
-import type { DataEvent, ExitEvent, SaveCliSettingRequest } from './ipc';
+import type { DataEvent, ExitEvent, RolesResult, SaveCliSettingRequest } from './ipc';
 import type { RunState, WorkflowDefinition, WorkflowInfo } from './workflow';
 import type { CliAuthSetting, CliAuthStatus, CliId } from './cli-auth';
 
@@ -47,6 +47,15 @@ export interface MyTerminalApi {
   clearCliKey(id: CliId): Promise<Record<CliId, CliAuthSetting>>;
   /** 開一個跑登入指令的工作階段，回傳它的 id。*/
   cliLogin(id: CliId): Promise<string>;
+
+  /** 角色清單 (內建 + 角色庫)；掃過的話回的是快取那一份。*/
+  listRoles(): Promise<RolesResult>;
+  /** 重新掃一次角色資料夾。*/
+  rescanRoles(): Promise<RolesResult>;
+  /** 換角色資料夾：存起來並重掃；目錄不存在會以訊息 reject。*/
+  setRolesDir(dir: string): Promise<RolesResult>;
+  /** 開原生的選資料夾對話框；使用者取消時回 null。*/
+  pickRolesDir(): Promise<string | null>;
 
   onData(listener: (event: DataEvent) => void): void;
   onExit(listener: (event: ExitEvent) => void): void;

@@ -37,6 +37,11 @@ const api: MyTerminalApi = {
   clearCliKey: (id) => ipcRenderer.invoke(IPC.clearCliKey, id),
   cliLogin: (id) => ipcRenderer.invoke(IPC.cliLogin, id),
 
+  listRoles: () => ipcRenderer.invoke(IPC.rolesList),
+  rescanRoles: () => ipcRenderer.invoke(IPC.rolesRescan),
+  setRolesDir: (dir) => ipcRenderer.invoke(IPC.rolesSetDir, { dir }),
+  pickRolesDir: () => ipcRenderer.invoke(IPC.rolesPickDir),
+
   onData: (listener) => void ipcRenderer.on(IPC.data, (_e, payload) => listener(payload)),
   onExit: (listener) => void ipcRenderer.on(IPC.exit, (_e, payload) => listener(payload)),
   onSessionsChanged: (listener) =>

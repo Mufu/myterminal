@@ -1,8 +1,8 @@
 import type { AgentKind, AgentPermission } from './agent';
 import { isAgentPermission } from './agent';
 import type { BaseShell } from './profile';
-import type { AgentRole } from './roles';
-import { findRole } from './roles';
+import type { AgentRole, RoleInfo } from './roles';
+import { missingRoleReason, roleMissing } from './roles';
 
 /**
  * 工作流定義 (version 1)：純 JSON，是唯一的真相來源 ——
@@ -141,8 +141,10 @@ export const DEFAULT_MAX_TOTAL_COST_USD = 2;
 /**
  * 驗證工作流定義：回傳錯誤訊息陣列，空陣列代表合法。
  * 跟 validateProfile 一樣是純函式，放在 shared 讓 main 與之後的畫布共用。
+ * roles 給了就以它為準 (角色庫掃出來的那一份)，省略時角色庫的 id 只驗語法 ——
+ * 讀檔的時候角色庫可能還沒掃，那時不該把使用者存好的定義判成不合法。
  */
-export function validateWorkflow(def: WorkflowDefinition): string[] {
+export function validateWorkflow(def: WorkflowDefinition, roles?: readonly RoleInfo[]): string[] {
   const errors: string[] = [];
   const byId = new Map(def.nodes.map((node) => [node.id, node]));
 
@@ -170,8 +172,8 @@ export function validateWorkflow(def: WorkflowDefinition): string[] {
     if (node.type === 'agent') {
       if (!node.config.prompt.trim()) errors.push(`節點 ${node.id} 的提示不能是空的`);
       if (!node.config.cwd?.trim()) errors.push(`節點 ${node.id} 的工作目錄不能是空的`);
-      if (node.config.role !== undefined && !findRole(node.config.role)) {
-        errors.push(`節點 ${node.id} 的角色不存在：${node.config.role}`);
+      if (node.config.role !== undefined && roleMissing(node.config.role, roles)) {
+        errors.push(`節點 ${node.id} 的角色不存在：${missingRoleReason(node.config.role)}`);
       }
       if (node.config.permission !== undefined && !isAgentPermission(node.config.permission)) {
         errors.push(`節點 ${node.id} 的權限不存在：${node.config.permission}`);

@@ -8,7 +8,8 @@ import type {
   WorkflowNode,
 } from '../src/shared/workflow';
 import { TEMPLATES } from '../src/main/workflow/templates';
-import type { AgentRole } from '../src/shared/roles';
+import type { AgentRole, RoleInfo } from '../src/shared/roles';
+import { ROLES } from '../src/shared/roles';
 import type { AgentPermission } from '../src/shared/agent';
 import { permissionFromAllowEdits } from '../src/shared/agent';
 
@@ -159,6 +160,29 @@ describe('validateWorkflow', () => {
     const bad = minimal();
     (bad.nodes[1] as Extract<WorkflowNode, { type: 'agent' }>).config.role = 'boss' as AgentRole;
     expect(validateWorkflow(bad)).toEqual(['節點 a 的角色不存在：boss']);
+  });
+
+  it('沒給角色清單時，角色庫的 id 只驗語法 (那時可能還沒掃)', () => {
+    const d = minimal();
+    (d.nodes[1] as Extract<WorkflowNode, { type: 'agent' }>).config.role = 'lib:engineering/x';
+    expect(validateWorkflow(d)).toEqual([]);
+  });
+
+  it('給了角色清單就以它為準，角色庫裡找不到的要講清楚', () => {
+    const d = minimal();
+    (d.nodes[1] as Extract<WorkflowNode, { type: 'agent' }>).config.role = 'lib:engineering/x';
+
+    const found: RoleInfo = {
+      id: 'lib:engineering/x',
+      label: 'X',
+      systemPrompt: '你是 X',
+      defaultPermission: 'readonly',
+      source: 'library',
+    };
+    expect(validateWorkflow(d, [...ROLES, found])).toEqual([]);
+    expect(validateWorkflow(d, ROLES)).toEqual([
+      '節點 a 的角色不存在：lib:engineering/x（角色庫裡找不到，確認角色資料夾）',
+    ]);
   });
 
   it('agent 節點的權限必須是三檔之一，沒寫也可以 (預設唯讀)', () => {

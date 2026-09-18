@@ -3,6 +3,7 @@ import type { AgentPermission } from '../../shared/agent';
 import { readPermission } from '../../shared/agent';
 import type { AgentNodeConfig, WorkflowDefinition, WorkflowNode } from '../../shared/workflow';
 import { validateWorkflow } from '../../shared/workflow';
+import type { RoleRegistry } from '../role-library';
 import { findTemplate } from './templates';
 
 /** 讀檔的縫線：回傳整個檔案內容，檔案不存在時回傳 null。*/
@@ -19,6 +20,11 @@ export class WorkflowStore {
   constructor(
     private readonly read: WorkflowReader,
     private readonly write: WorkflowWriter,
+    /**
+     * 存檔時角色從哪裡查。沒給就不驗角色庫的 id ——
+     * list() 一律不驗，不然角色資料夾被搬走時連打開來改都做不到。
+     */
+    private readonly roles?: RoleRegistry,
   ) {}
 
   list(): WorkflowDefinition[] {
@@ -38,7 +44,7 @@ export class WorkflowStore {
 
   /** 以 id upsert；覆寫時保留原本的順序。不合法就整份不寫。*/
   save(definition: WorkflowDefinition): void {
-    const errors = validateWorkflow(definition);
+    const errors = validateWorkflow(definition, this.roles?.());
     if (errors.length > 0) throw new Error(errors.join('\n'));
     if (findTemplate(definition.id)) throw new Error('不能覆蓋內建範本');
 
@@ -137,7 +143,7 @@ function isEdge(value: unknown): boolean {
 }
 
 /** 正式環境：整份檔案一次讀進來、一次覆寫回去。*/
-export function fileWorkflowStore(path: string): WorkflowStore {
+export function fileWorkflowStore(path: string, roles?: RoleRegistry): WorkflowStore {
   return new WorkflowStore(
     () => {
       try {
@@ -147,5 +153,6 @@ export function fileWorkflowStore(path: string): WorkflowStore {
       }
     },
     (content) => writeFileSync(path, content, 'utf8'),
+    roles,
   );
 }

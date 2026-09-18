@@ -1,4 +1,4 @@
-import { ipcMain, type WebContents } from 'electron';
+import { dialog, ipcMain, type WebContents } from 'electron';
 import { IPC } from '../shared/ipc';
 import type {
   CreateSessionRequest,
@@ -6,6 +6,7 @@ import type {
   ResizeRequest,
   ResumeWorkflowRequest,
   SaveCliSettingRequest,
+  SetRolesDirRequest,
   StartWorkflowRequest,
 } from '../shared/ipc';
 import type { SavedProfile } from '../shared/profile';
@@ -17,6 +18,7 @@ import type { SessionManager } from './session-manager';
 import type { SessionLogger } from './session-logger';
 import type { ProfileStore } from './profile-store';
 import type { CliAuthBridge } from './cli-auth-bridge';
+import type { RoleService } from './role-library';
 import type { WorkflowService } from './workflow/workflow-service';
 import type { WorkflowStore } from './workflow/workflow-store';
 import { findWorkflow, listWorkflows } from './workflow/catalog';
@@ -37,6 +39,7 @@ export function registerIpc(
   workflows: WorkflowService,
   definitions: WorkflowStore,
   cli: CliAuthBridge,
+  roles: RoleService,
   getWebContents: () => WebContents | null,
 ): void {
   const send = (channel: string, payload: unknown): void => {
@@ -152,6 +155,22 @@ export function registerIpc(
   ipcMain.handle(IPC.clearCliKey, (_e, id: CliId) => {
     cli.store.clearKey(id);
     return cli.store.settings();
+  });
+
+  // 角色庫：清單、重新掃描、換資料夾。三個都回同一種結果，
+  // renderer 那邊就只有一條「拿到新的角色清單」的路徑。
+  ipcMain.handle(IPC.rolesList, () => roles.list());
+  ipcMain.handle(IPC.rolesRescan, () => roles.rescan());
+  ipcMain.handle(IPC.rolesSetDir, (_e, req: SetRolesDirRequest) => roles.setDir(req.dir));
+
+  // 「瀏覽…」：原生的選資料夾對話框，取消就回 null (畫面上什麼都不動)。
+  ipcMain.handle(IPC.rolesPickDir, async () => {
+    const result = await dialog.showOpenDialog({
+      title: '選擇角色資料夾',
+      defaultPath: roles.dir(),
+      properties: ['openDirectory'],
+    });
+    return result.canceled ? null : (result.filePaths[0] ?? null);
   });
 
   ipcMain.handle(IPC.cliLogin, (_e, id: CliId) => {

@@ -5,7 +5,8 @@ import { FakePtySpawner } from './fakes/fake-pty';
 import { FakeAgentRun, FakeAgentRunner } from './fakes/fake-agent';
 import type { DataEvent, ExitEvent } from '../src/shared/ipc';
 import type { SessionInfo } from '../src/shared/session';
-import { findRole } from '../src/shared/roles';
+import type { RoleInfo } from '../src/shared/roles';
+import { ROLES, findRole } from '../src/shared/roles';
 import { homedir } from 'node:os';
 
 let spawner: FakePtySpawner;
@@ -264,6 +265,29 @@ describe('SessionManager 的 agent 任務', () => {
 
     expect(agents.tasks[0].systemPrompt).toBe(findRole('reviewer')?.systemPrompt);
     expect(info.role).toBe('reviewer');
+  });
+
+  it('角色庫的角色從注入的 registry 查', () => {
+    const libRole: RoleInfo = {
+      id: 'lib:engineering/code-reviewer',
+      label: 'Code Reviewer',
+      systemPrompt: 'You are Code Reviewer.',
+      defaultPermission: 'readonly',
+      source: 'library',
+    };
+    const withLibrary = new SessionManager(
+      spawner,
+      new ShellFactory((name) => name),
+      (fn) => fn(),
+      () => agents,
+      undefined,
+      () => true,
+      () => [...ROLES, libRole],
+    );
+
+    const info = withLibrary.create({ ...task, role: libRole.id }, 80, 24);
+    expect(agents.tasks[0].systemPrompt).toBe(libRole.systemPrompt);
+    expect(info.role).toBe(libRole.id);
   });
 
   it('沒填工作目錄時用家目錄', () => {

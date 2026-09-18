@@ -5,6 +5,7 @@ import type { BaseCheckpointSaver } from '@langchain/langgraph';
 import type { RunState, RunStatus, WorkflowDefinition } from '../../shared/workflow';
 import { paramsOf } from '../../shared/workflow';
 import type { IAgentRunnerFactory } from '../agent-runner';
+import type { RoleRegistry } from '../role-library';
 import type {
   ApprovalAnswer,
   CompiledWorkflow,
@@ -44,6 +45,8 @@ export interface WorkflowServiceDeps {
   newRunId?: () => string;
   /** 工作目錄存不存在的縫線，測試注入假的。*/
   exists?: (path: string) => boolean;
+  /** 角色從哪裡查 (內建 + 角色庫)；省略就是只有內建那五個。*/
+  roles?: RoleRegistry;
 }
 
 type WorkflowEvents = { changed: [RunState[]] };
@@ -211,6 +214,7 @@ export class WorkflowService extends EventEmitter<WorkflowEvents> {
       budget: { maxTotalCostUsd: stored.maxTotalCostUsd },
       params: stored.params,
       timers: this.deps.timers,
+      roles: this.deps.roles,
       report: (event) => this.report(stored, event),
     });
   }
