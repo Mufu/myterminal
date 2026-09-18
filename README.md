@@ -8,6 +8,10 @@
 
 ![介面](docs/UI.png)
 
+## 下載
+
+已打包的執行檔放在 [GitHub Releases](https://github.com/Mufu/myterminal/releases)（執行檔不進 git）。建議下載 `myterminal-<版本>-win.zip` 解壓後直接跑 `myterminal.exe`；安裝版與免安裝單檔的差別見下面「打包成執行檔」的表格。
+
 ## 功能
 
 工具列（由左至右）：
