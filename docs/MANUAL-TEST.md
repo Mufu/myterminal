@@ -859,23 +859,22 @@
 
 結果：☐ 通過 ☐ 失敗 ☐ 略過　備註：
 
-
 ### G14 角色庫（需要 網路，會 clone 一個 repo）
 
 步驟：
-1. 先在 PowerShell 裡 `git clone https://github.com/Mufu/agency-agents D:\agency-agents`（約 300 個 markdown）。
+1. 先在 PowerShell 裡 `git clone https://github.com/Mufu/agency-agents D:gency-agents`（約 300 個 markdown）。
 2. 新連接 → Agent 任務 → 「角色」那一格按「選擇…」。看最上面那一排：「角色資料夾」與狀態列。
-3. 把「角色資料夾」改成 `D:\agency-agents` 按 Enter（或按「瀏覽…」用原生對話框挑同一個資料夾）。
+3. 把「角色資料夾」改成 `D:gency-agents` 按 Enter（或按「瀏覽…」用原生對話框挑同一個資料夾）。
 4. 展開「略過的檔案」看一眼，再在搜尋框打 `code review`，選 `Code Reviewer`。
-5. 任務填 `用一句中文說明你現在扮演的角色`，工作目錄填 `D:\tmp\mt-test` → 建立。
+5. 任務填 `用一句中文說明你現在扮演的角色`，工作目錄填 `D:	mp\mt-test` → 建立。
 6. 關掉 app 再開，重複步驟 2 只看「角色資料夾」那一格。
 
 預期：
-- 步驟 2 的資料夾預設是 `%APPDATA%\myterminal\roles`，狀態列寫「0 個角色（0 個檔案略過）」。
-- 步驟 3 之後狀態列變成「約 290 個角色（約 40 個檔案略過）」，清單依 `Engineering`、`Testing`、`Product` 這種**顯示名稱**分組（不是目錄名），「內建」那一組在最上面。
+- 步驟 2 的資料夾預設是 `%APPDATA%\myterminaloles`，狀態列寫「0 個角色（0 個檔案略過）」。
+- 步驟 3 之後狀態列變成「約 290 個角色（約 40 個檔案略過）」，清單依 `Engineering`、`Testing`、`Product` 這種顯示名稱分組（不是目錄名），「內建」那一組在最上面。
 - 步驟 4 略過的檔案裡看得到 `README.md`、`CONTRIBUTING.md` 與 `integrations/`、`strategy/` 底下的檔案，各自寫了原因。選完欄位顯示 `👁️ Code Reviewer`，「權限」跳成「唯讀」。
-- 步驟 5 跑得起來，回答是英文（角色的提示是英文的）或中文都算通過 —— 重點是回答裡認得出它在扮演 code reviewer。任務標頭那一列旁邊的角色標籤寫 `👁️ Code Reviewer`。
-- 步驟 6 資料夾還是 `D:\agency-agents`（設定存在 `%APPDATA%\myterminal\settings.json`）。
+- 步驟 5 跑得起來，回答是英文（角色的提示是英文的）或中文都算通過，重點是回答裡認得出它在扮演 code reviewer。任務標頭那一列旁邊的角色標籤寫 `👁️ Code Reviewer`。
+- 步驟 6 資料夾還是 `D:gency-agents`（設定存在 `%APPDATA%\myterminal\settings.json`）。
 - 「瀏覽…」開的是 Windows 原生的選資料夾對話框；按取消什麼都不動。
 
 結果：☐ 通過 ☐ 失敗 ☐ 略過　備註：
@@ -1278,22 +1277,19 @@
 
 結果：☐ 通過 ☐ 失敗 ☐ 略過　備註：
 
-
-### I26 節點用角色庫的角色，資料夾不見就擋存檔
-
-前置：G14 已經把角色資料夾指到 `D:\agency-agents`（沒做過 G14 就先做）。
+### I26 節點用角色庫的角色，資料夾不見就擋存檔（需要 先做 G14）
 
 步驟：
 1. 「編輯」開畫布，加一個 Agent 節點接成 開始 → Agent → 結束，提示填 `{{params.task}}`、工作目錄填 `{{params.cwd}}`。
 2. 「角色」按「選擇…」，搜尋 `api tester`，選 `API Tester`。名稱填「角色庫流程」，按「儲存」。
-3. 用檔案總管把 `D:\agency-agents` 改名成 `D:\agency-agents-x`。
+3. 用檔案總管把 `D:gency-agents` 改名成 `D:gency-agents-x`。
 4. 回 myterminal，「角色」按「選擇…」→「重新掃描」→ 關閉，再按「儲存」。
-5. 把資料夾改回 `D:\agency-agents`，再「重新掃描」一次、再「儲存」。
+5. 把資料夾改回 `D:gency-agents`，再「重新掃描」一次、再「儲存」。
 
 預期：
 - 步驟 2 卡片上的標籤是 `🔌 API Tester`，屬性面板的「權限」是「唯讀」；儲存成功。`%APPDATA%\myterminal\workflows.json` 裡那個節點的 `"role"` 是 `"lib:testing/testing-api-tester"`。
 - 步驟 4 狀態列變成「0 個角色（0 個檔案略過）」，卡片上的標籤變成灰色的「未設角色」（id 還留著，只是查不到）；儲存被擋下來，畫布上的錯誤是「節點 agent-1 的角色不存在：lib:testing/testing-api-tester（角色庫裡找不到，確認角色資料夾）」。
-- 步驟 5 標籤與儲存都恢復正常 —— 定義本身沒被動過。
+- 步驟 5 標籤與儲存都恢復正常，定義本身沒被動過。
 
 結果：☐ 通過 ☐ 失敗 ☐ 略過　備註：
 
