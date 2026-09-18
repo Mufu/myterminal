@@ -1,11 +1,11 @@
 # 手動測試檢查表
 
-版本：0.1.1+ (main 2026-09-18)。互動版（可直接勾結果）在 Claude 的 artifact 頁面；這份是同一份案例的純文字版。
+版本：0.1.2 (main 2026-09-18)。互動版（可直接勾結果）在 Claude 的 artifact 頁面；這份是同一份案例的純文字版。
 
 ## 環境準備
 
 - Windows 11，16 GB 以上記憶體。
-- 執行檔三選一：`dist\myterminal-0.1.1-win.zip`（解壓一次到任何資料夾，跑裡面的 `myterminal.exe`，啟動約 3 到 4 秒，建議）；`dist\myterminal-0.1.1-setup.exe`（安裝版，啟動最快）；`D:\AndroidStudioProjects\claude_code\myterminal\myterminal-0.1.1-portable.exe`（免安裝單檔，每次啟動要解壓約 40 秒）。
+- 執行檔三選一：`dist\myterminal-0.1.2-win.zip`（解壓一次到任何資料夾，跑裡面的 `myterminal.exe`，啟動約 3 到 4 秒，建議）；`dist\myterminal-0.1.2-setup.exe`（安裝版，啟動最快）；`D:\AndroidStudioProjects\claude_code\myterminal\myterminal-0.1.2-portable.exe`（免安裝單檔，每次啟動要解壓約 40 秒）。
 - WSL 已裝 Ubuntu；PuTTY 的 `plink.exe` 在 `C:\Program Files\PuTTY\` 或 PATH 上（SSH 案例用）。SSH 案例可用本機 sshd：`wsl.exe -u root -e bash scripts/wsl-sshd-setup.sh` 會開 127.0.0.1:2222，帳號 `mtssh`，密碼 `mtssh-e2e`。
 - `claude`（已登入 Max）、`codex`（已登入 ChatGPT）、`muse`（已裝，未登入）、`opencode`（已裝，免費模型不需金鑰）都在 PATH 上。裝新 CLI 後要重開 myterminal。
 - 會用到 Claude / Codex 的案例只消耗訂閱額度，不會扣款；OpenCode 用 `opencode/mimo-v2.5-free` 免費模型，只需要網路。
@@ -20,8 +20,8 @@
 ### A1 啟動：zip 版與免安裝版
 
 步驟：
-1. 解壓 `myterminal-0.1.1-win.zip` 到任何資料夾，雙擊裡面的 `myterminal.exe`，計時到視窗出現。
-2. 雙擊 `myterminal-0.1.1-portable.exe`，同樣計時。
+1. 解壓 `myterminal-0.1.2-win.zip` 到任何資料夾，雙擊裡面的 `myterminal.exe`，計時到視窗出現。
+2. 雙擊 `myterminal-0.1.2-portable.exe`，同樣計時。
 
 預期：
 - zip 版約 2 到 4 秒出現主視窗（主行程改成用到工作流時才載入 LangGraph，量到從 3.1 秒降到 1.5 秒）；免安裝單檔約 40 秒（每次啟動都要解壓）。
@@ -33,7 +33,7 @@
 ### A2 安裝版安裝與啟動（需要 會安裝到目前使用者）
 
 步驟：
-1. 執行 `dist\myterminal-0.1.1-setup.exe`。
+1. 執行 `dist\myterminal-0.1.2-setup.exe`。
 2. 從桌面或開始功能表捷徑啟動。
 3. 「應用程式與功能」裡移除。
 
