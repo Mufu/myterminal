@@ -1,0 +1,218 @@
+{
+  "ranAt": "2026-09-18T09:05:43.353Z",
+  "suites": [
+    {
+      "spec": "e2e/ssh.spec.ts",
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "notes": "19.2 s (整段 40 s)。WSL sshd 127.0.0.1:2222。spec 改成用自己的 --user-data-dir (原本會碰到真正的 %APPDATA%\\myterminal)。"
+    },
+    {
+      "spec": "e2e/agent.spec.ts",
+      "passed": 3,
+      "failed": 0,
+      "skipped": 1,
+      "notes": "claude 27.9 s、codex 36.8 s、opencode 25.0 s，muse skip (無 Meta 憑證)，共 1.5 m。第一輪繼承了外層 Claude Code 的 CLAUDECODE / CLAUDE_CODE_* 環境變數 (claude 會關掉對話紀錄)，所以拿掉那些變數後 claude 那一支重跑一次：16.1 s 通過、≈$0.121。spec 改成用自己的 --user-data-dir。"
+    },
+    {
+      "spec": "e2e/workflow.spec.ts",
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0,
+      "notes": "1.1 m + 1.1 m (共 2.3 m)。兩次執行各 ≈$0.326 / ≈$0.321 (實作 + 審查，修正都略過)。"
+    },
+    {
+      "spec": "e2e/workflow-custom.spec.ts",
+      "passed": 6,
+      "failed": 0,
+      "skipped": 0,
+      "notes": "A 1.0 m ≈$0.171、B 16.2 s (按下到失敗 11.0 s) ≈$0.000、C 38.7 s ≈$0.000、D codex 54.7 s 12.0k tokens、E 48.2 s ≈$0.146、F 15.1 s，共 4.0 m。全部通過，但 C 的截圖與 workflow-runs.json 顯示被取消的節點是 failed (紅點)，見 H4。"
+    },
+    {
+      "spec": "e2e/editor-run.spec.ts",
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "notes": "35.1 s，OpenCode 免費模型 opencode/mimo-v2.5-free，不花額度。"
+    },
+    {
+      "spec": "e2e/assistant.spec.ts",
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0,
+      "notes": "7.6 s / 4.0 s / 23.6 s (共 40.5 s)。真問兩句：≈$0.078 · 1.9 s、≈$0.084 · 3.4 s。"
+    },
+    {
+      "spec": "e2e/checklist-quota.spec.ts",
+      "passed": 7,
+      "failed": 0,
+      "skipped": 0,
+      "notes": "新 spec (MYTERMINAL_QUOTA_E2E)。D3 30.0 s、G2 39.8 s、G3 18.8 s、G13 51.5 s、H12 1.4 m、H8 51.2 s、M4 13.4 s，共 4.9 m，一次就全過。"
+    }
+  ],
+  "cases": [
+    {
+      "id": "D3",
+      "status": "pass",
+      "spec": "e2e/checklist-quota.spec.ts › D3：輸入字的兩行進到 Claude 成為同一段提示，只回一次 OK",
+      "note": "兩行在同一個 ❯ 提示裡 (「只回覆 OK。」下一行「不要做別的事。」)，只有一個「● OK」，輸入框沒有殘留。互動式 Claude 不顯示金額 (估約 ≈$0.1)。"
+    },
+    {
+      "id": "G2",
+      "status": "pass",
+      "spec": "e2e/checklist-quota.spec.ts › G2 / G12：可修改檔案建得出 hello.txt，唯讀建不出 blocked.txt；結果行是 ≈$",
+      "note": "權限下拉三個選項正確；可修改檔案建出 hello.txt (≈$0.121)；唯讀沒建 blocked.txt，Claude 說「目前處於 Plan mode … 不能建立或修改任何檔案」(≈$0.195)。注意：plan 模式把計畫檔寫進了 ~/.claude/plans/blocked-txt-stateless-flamingo.md。"
+    },
+    {
+      "id": "G3",
+      "status": "pass",
+      "spec": "e2e/checklist-quota.spec.ts › G3：選審查者權限跳成唯讀，清單上有角色標籤，回答以審查者身分",
+      "note": "先設可修改檔案→選審查者變唯讀→工程師變可修改檔案→審查者又變唯讀；清單列有「審查者」標籤；回答「我是只審查、不改檔的程式碼審查者…」。≈$0.128。"
+    },
+    {
+      "id": "G12",
+      "status": "pass",
+      "spec": "e2e/checklist-quota.spec.ts › G2 / G12：… 結果行是 ≈$；e2e/checklist-quota.spec.ts › H12 / G12：…",
+      "note": "Agent 任務結果行「✔ 完成 · 4.1 s · ≈$0.121 · 50.4k tokens · session …」；工作流清單金額「≈$0.265」的 title 是「CLI 依 token 用量估算的 API 等值金額，訂閱帳號不另收費，只算進方案的用量上限」。不另花額度 (共用 G2 / H12)。"
+    },
+    {
+      "id": "G13",
+      "status": "pass",
+      "spec": "e2e/checklist-quota.spec.ts › G13：完全放行跑得了 git --version，可修改檔案被擋；接手帶跳過權限的旗標",
+      "note": "完全放行：標頭有 [完全放行]、輸出 git version 2.51.0.windows.1、列上紅色「完全放行」(≈$0.120)；可修改檔案：沒有版本號，Claude 說指令需要核准、非互動無法核准 (≈$0.134)，列上沒有標記；接手啟動指令「claude --resume 2dc8bb36-… --dangerously-skip-permissions」，沒打字直接關掉，claude.exe 有跟著收掉。"
+    },
+    {
+      "id": "H8",
+      "status": "pass",
+      "spec": "e2e/checklist-quota.spec.ts › H8：用量上限 0.01 → 第一個節點跑完就失敗",
+      "note": "程式碼審查（唯讀）範本、上限 0.01：審查節點跑完後執行「失敗」，錯誤含「超出這次執行的用量上限 (估算 $0.01)」，節點紅點。≈$0.201。"
+    },
+    {
+      "id": "M4",
+      "status": "pass",
+      "spec": "e2e/checklist-quota.spec.ts › M4：在畫布上問「怎麼加節點」，答案講的是調色盤，不是新連接",
+      "note": "答案提到「＋ Agent」「＋ 條件」「＋ 批准」「＋ 結束」四個都有，沒提新連接，畫布節點數不變；但沒講接線的做法 (檢查表的 expect 有提)。≈$0.012 · 2.1 s。"
+    },
+    {
+      "id": "H12",
+      "status": "pass",
+      "spec": "e2e/checklist-quota.spec.ts › H12 / G12：程式碼審查（唯讀）不停下來問就完成，最後一行 PASS/FAIL，git status 不變",
+      "note": "3 個檔案的暫存 repo：只有「程式碼審查（唯讀） · 審查」一個 agent 節點，直接「完成」沒有批准；依嚴重度列出問題 (app.js:5 等)，最後一行 FAIL；git status 前後一樣。≈$0.265。注意：唯讀 (plan) 模式下 Claude 仍執行了 Bash (node app.js、node -e …)。"
+    },
+    {
+      "id": "H1",
+      "status": "pass",
+      "spec": "e2e/workflow.spec.ts › 執行範本跑到等待批准，批准之後完成並留下檔案",
+      "note": "實作 → 審查 → 批准範本跑到「等待批准」，問題「要保留這次的變更嗎？」，工作階段名稱「範本名 · 實作 / 審查」，檔案有建出來 (spec 用 hello.txt，不是 wf.txt)。≈$0.326。"
+    },
+    {
+      "id": "H2",
+      "status": "pass",
+      "spec": "e2e/workflow.spec.ts › 執行範本跑到等待批准，批准之後完成並留下檔案",
+      "note": "批准後「完成」、結束節點 done、修正節點略過。額度算在 H1。"
+    },
+    {
+      "id": "H3",
+      "status": "pass",
+      "spec": "e2e/workflow-custom.spec.ts › A：條件成立後停在批准，按退回收尾而檔案留著",
+      "note": "退回後「已退回」、沒有錯誤文字、結束節點略過、hello.txt 留著。用的是自訂工作流 (實作→條件→批准)，不是內建範本。≈$0.171。"
+    },
+    {
+      "id": "H4",
+      "status": "fail",
+      "spec": "e2e/workflow-custom.spec.ts › C：執行中按取消，十秒內變成已取消",
+      "note": "spec 通過 (10 秒內「已取消」、工作階段變已結束 (1))，但正在跑的節點最後是 failed 紅點，不是中性的「已取消」：取消後 CLI 回報的「已取消」錯誤被 runAgent 報成 failed，蓋掉 settle() 設的 cancelled。≈$0.000。"
+    },
+    {
+      "id": "H5",
+      "status": "pass",
+      "spec": "e2e/workflow.spec.ts › 等待批准的執行在 app 重啟之後仍然批得下去",
+      "note": "重開 app 後仍是等待批准、問題還在、審查節點 done，批准後完成、檔案在。≈$0.321。"
+    },
+    {
+      "id": "C6",
+      "status": "pass",
+      "spec": "e2e/ssh.spec.ts › 用新連接開一個 SSH 工作階段，登入、執行指令、離線",
+      "note": "plink 在終端機裡問密碼，SSH_E2E_OK 與 hostname 印出，第一行指令沒被吃掉。不用額度。"
+    },
+    {
+      "id": "C7",
+      "status": "pass",
+      "spec": "e2e/ssh.spec.ts › 用新連接開一個 SSH 工作階段，登入、執行指令、離線",
+      "note": "exit 後那一列「已結束 (0)」，新開的 plink.exe 都收掉了。「畫面內容保留」沒有另外斷言。"
+    },
+    {
+      "id": "G1",
+      "status": "pass",
+      "spec": "e2e/agent.spec.ts › claude：Agent 任務跑完之後可以接手",
+      "note": "AGENT_E2E_OK 獨佔一行、「✔ 完成 · 3.4 s · ≈$0.121 · 26.7k tokens · session …」、「工作階段已結束」、標籤「Claude 任務」 (乾淨環境重跑那次)。"
+    },
+    {
+      "id": "G4",
+      "status": "partial",
+      "spec": "e2e/agent.spec.ts › claude：Agent 任務跑完之後可以接手",
+      "note": "接手開出第二個工作階段「接手 …」，互動式 Claude 起來了；但沒有問「你剛才回覆了什麼？」驗證它記得對話 (spec 的判斷式也會被 PowerShell 提示字元滿足)。"
+    },
+    {
+      "id": "G5",
+      "status": "pass",
+      "spec": "e2e/agent.spec.ts › codex：Agent 任務跑完之後可以接手",
+      "note": "codex 36.8 s 回 AGENT_E2E_OK 與 ✔ 完成 (這個帳號現在拿得到模型了)。結果行格式 spec 沒驗；workflow-custom D 的 codex 節點顯示「12.0k tokens」而不是 ≈$0.000。用 ChatGPT 額度。"
+    },
+    {
+      "id": "G6",
+      "status": "partial",
+      "spec": "e2e/agent.spec.ts › codex：Agent 任務跑完之後可以接手",
+      "note": "接手開出第二個工作階段，但 spec 沒驗啟動指令是 codex resume <id>，判斷式 /Codex|▌|>\\s*$/ 很寬。"
+    },
+    {
+      "id": "G7",
+      "status": "pass",
+      "spec": "e2e/agent.spec.ts › opencode：Agent 任務跑得完，清單上可以接手",
+      "note": "OPENCODE_E2E_OK 與 ✔ 完成，有接手按鈕，不需金鑰 (opencode/mimo-v2.5-free)。不用額度。"
+    },
+    {
+      "id": "I18",
+      "status": "pass",
+      "spec": "e2e/editor-run.spec.ts › 畫布上看得到執行狀態、切得到節點的終端機、批准得了",
+      "note": "「儲存並執行」開出執行對話框，開始後留在畫布上，卡片出現這份工作流的執行狀態。免費模型。"
+    },
+    {
+      "id": "J1",
+      "status": "pass",
+      "spec": "e2e/editor-run.spec.ts › 畫布上看得到執行狀態、切得到節點的終端機、批准得了",
+      "note": "Agent 卡片 執行中 → 完成，節點用量是 token 數；編輯列「執行：」有狀態與用量；批准卡片「等待批准」。免費模型。"
+    },
+    {
+      "id": "J2",
+      "status": "pass",
+      "spec": "e2e/editor-run.spec.ts › 畫布上看得到執行狀態、切得到節點的終端機、批准得了",
+      "note": "卡片「輸出」切到那個節點的終端機，看得到 RUNVIEW_OK 獨佔一行 (✔ 完成 沒有另外斷言)。"
+    },
+    {
+      "id": "J3",
+      "status": "partial",
+      "spec": "e2e/editor-run.spec.ts › 畫布上看得到執行狀態、切得到節點的終端機、批准得了",
+      "note": "屬性面板有「接手」、按「看輸出」會切到終端機；說明文字沒驗，也沒真的按接手開互動式 opencode。"
+    },
+    {
+      "id": "J4",
+      "status": "pass",
+      "spec": "e2e/editor-run.spec.ts › 畫布上看得到執行狀態、切得到節點的終端機、批准得了",
+      "note": "批准卡片上按「批准」→ 執行「完成」、結束卡片「完成」。"
+    },
+    {
+      "id": "J7",
+      "status": "partial",
+      "spec": "e2e/editor-run.spec.ts › 畫布上看得到執行狀態、切得到節點的終端機、批准得了",
+      "note": "從終端機按「編輯」回來還是同一份工作流、卡片狀態還在；但切走時節點已經完成，「執行中切走、回來繼續更新」沒有涵蓋。"
+    },
+    {
+      "id": "M2",
+      "status": "pass",
+      "spec": "e2e/assistant.spec.ts › 助理：真的問兩句，第二句接得上前一句",
+      "note": "第一句提到「新連接」與 WSL (≈$0.078 · 1.9 s)；只問「那 SSH 呢？」也答出 plink / 主機 (≈$0.084 · 3.4 s)。「新對話」清空由沒登入那支測試驗到。"
+    }
+  ]
+}
