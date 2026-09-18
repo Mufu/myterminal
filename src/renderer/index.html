@@ -270,14 +270,8 @@
         </label>
         <p id="w-description" class="cli-hint"></p>
 
-        <label>
-          任務
-          <textarea id="w-task" rows="4" placeholder="要 agent 做什麼"></textarea>
-        </label>
-
-        <label>
-          工作目錄 <input id="w-cwd" type="text" placeholder="agent 會在這裡修改檔案" />
-        </label>
+        <!-- 欄位是照著這份工作流宣告的啟動參數長出來的，見 workflow-run-dialog.ts。 -->
+        <div id="w-params"></div>
 
         <label>
           用量上限（估算美元）

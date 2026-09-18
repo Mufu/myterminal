@@ -154,6 +154,27 @@ describe('WorkflowService', () => {
     expect(() => service.start(linear(), {})).not.toThrow();
   });
 
+  /** 自訂的目錄參數一樣要先檢查，訊息用那個參數的標籤。*/
+  it('自訂的目錄參數不存在時，訊息用它的標籤', () => {
+    const service = new WorkflowService(disk.deps({ exists: () => false }));
+    const definition = linear();
+    definition.params = [
+      { name: 'task', label: '任務', kind: 'multiline', required: true },
+      { name: 'repo', label: '程式庫', kind: 'directory', required: true },
+    ];
+    expect(() => service.start(definition, { task: 'x', repo: 'D:/no-such-repo' })).toThrow(
+      '程式庫不存在：D:/no-such-repo',
+    );
+    expect(service.list()).toEqual([]);
+  });
+
+  it('不是目錄的參數不會被當成路徑檢查', () => {
+    const service = new WorkflowService(disk.deps({ exists: () => false }));
+    const definition = linear();
+    definition.params = [{ name: 'task', label: '任務', kind: 'multiline', required: true }];
+    expect(() => service.start(definition, { task: 'D:/no-such-dir' })).not.toThrow();
+  });
+
   it('start 給了用量上限，超過的那個節點就讓執行收尾', async () => {
     const service = new WorkflowService(disk.deps());
     service.start(linear(), {}, { maxTotalCostUsd: 0.05 });

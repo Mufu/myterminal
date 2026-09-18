@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { nodeDotClass, runStatusLabel, usageMode } from '../src/renderer/workflow-list-view';
-import { parseBudget, validateRunParams } from '../src/renderer/workflow-run-dialog';
+import { fieldId, parseBudget } from '../src/renderer/workflow-run-dialog';
 import type { RunNodeStatus, RunStatus } from '../src/shared/workflow';
 import type { CliAuthStatus } from '../src/shared/cli-auth';
 import { ROLES, findRole } from '../src/shared/roles';
@@ -76,12 +76,12 @@ describe('parseBudget', () => {
   });
 });
 
-describe('validateRunParams', () => {
-  it('任務與工作目錄都是必填的', () => {
-    expect(validateRunParams({ task: '建立 hello.txt', cwd: 'D:/tmp' })).toEqual([]);
-    expect(validateRunParams({ task: '  ', cwd: 'D:/tmp' })).toEqual(['請輸入任務內容']);
-    expect(validateRunParams({ task: 'x', cwd: '' })).toEqual(['請輸入工作目錄']);
-    expect(validateRunParams({ task: '', cwd: '' })).toEqual(['請輸入任務內容', '請輸入工作目錄']);
+/** 欄位的 id：task 與 cwd 是一直以來的那兩個，其餘照參數名稱長出來。*/
+describe('fieldId', () => {
+  it('task 與 cwd 維持舊的 id，自訂參數是 w-param-<名稱>', () => {
+    expect(fieldId('task')).toBe('w-task');
+    expect(fieldId('cwd')).toBe('w-cwd');
+    expect(fieldId('branch')).toBe('w-param-branch');
   });
 });
 

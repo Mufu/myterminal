@@ -532,7 +532,7 @@ test('執行對話框：任務或工作目錄沒填就不讓開始', async () =>
 
     await window.click('#w-ok');
     await expect(window.locator('#workflow-run')).toBeVisible();
-    await expect(window.locator('#w-errors')).toContainText('請輸入任務內容');
+    await expect(window.locator('#w-errors')).toContainText('請輸入任務');
     await expect(window.locator('#w-errors')).toContainText('請輸入工作目錄');
 
     await window.fill('#w-task', '隨便做點什麼');
@@ -544,7 +544,7 @@ test('執行對話框：任務或工作目錄沒填就不讓開始', async () =>
     await window.fill('#w-cwd', join(root, 'test-results'));
     await window.click('#w-ok');
     await expect(window.locator('#workflow-run')).toBeVisible();
-    await expect(window.locator('#w-errors')).toHaveText('請輸入任務內容');
+    await expect(window.locator('#w-errors')).toHaveText('請輸入任務');
 
     // 一個工作流都沒真的跑起來。
     await expect(window.locator('.workflow-empty')).toHaveText('尚無工作流執行');
