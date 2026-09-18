@@ -152,7 +152,8 @@ claude 開過一次、按過信任」之後才算數；在被信任的專案裡�
 ### 角色
 
 角色是**一段可以重複用的系統提示前言**，加上一個預設的權限。
-定義在 [`src/shared/roles.ts`](../src/shared/roles.ts)，就五個，改一次全部生效：
+來源有兩種：**內建**的五個（寫在 [`src/shared/roles.ts`](../src/shared/roles.ts)，改一次全部生效）
+與**角色庫**（使用者指的一個資料夾，見下面）。
 
 | `role` | 名稱 | 做什麼 | `permission` 預設 |
 | --- | --- | --- | --- |
@@ -176,7 +177,33 @@ claude 開過一次、按過信任」之後才算數；在被信任的專案裡�
 要跑測試的角色（工程師、測試工程師）預設只到 `edit`，跑不了測試 ——
 真的要跑就自己把那個節點改成 `full`，理由見上面的「為什麼需要 `full`」。
 
-角色不存在時 `validateWorkflow` 會報 `節點 <id> 的角色不存在：<role>`。
+#### 角色庫
+
+`role` 的值是 `lib:` 開頭時就是角色庫的角色：`lib:<相對路徑（去掉 .md）>`，
+例如 `lib:engineering/code-reviewer`。使用者的角色資料夾裡每一個有 frontmatter 的
+markdown 就是一個 —— `---` 之後的整篇就是 `systemPrompt`，`defaultPermission`
+一律是最保守的 `readonly`。怎麼設、檔案格式與 token 成本見
+[README 的「角色庫」](../README.md#角色庫)。
+
+三個角色庫的檔案：
+
+| 檔案 | 做什麼 |
+| --- | --- |
+| [`src/shared/role-file.ts`](../src/shared/role-file.ts) | 純函式：一個 markdown 讀成 `RoleInfo`（沒有 frontmatter 或沒有 `name` 就回 `null`），以及讀 `divisions.json` |
+| [`src/main/role-library.ts`](../src/main/role-library.ts) | 掃資料夾（檔案系統走注入的縫線）、快取、`RoleService`（設定裡的資料夾 + 掃出來的角色），以及 `RoleRegistry` 這個查角色的縫線 |
+| [`src/main/settings-store.ts`](../src/main/settings-store.ts) | `userData/settings.json`，目前只存 `rolesDir` |
+
+#### 角色不存在時
+
+`validateWorkflow(def, roles?)` 的第二個參數是**目前那份角色清單**（內建 + 角色庫）：
+
+- **給了**：`role` 一定要在裡面。內建的報 `節點 <id> 的角色不存在：<role>`，
+  角色庫的報 `節點 <id> 的角色不存在：<role>（角色庫裡找不到，確認角色資料夾）` ——
+  資料夾被搬走 / 檔案改名時看得出是哪裡的問題。
+- **省略**：`lib:` 的 id 只驗語法。讀檔（`WorkflowStore.list()`）時角色庫可能還沒掃，
+  那時不該把使用者存好的定義判成不合法 —— 定義照樣載得進畫布，改得動也看得到。
+
+renderer 傳的是 `AppState.roles`，main 傳的是 `RoleService.registry()`。
 `RunNodeState` 也複製一份 `role`，右側清單才貼得出那個標籤。
 
 ### 樣板

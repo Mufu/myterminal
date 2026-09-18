@@ -149,6 +149,40 @@ renderer 端沒有第二份狀態：`AppState` 多存一份 `profiles`，
 點一列時走的是 `main.ts` 裡同一個 `createSession()`，
 所以「先量 cols/rows 再 spawn」的順序對兩個入口都成立。
 
+## 角色庫 (RoleLibrary + SettingsStore)
+
+角色有兩種來源：內建那五個（`src/shared/roles.ts` 的 `ROLES`）與**角色庫** ——
+使用者指的一個資料夾，裡面每個有 frontmatter 的 markdown 就是一個角色。
+使用者看得到的說明在 [README 的「角色庫」](../README.md#角色庫)。
+
+三層，每一層都只做一件事：
+
+| 檔案 | 層 | 做什麼 |
+| --- | --- | --- |
+| `src/shared/role-file.ts` | 純函式 | `parseRoleFile(relPath, text, divisions?)`：frontmatter 取 `name` / `description` / `emoji`，`---` 之後的整篇就是 `systemPrompt`；沒有 frontmatter 或沒有 `name` 回 `null`。`parseDivisions(text)` 讀 `divisions.json`。**不碰檔案系統** |
+| `src/main/role-library.ts` | Repository | `RoleLibrary.scan(dir)` / `rescan(dir)`：檔案系統走注入的兩個縫線（`listMarkdown`、`readDivisions`），跟 `ProfileStore` 同一個手法。`RoleService` 把「設定裡的資料夾」與「掃出來的角色」黏起來，就是那三個 IPC 頻道的內容 |
+| `src/main/settings-store.ts` | Repository | `userData/settings.json`，目前只有 `rolesDir`；讀寫縫線與寬容度都跟 `ProfileStore` 一樣 |
+
+掃描的規則：`integrations/`、`strategy/`、`examples/`、`scripts/` 與點開頭的資料夾
+（agency-agents 拿這幾個放轉換輸出與劇本）、以及讀不出角色的檔案，一律進 `skipped`
+而不丟例外 —— 使用者指到一個亂七八糟的資料夾時 app 還是活著的。
+掃過的結果留在記憶體裡，換資料夾或按「重新掃描」才重讀（300 個檔案一趟磁碟不便宜）。
+
+### RoleRegistry：main 這一側怎麼查角色
+
+`RoleRegistry = () => readonly RoleInfo[]`，由 `RoleService.registry` 提供。
+以前 `session-manager.ts` 與 `graph-compiler.ts` 直接呼叫 `findRole(id)`（只認得內建的五個），
+現在改成注入這個縫線再用 `findRoleIn(registry(), id)`：
+
+- **`SessionManager`**：建構子最後一個參數，預設 `builtinRegistry`，所以既有的單元測試
+  不必為了一句 `systemPrompt` 去準備一個資料夾。
+- **`compile()`**：`CompileDeps.roles`，同時餵給 `validateWorkflow(def, roles())`。
+- **`WorkflowStore`**：建構子第三個參數。**只有 `save()` 用它**，`list()` 一律不驗角色 ——
+  資料夾被搬走時定義還打得開、改得動。
+
+renderer 那一側是 `AppState.roles`（開機是內建五個，`roles:list` 回來才接上角色庫），
+`RolePickerDialog` 與所有貼角色標籤的 View 都看它。
+
 ## CLI 設定 (CliAuthStore + 金鑰縫線)
 
 四支互動式 CLI（Claude / Codex / Muse / OpenCode）各自可以選「登入」或
@@ -390,6 +424,10 @@ renderer → main（`ipcMain.handle`，全部回傳 Promise）：
 | `cli:save-setting` | `{ id, mode, apiKey?, provider?, model? }` | 更新後的整份設定（不合法就 reject） |
 | `cli:clear-key` | `CliId` | 更新後的整份設定 |
 | `cli:login` | `CliId` | 跑登入指令那個工作階段的 id（OpenCode 會 reject） |
+| `roles:list` | — | `RolesResult`（內建 + 角色庫、資料夾、略過的檔案；掃過就給快取那一份） |
+| `roles:rescan` | — | `RolesResult`（一定重讀） |
+| `roles:set-dir` | `{ dir }` | `RolesResult`（存起來再重掃；目錄不存在就 reject） |
+| `roles:pick-dir` | — | 使用者挑的路徑，取消時是 `null`（Electron 原生的選資料夾對話框） |
 
 main → renderer（`webContents.send`）：
 

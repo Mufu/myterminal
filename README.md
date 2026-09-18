@@ -122,7 +122,7 @@ AGENT_E2E_OK
 | 欄位 | 說明 |
 | --- | --- |
 | 執行者 | Claude／Codex／Muse／OpenCode |
-| 角色 | 產品經理／架構師／工程師／測試工程師／審查者，選了就在任務前面加一段前置指示（只有 Claude 有 `--append-system-prompt`，其他三支是接在提示前面）。換角色時「權限」會跟著跳到那個角色的預設值。留「無」就沒有 |
+| 角色 | 按「選擇…」開角色選擇器：內建五個（產品經理／架構師／工程師／測試工程師／審查者）再加上[角色庫](#角色庫)裡的。選了就在任務前面加一段前置指示（只有 Claude 有 `--append-system-prompt`，其他三支是接在提示前面）。換角色時「權限」會跟著跳到那個角色的預設值。「清除」回到「無」 |
 | 任務 | 要它做什麼（多行沒問題：Claude／Codex／OpenCode 走 stdin，Muse 寫成暫存檔用 `--prompt-file` 讀，都不碰命令列引號） |
 | 工作目錄 | 留空的話用家目錄 |
 | 權限 | 三檔，**預設「唯讀」**：<br>**唯讀** —— 每支 CLI 最嚴格但仍會回答的模式（會讀、會回答，但不能寫）：Claude 的 `plan`、Codex 的 `read-only` 沙箱、Muse 的 `--approval-mode untrusted --disable-write`、OpenCode 內建的唯讀 `plan` agent。<br>**可修改檔案** —— Claude 的 `acceptEdits`、Codex 的 `workspace-write`、Muse 的 `--approval-mode never`、OpenCode 的預設。**注意：Claude 這一檔改得了檔案卻會擋掉 Bash 指令**，所以跑不了測試。<br>**完全放行（會執行任何指令）** —— Claude 的 `bypassPermissions`、Codex 的 `danger-full-access`、Muse 的 `never`、OpenCode 的 `--auto`。要跑測試就是這一檔，代價是那一次執行什麼指令都擋不住；終端機的任務標頭會標 `[完全放行]`。細節見 [`docs/WORKFLOW.md`](docs/WORKFLOW.md) 的「為什麼需要 `full`」 |
@@ -159,6 +159,68 @@ AGENT_E2E_OK
 實測到的東西（命令、事件格式、延遲、Windows 的坑、還沒解決的風險）寫在
 [`docs/AGENT-SPIKE.md`](docs/AGENT-SPIKE.md)。這一頁是**單一一次執行**：
 送出去、看它做完就結束。要多步驟、分支與人工批准，看下面的[工作流](#工作流)。
+
+## 角色庫
+
+內建那五個角色是中文的通用角色。**要更多、更專門的角色，指一個放 markdown 的資料夾**，
+裡面每一個有 frontmatter 的檔案就是一個角色 —— 不必改程式，也不必重開 app。
+
+在角色選擇器（Agent 任務或畫布節點的「角色」欄位按「選擇…」）最上面那一排設定：
+
+| 欄位 | 說明 |
+| --- | --- |
+| 角色資料夾 | 預設是 `%APPDATA%\myterminal\roles`（一開始不存在，等於沒有角色庫）。打路徑按 Enter 或按「瀏覽…」選一個 |
+| 重新掃描 | 在外面加了 / 改了角色檔之後按一下，不必重開 app |
+| N 個角色（M 個檔案略過） | 掃出來的結果；「略過的檔案」展開看是哪些檔案、為什麼被略過 |
+
+### 從哪裡拿一包角色
+
+<https://github.com/Mufu/agency-agents>（MIT）有大約 300 個角色，分成
+`engineering/`、`testing/`、`product/`、`design/`、`marketing/` 等目錄：
+
+```powershell
+git clone https://github.com/Mufu/agency-agents D:\agency-agents
+```
+
+然後把「角色資料夾」指到 `D:\agency-agents`。根目錄的 `divisions.json` 會被讀進來，
+選擇器上的分組就寫成 `Engineering`、`Testing` 這種顯示名稱而不是目錄名。
+
+**建議先挑一個子集。** 300 個角色在選擇器裡靠搜尋找得到，但你大概只會用到十幾個；
+複製想要的那幾個檔案到自己的資料夾（保留一層目錄當分類）會好用很多。
+
+### 檔案格式
+
+```markdown
+---
+name: Code Reviewer
+description: Expert code reviewer who provides constructive, actionable feedback
+emoji: 👁️
+---
+# Code Reviewer Agent
+
+You are **Code Reviewer**, an expert who provides thorough, constructive code reviews.
+```
+
+- `name` 是**必填**的 —— 沒有 frontmatter 或沒有 `name` 的檔案（`README.md` 之類）會被略過。
+- `description` 與 `emoji` 選填，選擇器與標籤上會顯示。其餘欄位（`color`、`vibe`、`tools`…）讀進來也用不到。
+- **`---` 之後的整篇 markdown 就是系統提示**，原樣送給 CLI。
+- 角色 id 是 `lib:<相對路徑（去掉 .md）>`，例如 `lib:engineering/code-reviewer`；
+  存進 `profiles.json` / `workflows.json` 的就是這個字串。
+  **檔案搬家等於換一個角色**，原本用它的設定就會找不到（存檔時會報
+  「角色不存在：… （角色庫裡找不到，確認角色資料夾）」）。
+- 角色庫的角色**權限一律預設「唯讀」** —— 別人寫的提示我們讀不完，不自動給它動檔案的權力。
+- `integrations/`、`strategy/`、`examples/`、`scripts/` 與點開頭的資料夾不掃
+  （agency-agents 拿這幾個放轉換輸出與劇本，不是角色）。
+
+### 要注意的地方
+
+- **這些角色的提示是英文的**，而且很長（一個檔案兩三千字不稀奇）。
+  送出去的每一次任務都會帶著整段提示，**token 用量比內建那五個高不少** ——
+  內建的每個大約 50～80 個字，agency-agents 的動輒 2000～4000 token。
+  跑工作流時這是每一個節點、每一次重試都要付一遍的成本。
+- CLI 回的話會跟著提示的語言走，多半是英文。要中文就在任務裡講。
+- 角色庫是**這台機器的設定**（存在 `%APPDATA%\myterminal\settings.json`），
+  不會跟著 `workflows.json` 一起搬 —— 換一台機器要重新指資料夾。
 
 ## 工作流
 
