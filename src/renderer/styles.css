@@ -1892,6 +1892,7 @@ html[data-theme='warm'] .session-item.active .session-dot {
 
 /* 角色標籤放得下就放，放不下用 … 收掉 (角色庫的名字比內建的長很多)。*/
 .session-item .role-tag,
+.profile-item .role-tag,
 .workflow-node .role-tag {
   min-width: 0;
   overflow: hidden;

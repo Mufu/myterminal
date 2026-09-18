@@ -1,6 +1,8 @@
 import type { AppState } from './app-state';
 import type { SavedProfile } from '../shared/profile';
 import { TYPE_LABELS, defaultStartupCommand } from '../shared/profile';
+import type { RoleInfo } from '../shared/roles';
+import { findRoleIn, roleTagText } from '../shared/roles';
 import { closeIcon } from './session-list-view';
 
 /** 一行說明這個設定檔連到哪裡；PowerShell 沒有額外資訊就是空字串。*/
@@ -41,6 +43,12 @@ export class ProfileListView {
     this.render();
   }
 
+  /** 這一筆設定檔選了哪個角色；不是 Agent 任務 (或角色庫被搬走) 就沒有。*/
+  private role(profile: SavedProfile): RoleInfo | undefined {
+    if (profile.type !== 'agent' || !profile.role) return undefined;
+    return findRoleIn(this.state.roles, profile.role);
+  }
+
   private render(): void {
     this.list.textContent = '';
     this.count.textContent = String(this.state.profiles.length);
@@ -74,6 +82,16 @@ export class ProfileListView {
       tag.className = 'session-tag';
       tag.textContent = TYPE_LABELS[profile.type];
       meta.appendChild(tag);
+
+      // 選了角色的 Agent 任務多貼一個標籤，跟工作階段那一列同一個樣子。
+      const role = this.role(profile);
+      if (role) {
+        const roleTag = document.createElement('span');
+        roleTag.className = 'role-tag';
+        roleTag.textContent = roleTagText(role);
+        roleTag.title = roleTagText(role);
+        meta.appendChild(roleTag);
+      }
 
       const detail = profileMeta(profile);
       if (detail) {
