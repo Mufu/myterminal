@@ -17,6 +17,8 @@ import { freshUserData, launchApp, pickRole, root } from './helpers';
 const userData = freshUserData('roles');
 /** main 沒設定過角色資料夾時就是 userData/roles，所以直接種在那裡。*/
 const rolesDir = join(userData, 'roles');
+/** 第二個資料夾，只用來驗「打路徑按 Enter 就換過去」。*/
+const otherRolesDir = join(userData, 'roles2');
 
 const shot = (window: Page, name: string) =>
   window.screenshot({ path: join(root, 'test-results', `roles-${name}.png`) });
@@ -39,6 +41,13 @@ function seedRoles(): void {
   );
   // 沒有 frontmatter，掃描時要被略過。
   writeFileSync(join(rolesDir, 'README.md'), '# 我的角色庫\n\n放角色檔的地方。\n', 'utf8');
+
+  mkdirSync(join(otherRolesDir, 'design'), { recursive: true });
+  writeFileSync(
+    join(otherRolesDir, 'design', 'z.md'),
+    roleFile('Lib Designer', '🎨', 'Draws the thing'),
+    'utf8',
+  );
 }
 
 seedRoles();
@@ -64,8 +73,25 @@ test('Agent 任務選得到角色庫的角色，權限跟著跳成唯讀', async
     ]);
     await shot(window, 'picker');
 
+    // 打路徑按 Enter 就換資料夾。這是 <form method="dialog">，所以重點是
+    // 對話框不能被隱含送出關掉 —— 換完還要留在原地看得到新的狀態。
+    await window.fill('#roles-dir', otherRolesDir);
+    await window.keyboard.press('Enter');
+    await expect(window.locator('#roles-status')).toHaveText('1 個角色（0 個檔案略過）');
+    await expect(window.locator('#role-picker')).toBeVisible();
+    await expect(window.locator('#roles-errors')).toHaveText('');
+
+    // 換回去，後面兩個測試看到的還是原本那個資料夾。
+    await window.fill('#roles-dir', rolesDir);
+    await window.keyboard.press('Enter');
+    await expect(window.locator('#roles-status')).toHaveText('2 個角色（1 個檔案略過）');
+    await expect(window.locator('#role-picker')).toBeVisible();
+
     // 搜尋 y 那一個，點下去就選好了。
     await window.fill('#role-search', 'y');
+    // 搜尋框的 Enter 也不能把對話框關掉，清單照樣是篩過的。
+    await window.keyboard.press('Enter');
+    await expect(window.locator('#role-picker')).toBeVisible();
     await expect(window.locator('.role-row')).toHaveCount(1);
     await window.locator('.role-row').click();
     await expect(window.locator('#role-picker')).toBeHidden();

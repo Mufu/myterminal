@@ -40,8 +40,19 @@ export class RolePickerDialog implements RolePickerPort {
   ) {
     this.search.addEventListener('input', () => this.renderList());
 
-    // 直接在欄位裡打路徑按 Enter 也算換資料夾 (跟按「瀏覽…」挑一個一樣)。
-    this.dirInput.addEventListener('change', () => this.setDir(this.dirInput.value));
+    // 這是 <form method="dialog">，所以在欄位裡按 Enter 會走隱含送出，
+    // 挑上「關閉」那顆按鈕把整個對話框收掉 —— 兩個欄位都要自己把 Enter 攔下來。
+    // 直接在欄位裡打路徑按 Enter 就是換資料夾 (跟按「瀏覽…」挑一個一樣)。
+    this.dirInput.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter') return;
+      event.preventDefault();
+      this.setDir(this.dirInput.value);
+    });
+    // 搜尋框的 Enter 什麼都不做：清單本來就隨著打字在篩了。
+    this.search.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') event.preventDefault();
+    });
+
     $('roles-browse').addEventListener('click', () => void this.browse());
     $('roles-rescan').addEventListener('click', () => {
       void new RescanRolesCommand(
