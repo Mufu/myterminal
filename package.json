@@ -1,6 +1,6 @@
 {
   "name": "myterminal",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Windows 桌面終端機管理員：一個視窗管理多個 PowerShell / WSL / SSH / Claude / Codex 工作階段",
   "main": "./out/main/index.js",
   "private": true,
