@@ -20,8 +20,18 @@ type WorkflowDefinition = {
   id: string;
   name: string;
   description?: string;      // 一句話說明，執行對話框會顯示；選填
+  params?: WorkflowParamDef[];          // 執行時要填的欄位；沒寫就是 task ＋ cwd
   nodes: WorkflowNode[];
   edges: WorkflowEdge[];
+};
+
+type WorkflowParamDef = {
+  name: string;              // {{params.<name>}} 用的識別字：英文或底線開頭
+  label: string;             // 執行對話框上那一行字
+  kind: 'text' | 'multiline' | 'directory';
+  required: boolean;
+  default?: string;          // 欄位的預設值
+  hint?: string;             // 欄位的 placeholder
 };
 
 type WorkflowNode = {
@@ -176,14 +186,42 @@ claude 開過一次、按過信任」之後才算數；在被信任的專案裡�
 | 寫法 | 代入 |
 | --- | --- |
 | `{{<節點id>.text}}` | 那個節點的輸出文字 |
-| `{{params.<名稱>}}` | 啟動時填的參數（範本是 `task` 與 `cwd`） |
+| `{{params.<名稱>}}` | 啟動時填的參數（見下面的「啟動參數」；範本是 `task` 與 `cwd`） |
 
 找不到的來源代空字串；看不懂的樣板原樣留著。**沒有其他變數、沒有運算式**。
+
+### 啟動參數
+
+**一份工作流自己決定執行時要填哪些欄位。** `params` 沒寫的定義（所有舊的 JSON）
+一律當成下面這兩個 —— `paramsOf(def)` 回傳的就是它：
+
+| `name` | `label` | `kind` | `required` | 備註 |
+| --- | --- | --- | --- | --- |
+| `task` | 任務 | `multiline` | 是 | 要 agent 做什麼 |
+| `cwd` | 工作目錄 | `directory` | 是 | agent 會在這裡修改檔案 |
+
+`kind` 決定執行對話框上那個欄位長什麼樣，也決定它會不會被當成路徑檢查：
+
+| `kind` | 欄位 | 其他 |
+| --- | --- | --- |
+| `text` | 單行輸入框 | — |
+| `multiline` | 四行的 textarea | — |
+| `directory` | 單行輸入框 | 記得上一次填的值；執行前檢查目錄存不存在 |
+
+欄位的 id 是 `#w-task`、`#w-cwd`（這兩個一直都是這個名字），其餘是 `#w-param-<名稱>`。
+`default` 會先填進去，`hint` 是 placeholder。目錄參數記著上一次填的值
+（`cwd` 跟[手動操作](#手動操作自己在節點的工作目錄裡下-prompt)的工作目錄對話框共用同一個，
+其餘存在 `myterminal.lastParam.<名稱>`）。
+
+畫布上**沒有選任何節點**時，右側面板就是這份工作流的「啟動參數」編輯器：
+一個參數六列（名稱、標籤、型別、必填、預設、提示）加一顆「刪除」，最下面是「＋ 加一個參數」。
+節點的提示欄位下面那一行「可用 …」也跟著宣告的參數走。
 
 ### 內建範本
 
 八份，寫死在 [`templates.ts`](../src/main/workflow/templates.ts)，跟自訂工作流同一種格式。
-每一份都只吃 `{{params.task}}`（任務）與 `{{params.cwd}}`（工作目錄）兩個啟動參數，
+每一份都只吃 `{{params.task}}`（任務）與 `{{params.cwd}}`（工作目錄）兩個啟動參數
+（`params` 明寫出來，畫布的「啟動參數」面板才看得到），
 節點的提示只寫「這一步要做什麼」，職責與語氣交給[角色](#角色)。
 被條件看的節點，提示最後一定有一句「最後一行只輸出 X 或 Y」，
 迴圈一律是 `resumeFrom` ＋ `maxAttempts: 3`。
@@ -253,7 +291,7 @@ claude 開過一次、按過信任」之後才算數；在被信任的專案裡�
 
 ### 驗證
 
-`validateWorkflow(def)` 回傳錯誤訊息陣列（空陣列代表合法），十一條規則：
+`validateWorkflow(def)` 回傳錯誤訊息陣列（空陣列代表合法），十五條規則：
 
 0. 名稱不能是空白 —— `工作流名稱不能是空的`
 1. 剛好一個 `start` 節點
@@ -267,13 +305,26 @@ claude 開過一次、按過信任」之後才算數；在被信任的專案裡�
 9. `condition` 的 `source` 必須是**存在的 `agent` 節點**（沒有輸出的節點看不出結果，
    那個條件會永遠走「否」）—— `節點 <id> 的條件來源不存在：<source>`
 10. `condition` 的正規式編得起來 —— `節點 <id> 的正規式無效`
+11. 參數名稱是英文或底線開頭的識別字 ——
+    `參數名稱只能用英文、數字與底線，而且不能以數字開頭：<name>`
+12. 參數名稱不重複 —— `參數名稱重複：<name>`
+13. 參數的標籤不能是空白 —— `參數 <name> 的標籤不能是空的`
+14. 節點的提示與工作目錄用到的 `{{params.x}}` 都要宣告過 ——
+    `節點 <id> 用到未定義的參數 <name>`
+15. 工作目錄用到的參數必須是 `directory` ——
+    `節點 <id> 的工作目錄用的參數 <name> 必須是目錄`
 
 角色不存在時另外報 `節點 <id> 的角色不存在：<role>`。
 
 `GraphCompiler.compile()` 第一件事就是跑它，不合法直接丟例外，不會編譯出半殘的圖。
 
-**執行前再檢查一次工作目錄**：`WorkflowService.start()` 看 `params.cwd` 存不存在，
-不存在就直接以 `工作目錄不存在：<path>` 拒絕，連一筆執行都不會建立 ——
+**執行填的值另外驗一次**：`validateRunParams(def, values)`（同一個檔案裡的純函式）
+看每一個 `required` 的參數有沒有留白，訊息是 `請輸入<label>`。執行對話框在送出前先跑它，
+`workflow:start` 這一側再跑一次。
+
+**執行前再檢查一次目錄**：`WorkflowService.start()` 看每一個 `directory` 參數填的路徑
+存不存在，不存在就直接以 `<label>不存在：<path>` 拒絕（預設那一個就是
+`工作目錄不存在：<path>`），連一筆執行都不會建立 ——
 不然 CLI 只會回一句 `spawn claude ENOENT`，看不出是目錄的問題。
 執行對話框收到拒絕時會留在原地把訊息顯示出來。
 
@@ -288,7 +339,8 @@ claude 開過一次、按過信任」之後才算數；在被信任的專案裡�
 就是一個 `WorkflowDefinition` 陣列，**跟範本同一種格式**，手動編輯也可以
 （壞掉的 JSON 當成空清單）。讀的時候會檢查**形狀**：每個節點要有
 `id` / `type` / `label` / `position.x` / `position.y`（agent、condition、approval 還要有 `config`），
-每條連線要有 `from` / `to`，不對的那一筆整個忽略 —— 不然畫布會在
+每條連線要有 `from` / `to`，宣告了 `params` 的話每一個要有 `name` / `label` / `kind` / `required`，
+不對的那一筆整個忽略 —— 不然畫布會在
 `node.position.x` 上丟例外，一片空白。**只檢查形狀**：提示留白這種
 `validateWorkflow` 才抱怨的問題仍然列得出來、改得了。管它的是
 [`workflow-store.ts`](../src/main/workflow/workflow-store.ts) 的 `WorkflowStore`，
@@ -305,10 +357,11 @@ claude 開過一次、按過信任」之後才算數；在被信任的專案裡�
 
 | 頻道 | 參數 | 回傳 |
 | --- | --- | --- |
-| `workflow:list` | — | `WorkflowInfo[]`（`{ id, name, description?, builtin }`；執行對話框把 `description` 寫在下拉底下那一行） |
+| `workflow:list` | — | `WorkflowInfo[]`（`{ id, name, description?, params, builtin }`；執行對話框把 `description` 寫在下拉底下那一行，欄位照著 `params` 長） |
 | `workflow:get` | `id` | `WorkflowDefinition` 或 `undefined` |
 | `workflow:save` | `WorkflowDefinition` | — ，不合法就以驗證訊息 reject |
 | `workflow:delete` | `id` | — ，不存在就什麼都不做 |
+| `workflow:start` | `{ workflowId, params, maxTotalCostUsd? }` | `runId`；必填的參數留白或目錄不存在就 reject |
 
 ## 畫布編輯器
 
@@ -346,6 +399,7 @@ claude 開過一次、按過信任」之後才算數；在被信任的專案裡�
 
 | 節點 | 可以設的東西 |
 | --- | --- |
+| 沒選任何東西 | 這份工作流的[啟動參數](#啟動參數)：名稱、標籤、型別、必填、預設、提示，加／刪一個 |
 | 全部 | 節點 id（唯讀，提示裡用 `{{<id>.text}}` 取得它的輸出）、名稱 |
 | `agent` | 執行者（claude／codex）、角色、提示、工作目錄、權限、接續對話（`resumeFrom`）、最多幾次、逾時 |
 | `condition` | 看哪個 agent 節點的輸出、判斷方式（最後一行等於／符合正規式）與值 |
@@ -403,7 +457,7 @@ claude 開過一次、按過信任」之後才算數；在被信任的專案裡�
 | **開終端機並啟動 `<CLI>`** | 同上，再順手把那個節點的 CLI（Claude／Codex／Muse／OpenCode）叫起來，並把代好的提示**填進「輸入字」面板**——看過、改過，自己按「送出」。API 金鑰的注入跟一般 CLI 工作階段完全一樣 |
 | **複製提示** | 把代好的提示放進剪貼簿，要貼到哪裡由你決定 |
 
-「代好的提示」是指：`{{params.task}}`、`{{params.cwd}}` 用**這份工作流最近一次執行**的啟動參數
+「代好的提示」是指：`{{params.<名稱>}}`（預設那兩個是 `task` 與 `cwd`）用**這份工作流最近一次執行**的啟動參數
 代進去（`RunState.params`，跟著執行一起存），代不出來的（沒跑過、或是 `{{<節點id>.text}}`
 這種上游輸出）**原樣留著**，讓你一眼看得出還缺什麼；節點有角色時前面會加上那個角色的前置指示
 （中間空一行）——跟編排層真的送給 CLI 的是同一段話。
