@@ -3,6 +3,7 @@ import type { SessionInfo } from './session';
 import type { DataEvent, ExitEvent, RolesResult, SaveCliSettingRequest } from './ipc';
 import type { RunState, WorkflowDefinition, WorkflowInfo } from './workflow';
 import type { CliAuthSetting, CliAuthStatus, CliId } from './cli-auth';
+import type { AssistantEvent } from './assistant';
 
 /**
  * preload 透過 contextBridge 暴露到 window.myterminal 的介面。
@@ -57,6 +58,16 @@ export interface MyTerminalApi {
   /** 開原生的選資料夾對話框；使用者取消時回 null。*/
   pickRolesDir(): Promise<string | null>;
 
+  /**
+   * 問助理一句。答案走 onAssistantEvent 一段一段回來，
+   * 這個 Promise 要等它講完 (或失敗) 才 resolve；沒登入或上一個還在回答會 reject。
+   */
+  askAssistant(question: string, context: string): Promise<void>;
+  /** 「新對話」：忘掉上一段對話。*/
+  resetAssistant(): Promise<void>;
+  /** 回答到一半按「取消」。*/
+  cancelAssistant(): Promise<void>;
+
   onData(listener: (event: DataEvent) => void): void;
   onExit(listener: (event: ExitEvent) => void): void;
   onSessionsChanged(listener: (sessions: SessionInfo[]) => void): void;
@@ -64,6 +75,8 @@ export interface MyTerminalApi {
   onWorkflowChanged(listener: (runs: RunState[]) => void): void;
   /** 登入流程跑完之後 main 重探的結果。*/
   onCliAuthChanged(listener: (status: CliAuthStatus) => void): void;
+  /** 助理的回答：一段文字、講完了、或失敗。*/
+  onAssistantEvent(listener: (event: AssistantEvent) => void): void;
 }
 
 declare global {

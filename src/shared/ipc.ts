@@ -36,6 +36,9 @@ export const IPC = {
   rolesRescan: 'roles:rescan',
   rolesSetDir: 'roles:set-dir',
   rolesPickDir: 'roles:pick-dir',
+  assistantAsk: 'assistant:ask',
+  assistantReset: 'assistant:reset',
+  assistantCancel: 'assistant:cancel',
 
   /** main -> renderer (send) */
   data: 'session:data',
@@ -44,6 +47,7 @@ export const IPC = {
   profilesChanged: 'profiles:changed',
   workflowChanged: 'workflow:changed',
   cliAuthChanged: 'cli:auth-changed',
+  assistantEvent: 'assistant:event',
 } as const;
 
 export interface CreateSessionRequest {
@@ -104,6 +108,12 @@ export interface RolesResult {
 
 export interface SetRolesDirRequest {
   dir: string;
+}
+
+/** 問助理一句。context 是畫面狀態的摘要，排在問題前面。*/
+export interface AskAssistantRequest {
+  question: string;
+  context: string;
 }
 
 /** 存一支 CLI 的登入方式。apiKey 留空代表沿用已經存著的那一把。*/

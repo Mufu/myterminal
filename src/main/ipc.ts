@@ -1,6 +1,7 @@
 import { dialog, ipcMain, type WebContents } from 'electron';
 import { IPC } from '../shared/ipc';
 import type {
+  AskAssistantRequest,
   CreateSessionRequest,
   WriteRequest,
   ResizeRequest,
@@ -17,6 +18,7 @@ import { validateRunParams } from '../shared/workflow';
 import type { SessionManager } from './session-manager';
 import type { SessionLogger } from './session-logger';
 import type { ProfileStore } from './profile-store';
+import type { AssistantService } from './assistant-service';
 import type { CliAuthBridge } from './cli-auth-bridge';
 import type { RoleService } from './role-library';
 import type { WorkflowService } from './workflow/workflow-service';
@@ -40,6 +42,7 @@ export function registerIpc(
   definitions: WorkflowStore,
   cli: CliAuthBridge,
   roles: RoleService,
+  assistant: AssistantService,
   getWebContents: () => WebContents | null,
 ): void {
   const send = (channel: string, payload: unknown): void => {
@@ -172,6 +175,13 @@ export function registerIpc(
     });
     return result.canceled ? null : (result.filePaths[0] ?? null);
   });
+
+  // 助理：答案一段一段推回 renderer，invoke 的回覆等它講完才回去。
+  ipcMain.handle(IPC.assistantAsk, (_e, req: AskAssistantRequest) =>
+    assistant.ask(req.question, req.context, (event) => send(IPC.assistantEvent, event)),
+  );
+  ipcMain.handle(IPC.assistantReset, () => assistant.reset());
+  ipcMain.handle(IPC.assistantCancel, () => assistant.cancel());
 
   ipcMain.handle(IPC.cliLogin, (_e, id: CliId) => {
     // 就是一個普通的工作階段：出現在清單裡，使用者自己在裡面把瀏覽器流程走完。

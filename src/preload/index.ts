@@ -42,6 +42,10 @@ const api: MyTerminalApi = {
   setRolesDir: (dir) => ipcRenderer.invoke(IPC.rolesSetDir, { dir }),
   pickRolesDir: () => ipcRenderer.invoke(IPC.rolesPickDir),
 
+  askAssistant: (question, context) => ipcRenderer.invoke(IPC.assistantAsk, { question, context }),
+  resetAssistant: () => ipcRenderer.invoke(IPC.assistantReset),
+  cancelAssistant: () => ipcRenderer.invoke(IPC.assistantCancel),
+
   onData: (listener) => void ipcRenderer.on(IPC.data, (_e, payload) => listener(payload)),
   onExit: (listener) => void ipcRenderer.on(IPC.exit, (_e, payload) => listener(payload)),
   onSessionsChanged: (listener) =>
@@ -52,6 +56,8 @@ const api: MyTerminalApi = {
     void ipcRenderer.on(IPC.workflowChanged, (_e, payload) => listener(payload)),
   onCliAuthChanged: (listener) =>
     void ipcRenderer.on(IPC.cliAuthChanged, (_e, payload) => listener(payload)),
+  onAssistantEvent: (listener) =>
+    void ipcRenderer.on(IPC.assistantEvent, (_e, payload) => listener(payload)),
 };
 
 contextBridge.exposeInMainWorld('myterminal', api);

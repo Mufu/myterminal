@@ -8,6 +8,7 @@ import { fileProfileStore } from './profile-store';
 import { fileSettingsStore } from './settings-store';
 import { RoleService, fileRoleLibrary } from './role-library';
 import { agentRunners } from './agent-runner';
+import { AssistantService } from './assistant-service';
 import { NodeProcessSpawner } from './process-spawner';
 import { probeCliAuth } from './cli-auth-probe';
 import { cliAuthBridge } from './cli-auth-bridge';
@@ -86,6 +87,20 @@ const workflowDefinitions = fileWorkflowStore(
   roles.registry,
 );
 
+// 「助理」：知識檔開發時就在 repo 裡，打包版由 electron-builder 的 extraResources
+// 放到 resources/ASSISTANT.md。選了 API 金鑰時 CLI 就是拿那把金鑰在跑，
+// 所以「登入了沒有」跟晶片上的字看的是同一件事。
+const assistant = new AssistantService(new NodeProcessSpawner(), {
+  knowledgePath: app.isPackaged
+    ? join(process.resourcesPath, 'ASSISTANT.md')
+    : join(__dirname, '../../docs/ASSISTANT.md'),
+  isClaudeLoggedIn: () => {
+    const setting = cliStore.get('claude');
+    if (setting.mode === 'apiKey' && setting.hasKey) return true;
+    return cli.latest()?.claude.loggedIn ?? false;
+  },
+});
+
 // 關窗之後 pty 的 exit 事件才可能送達，那時 webContents 已經被銷毀。
 registerIpc(
   manager,
@@ -95,6 +110,7 @@ registerIpc(
   workflowDefinitions,
   cli,
   roles,
+  assistant,
   () => (win && !win.isDestroyed() ? win.webContents : null),
 );
 

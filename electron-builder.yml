@@ -8,6 +8,11 @@ npmRebuild: false
 files:
   - out/**/*
   - package.json
+# 助理的知識檔不進 asar：AssistantService 是把路徑交給 claude 的
+# --append-system-prompt-file，claude 讀得到的必須是真實檔案。
+extraResources:
+  - from: docs/ASSISTANT.md
+    to: ASSISTANT.md
 # node-pty 的 .node、conpty.dll、OpenConsole.exe 以及 fork 出來的
 # conpty_console_list_agent.js 都必須是真實檔案，不能留在 asar 裡。
 asarUnpack:
