@@ -1374,6 +1374,28 @@ html[data-theme='warm'] .session-item.active .session-dot {
   margin-right: auto;
 }
 
+/* 標題那一列的「重新偵測」不在 <menu> 裡，所以自己套一次對話框按鈕的樣子 (小一號)。*/
+#cli-refresh {
+  height: 26px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--selected);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+#cli-refresh:hover:enabled {
+  background: var(--dialog-hover-bg);
+}
+
+#cli-refresh:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
 #cli-settings {
   min-width: 460px;
   max-height: 86vh;
