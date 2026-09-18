@@ -1,6 +1,7 @@
 import type { BaseShell } from '../shared/profile';
 import { TYPE_LABELS as CLI_LABELS } from '../shared/profile';
-import { findRole } from '../shared/roles';
+import type { RoleInfo } from '../shared/roles';
+import { ROLES, findRoleIn } from '../shared/roles';
 import type { TemplateResolver } from '../shared/template';
 import { renderTemplate } from '../shared/template';
 import type { RunState, WorkflowNode } from '../shared/workflow';
@@ -28,10 +29,17 @@ export function resolveNodeCwd(node: AgentNode, run: RunState | null): string | 
   return cwd && !cwd.includes('{{') ? cwd : null;
 }
 
-/** 節點的提示，前面補上角色的前置指示 —— 跟編排層送給 CLI 的是同一段話。*/
-export function renderNodePrompt(node: AgentNode, run: RunState | null): string {
+/**
+ * 節點的提示，前面補上角色的前置指示 —— 跟編排層送給 CLI 的是同一段話。
+ * roles 是目前那份角色清單 (內建 + 角色庫)；角色庫被搬走時就只剩提示本身。
+ */
+export function renderNodePrompt(
+  node: AgentNode,
+  run: RunState | null,
+  roles: readonly RoleInfo[] = ROLES,
+): string {
   const prompt = renderTemplate(node.config.prompt, fromRun(run));
-  const role = node.config.role ? findRole(node.config.role) : undefined;
+  const role = node.config.role ? findRoleIn(roles, node.config.role) : undefined;
   return role ? `${role.systemPrompt}\n\n${prompt}` : prompt;
 }
 

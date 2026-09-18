@@ -2,7 +2,7 @@ import type { AppState } from './app-state';
 import type { SessionInfo } from '../shared/session';
 import { TYPE_LABELS } from '../shared/profile';
 import { PERMISSION_LABELS } from '../shared/agent';
-import { findRole } from '../shared/roles';
+import { findRoleIn, roleTagText } from '../shared/roles';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -106,11 +106,12 @@ export class SessionListView {
       }
 
       // 選了角色的 agent 任務多貼一個標籤，跟工作流節點那一列同一個樣子。
-      const role = session.role ? findRole(session.role) : undefined;
+      const role = session.role ? findRoleIn(this.state.roles, session.role) : undefined;
       if (role) {
         const roleTag = document.createElement('span');
         roleTag.className = 'role-tag';
-        roleTag.textContent = role.label;
+        roleTag.textContent = roleTagText(role);
+        roleTag.title = roleTagText(role);
         meta.appendChild(roleTag);
       }
 

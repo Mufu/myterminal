@@ -2,6 +2,8 @@ import type { SessionInfo } from '../shared/session';
 import type { SavedProfile } from '../shared/profile';
 import type { RunState } from '../shared/workflow';
 import type { CliAuthSetting, CliAuthStatus, CliId } from '../shared/cli-auth';
+import type { RoleInfo } from '../shared/roles';
+import { ROLES } from '../shared/roles';
 
 type Listener = () => void;
 
@@ -23,6 +25,8 @@ export class AppState {
   private _cliSettings: Record<CliId, CliAuthSetting> | null = null;
   private _cliProbing = false;
   private _view: MainView = 'terminal';
+  // 開機時先給內建那五個，roles:list 回來之後才接上角色庫。
+  private _roles: RoleInfo[] = [...ROLES];
 
   get sessions(): SessionInfo[] {
     return this._sessions;
@@ -42,6 +46,11 @@ export class AppState {
 
   get runs(): RunState[] {
     return this._runs;
+  }
+
+  /** 內建 + 角色庫；角色晶片、選擇器與驗證都只看這一份。*/
+  get roles(): RoleInfo[] {
+    return this._roles;
   }
 
   /** 四支 CLI 實際的登入狀態；探測回來之前是 null。*/
@@ -95,6 +104,11 @@ export class AppState {
 
   setRuns(runs: RunState[]): void {
     this._runs = runs;
+    this.notify();
+  }
+
+  setRoles(roles: RoleInfo[]): void {
+    this._roles = roles;
     this.notify();
   }
 

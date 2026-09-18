@@ -2,6 +2,7 @@ import { test, expect, _electron as electron } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
+import { pickRole } from './helpers';
 
 const root = join(__dirname, '..');
 
@@ -35,7 +36,7 @@ test('在畫布上拉出一個工作流並存起來', async () => {
   await expect(window.locator('.wf-node')).toHaveCount(3);
   await window.click('.wf-node[data-id="agent-1"] .wf-node-body');
 
-  await window.selectOption('#props-role', 'coder');
+  await pickRole(window, '#props-role-pick', '工程師', '工程師');
   // 角色的預設權限會跟著跳過來
   await expect(window.locator('#props-permission')).toHaveValue('edit');
   await window.fill('#props-prompt', '{{params.task}}');

@@ -84,3 +84,19 @@ function defined(env: NodeJS.ProcessEnv): Record<string, string> {
   for (const [key, value] of Object.entries(env)) if (value !== undefined) out[key] = value;
   return out;
 }
+
+/**
+ * 角色欄位：按「選擇…」→ 在選擇器裡搜尋 → 點那一列。
+ * pick 是那顆按鈕的 id (#props-role-pick 或 #f-agent-role-pick)，
+ * name 是角色的顯示名稱 (選擇器上那一列的字)。
+ */
+export async function pickRole(
+  window: Page,
+  pick: string,
+  query: string,
+  name: string,
+): Promise<void> {
+  await window.click(pick);
+  await window.fill('#role-search', query);
+  await window.locator('.role-row', { hasText: name }).first().click();
+}

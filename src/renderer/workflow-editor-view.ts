@@ -15,8 +15,10 @@ import type { AgentKind, AgentPermission } from '../shared/agent';
 import { PERMISSIONS, PERMISSION_LABELS } from '../shared/agent';
 import type { BaseShell } from '../shared/profile';
 import { CLI_TYPES, TYPE_LABELS as CLI_LABELS } from '../shared/profile';
-import { ROLES, findRole } from '../shared/roles';
+import type { RoleInfo } from '../shared/roles';
+import { findRoleIn, roleTagText } from '../shared/roles';
 import type { AppState } from './app-state';
+import type { RolePickerPort } from './ports';
 import type { WorkflowEditorModel } from './workflow-editor-model';
 import { NODE_HEADER, NODE_WIDTH, PORT_LABELS, PORT_ROW } from './workflow-editor-model';
 import { RunOverlay, latestRunFor } from './workflow-run-view';
@@ -162,6 +164,8 @@ export class WorkflowEditorView {
     private readonly model: WorkflowEditorModel,
     private readonly handlers: EditorHandlers,
     private readonly state: AppState,
+    /** 屬性面板的「選擇…」開出來的角色選擇器。*/
+    private readonly rolePicker: RolePickerPort,
   ) {
     this.overlay = new RunOverlay(
       {
@@ -323,11 +327,12 @@ export class WorkflowEditorView {
     body.className = 'wf-node-body';
     const summary = span('wf-summary', '');
     if (node.type === 'agent') {
-      const role = node.config.role ? findRole(node.config.role) : undefined;
-      const tag = span('role-tag', role ? role.label : '未設角色');
+      const role = this.role(node.config.role);
+      const text = role ? roleTagText(role) : '未設角色';
+      const tag = span('role-tag', text);
       if (!role) tag.classList.add('empty');
       summary.append(tag, span('wf-kind', node.config.kind));
-      summary.title = `${role ? role.label : '未設角色'} · ${node.config.kind}`;
+      summary.title = `${text} · ${node.config.kind}`;
     } else {
       const text = nodeSummary(node);
       if (text) {
@@ -657,6 +662,11 @@ export class WorkflowEditorView {
     );
   }
 
+  /** 角色 id 換成角色本身；角色庫被搬走時就是 undefined (卡片上寫「未設角色」)。*/
+  private role(id: string | undefined): RoleInfo | undefined {
+    return id ? findRoleIn(this.state.roles, id) : undefined;
+  }
+
   private agentProps(id: string, config: AgentNodeConfig): void {
     const kind = select(
       KIND_OPTIONS,
@@ -670,21 +680,22 @@ export class WorkflowEditorView {
       'props-kind',
     );
 
-    const role = select(
-      [['', '無'], ...ROLES.map((r) => [r.id, r.label] as [string, string])],
-      config.role ?? '',
-      (value) => {
-        const info = findRole(value);
-        // 換角色順便把「權限」跳到那個角色的預設值，跟新連接對話框一樣。
-        this.model.updateNode(id, {
-          config: info
-            ? { role: info.id, permission: info.defaultPermission }
-            : { role: undefined },
-        });
+    const role = roleField(
+      this.role(config.role),
+      () =>
+        this.rolePicker.open(config.role, (info) => {
+          // 換角色順便把「權限」跳到那個角色的預設值，跟新連接對話框一樣。
+          this.model.updateNode(id, {
+            config: { role: info.id, permission: info.defaultPermission },
+          });
+          this.propsKey = '';
+          this.renderProps();
+        }),
+      () => {
+        this.model.updateNode(id, { config: { role: undefined } });
         this.propsKey = '';
         this.renderProps();
       },
-      'props-role',
     );
 
     const others = this.model.definition.nodes
@@ -975,6 +986,37 @@ function number(
   el.value = value === undefined ? '' : String(value);
   el.placeholder = '預設';
   el.addEventListener('input', () => onInput(el.value === '' ? undefined : Number(el.value)));
+  return el;
+}
+
+/**
+ * 角色欄位：一格唯讀的顯示 + 「選擇…」「清除」。
+ * 角色庫可能有幾百個，下拉選單放不下也找不到，所以改成開一個選擇器。
+ */
+function roleField(
+  role: RoleInfo | undefined,
+  onPick: () => void,
+  onClear: () => void,
+): HTMLSpanElement {
+  const el = document.createElement('span');
+  el.className = 'role-field';
+
+  const name = span('role-field-name', role ? roleTagText(role) : '無');
+  name.id = 'props-role';
+  if (role?.description) name.title = role.description;
+  el.appendChild(name);
+
+  for (const [id, text, onClick] of [
+    ['props-role-pick', '選擇…', onPick],
+    ['props-role-clear', '清除', onClear],
+  ] as Array<[string, string, () => void]>) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.id = id;
+    button.textContent = text;
+    button.addEventListener('click', onClick);
+    el.appendChild(button);
+  }
   return el;
 }
 

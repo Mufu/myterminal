@@ -11,6 +11,7 @@ import type {
   WorkflowPort,
 } from '../shared/workflow';
 import { DEFAULT_PARAMS, NODE_PORTS, paramsOf, validateWorkflow } from '../shared/workflow';
+import type { RoleInfo } from '../shared/roles';
 
 /**
  * 畫布編輯器的狀態來源：一份 WorkflowDefinition 加上「選了誰、改過沒」。
@@ -276,8 +277,9 @@ export class WorkflowEditorModel {
     this.touch();
   }
 
-  validate(): string[] {
-    return validateWorkflow(this._definition);
+  /** roles 是目前這份角色清單 (內建 + 角色庫)；省略時角色庫的 id 只驗語法。*/
+  validate(roles?: readonly RoleInfo[]): string[] {
+    return validateWorkflow(this._definition, roles);
   }
 
   /**

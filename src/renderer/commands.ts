@@ -9,7 +9,9 @@ import type { BaseShell, ConnectionProfile, SavedProfile } from '../shared/profi
 import type { AgentKind, AgentPermission } from '../shared/agent';
 import type { CliAuthSetting, CliId } from '../shared/cli-auth';
 import { validateCliSetting } from '../shared/cli-auth';
-import type { SaveCliSettingRequest } from '../shared/ipc';
+import type { RolesResult, SaveCliSettingRequest } from '../shared/ipc';
+import type { RoleInfo } from '../shared/roles';
+import { ROLES } from '../shared/roles';
 import type { SessionInfo } from '../shared/session';
 import type {
   ICommand,
@@ -365,6 +367,8 @@ export class SaveWorkflowCommand implements ICommand {
     private readonly model: WorkflowEditorModel,
     private readonly showErrors: (messages: string[]) => void,
     private readonly refresh: () => void | Promise<void>,
+    /** 目前的角色清單 (內建 + 角色庫)；角色庫被搬走時存檔要擋下來。*/
+    private readonly roles: () => readonly RoleInfo[] = () => ROLES,
   ) {}
 
   async execute(): Promise<void> {
@@ -373,7 +377,7 @@ export class SaveWorkflowCommand implements ICommand {
 
   /** 回傳有沒有真的存進去；「儲存並執行」要靠它決定要不要開對話框。*/
   async run(): Promise<boolean> {
-    const errors = this.model.validate();
+    const errors = this.model.validate(this.roles());
     if (errors.length > 0) {
       this.showErrors(errors);
       return false;
@@ -536,6 +540,64 @@ export class RefreshCliAuthCommand implements ICommand {
     } finally {
       this.state.setCliProbing(false);
     }
+  }
+}
+
+/**
+ * 角色庫的兩顆按鈕。兩個都是「問 main 要一份新的角色清單」，
+ * 差別只在有沒有先換資料夾，所以共用同一段收尾：
+ * AppState 換上新清單 (晶片與選擇器跟著換)，對話框拿到整份結果去畫狀態。
+ */
+abstract class RolesCommand implements ICommand {
+  constructor(
+    protected readonly state: AppState,
+    private readonly onResult: (result: RolesResult) => void = () => {},
+    private readonly onError: (message: string) => void = () => {},
+  ) {}
+
+  protected abstract fetch(): Promise<RolesResult>;
+
+  async execute(): Promise<void> {
+    try {
+      const result = await this.fetch();
+      this.state.setRoles(result.roles);
+      this.onResult(result);
+    } catch (error) {
+      this.onError(errorText(error));
+    }
+  }
+}
+
+/** 「重新掃描」：在外面加了 / 改了角色檔之後不必重開 app。*/
+export class RescanRolesCommand extends RolesCommand {
+  constructor(
+    private readonly api: MyTerminalApi,
+    state: AppState,
+    onResult?: (result: RolesResult) => void,
+    onError?: (message: string) => void,
+  ) {
+    super(state, onResult, onError);
+  }
+
+  protected fetch(): Promise<RolesResult> {
+    return this.api.rescanRoles();
+  }
+}
+
+/** 換角色資料夾：main 存起來之後順便重掃；目錄不存在會以訊息 reject。*/
+export class SetRolesDirCommand extends RolesCommand {
+  constructor(
+    private readonly api: MyTerminalApi,
+    state: AppState,
+    private readonly dir: string,
+    onResult?: (result: RolesResult) => void,
+    onError?: (message: string) => void,
+  ) {
+    super(state, onResult, onError);
+  }
+
+  protected fetch(): Promise<RolesResult> {
+    return this.api.setRolesDir(this.dir);
   }
 }
 

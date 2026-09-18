@@ -1,3 +1,5 @@
+import type { RoleInfo } from '../shared/roles';
+
 /**
  * Command 需要的最小介面 (Port)。
  * 正式環境由 xterm.js / navigator.clipboard / <dialog> / <textarea> 實作，
@@ -35,6 +37,14 @@ export interface InputPanelPort {
 
 export interface DialogPort {
   open(): void;
+}
+
+/**
+ * 角色選擇器：開起來，使用者挑一個就把它交回來 (取消就不呼叫)。
+ * 「清除」是欄位自己那顆按鈕的事，所以這裡不會回 null。
+ */
+export interface RolePickerPort {
+  open(currentId: string | undefined, onPick: (role: RoleInfo) => void): void;
 }
 
 /** 刪除前的確認；正式環境是 window.confirm，測試直接回傳 true / false。*/

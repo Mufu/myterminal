@@ -1,12 +1,12 @@
 import type { ConnectionProfile, SessionType, BaseShell } from '../shared/profile';
 import type { AgentKind, AgentPermission } from '../shared/agent';
 import { PERMISSION_LABELS, PERMISSIONS } from '../shared/agent';
-import type { AgentRole } from '../shared/roles';
-import { ROLES, findRole } from '../shared/roles';
+import type { RoleInfo } from '../shared/roles';
+import { ROLES, roleTagText } from '../shared/roles';
 import { defaultStartupCommand, isCliType } from '../shared/profile';
 import { validateProfile } from '../shared/validate-profile';
 import { parseArgs } from '../shared/parse-args';
-import type { DialogPort } from './ports';
+import type { DialogPort, RolePickerPort } from './ports';
 
 const $ = <T extends HTMLElement>(id: string): T => {
   const el = document.getElementById(id);
@@ -36,26 +36,28 @@ export class NewConnectionDialog implements DialogPort {
   private readonly typeSelect = $<HTMLSelectElement>('f-type');
   private readonly errors = $<HTMLParagraphElement>('f-errors');
   private readonly saveProfile = $<HTMLInputElement>('f-save');
-  private readonly roleSelect = $<HTMLSelectElement>('f-agent-role');
+  private readonly roleName = $('f-agent-role-name');
   private readonly permissionSelect = $<HTMLSelectElement>('f-agent-permission');
 
-  constructor(private readonly onCreate: (profile: ConnectionProfile, save: boolean) => void) {
+  /** 選著的角色；沒選就是「無」(不套任何前置指示)。*/
+  private role: RoleInfo | null = null;
+
+  constructor(
+    private readonly onCreate: (profile: ConnectionProfile, save: boolean) => void,
+    /** 「選擇…」開出來的角色選擇器。*/
+    private readonly picker: RolePickerPort,
+    /** 目前的角色清單 (內建 + 角色庫)，驗證時要用。*/
+    private readonly roles: () => readonly RoleInfo[] = () => ROLES,
+  ) {
     this.typeSelect.addEventListener('change', () => this.syncFields());
-    this.fillRoles();
     this.fillPermissions();
-    this.roleSelect.addEventListener('change', () => this.applyRoleDefault());
+    $('f-agent-role-pick').addEventListener('click', () =>
+      this.picker.open(this.role?.id, (role) => this.setRole(role)),
+    );
+    $('f-agent-role-clear').addEventListener('click', () => this.setRole(null));
     $('f-ok').addEventListener('click', (event) => this.submit(event));
     this.syncFields();
-  }
-
-  /** 角色選項就是 ROLES，第一個是「無」(不套任何前置指示)。*/
-  private fillRoles(): void {
-    for (const { id, label } of [{ id: '', label: '無' }, ...ROLES]) {
-      const option = document.createElement('option');
-      option.value = id;
-      option.textContent = label;
-      this.roleSelect.appendChild(option);
-    }
+    this.renderRole();
   }
 
   /** 權限的三檔；「完全放行」的標籤自己帶著警語。*/
@@ -69,9 +71,14 @@ export class NewConnectionDialog implements DialogPort {
   }
 
   /** 換角色時把「權限」帶到那個角色的預設值；只在換的時候動它。*/
-  private applyRoleDefault(): void {
-    const role = findRole(this.roleSelect.value);
+  private setRole(role: RoleInfo | null): void {
+    this.role = role;
     if (role) this.permissionSelect.value = role.defaultPermission;
+    this.renderRole();
+  }
+
+  private renderRole(): void {
+    this.roleName.textContent = this.role ? roleTagText(this.role) : '無';
   }
 
   open(): void {
@@ -99,7 +106,7 @@ export class NewConnectionDialog implements DialogPort {
     const profile = this.collect();
     // 勾了「儲存此連線設定」名稱才是必填的 —— 設定檔以名稱為鍵。
     const save = this.saveProfile.checked;
-    const errors = validateProfile(profile, save);
+    const errors = validateProfile(profile, save, this.roles());
     if (errors.length > 0) {
       // 阻止 <form method="dialog"> 關閉對話框，讓使用者修正。
       event.preventDefault();
@@ -159,7 +166,7 @@ export class NewConnectionDialog implements DialogPort {
           kind: $<HTMLSelectElement>('f-agent-kind').value as AgentKind,
           prompt: $<HTMLTextAreaElement>('f-agent-prompt').value.trim(),
           permission: this.permissionSelect.value as AgentPermission,
-          role: (this.roleSelect.value as AgentRole) || undefined,
+          role: this.role?.id,
         };
 
       case 'custom':

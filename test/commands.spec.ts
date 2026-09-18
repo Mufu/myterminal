@@ -31,6 +31,8 @@ import {
   ClearCliKeyCommand,
   LoginCliCommand,
   RefreshCliAuthCommand,
+  RescanRolesCommand,
+  SetRolesDirCommand,
   errorText,
 } from '../src/renderer/commands';
 import { WorkflowEditorModel } from '../src/renderer/workflow-editor-model';
@@ -40,6 +42,9 @@ import type { MyTerminalApi } from '../src/shared/api';
 import type { SessionInfo } from '../src/shared/session';
 import type { ConnectionProfile, SavedProfile } from '../src/shared/profile';
 import type { CliAuthStatus } from '../src/shared/cli-auth';
+import type { RolesResult } from '../src/shared/ipc';
+import type { RoleInfo } from '../src/shared/roles';
+import { ROLES } from '../src/shared/roles';
 
 const session = (id: string, over: Partial<SessionInfo> = {}): SessionInfo => ({
   id,
@@ -875,5 +880,72 @@ describe('CLI 設定', () => {
 
     await expect(new RefreshCliAuthCommand(cli, state).execute()).rejects.toThrow('探不到');
     expect(state.cliProbing).toBe(false);
+  });
+});
+
+describe('角色庫', () => {
+  const libRole: RoleInfo = {
+    id: 'lib:engineering/code-reviewer',
+    label: 'Code Reviewer',
+    systemPrompt: 'You are Code Reviewer.',
+    defaultPermission: 'readonly',
+    source: 'library',
+    division: 'Engineering',
+  };
+
+  const scan = (over: Partial<RolesResult> = {}): RolesResult => ({
+    roles: [...ROLES, libRole],
+    dir: 'D:\\roles',
+    skipped: [{ relPath: 'README.md', reason: '沒有 frontmatter 的 name' }],
+    scannedAt: 1,
+    ...over,
+  });
+
+  /** 這一組 Command 只用到這兩個方法。*/
+  const rolesApi = (over: Partial<Record<string, unknown>> = {}) =>
+    ({
+      rescanRoles: vi.fn().mockResolvedValue(scan()),
+      setRolesDir: vi.fn().mockResolvedValue(scan({ dir: 'D:\\新的' })),
+      ...over,
+    }) as unknown as MyTerminalApi & {
+      rescanRoles: ReturnType<typeof vi.fn>;
+      setRolesDir: ReturnType<typeof vi.fn>;
+    };
+
+  it('重新掃描：AppState 換上新清單，整份結果交給對話框', async () => {
+    const api = rolesApi();
+    const state = new AppState();
+    const results: RolesResult[] = [];
+
+    await new RescanRolesCommand(api, state, (result) => results.push(result)).execute();
+
+    expect(api.rescanRoles).toHaveBeenCalled();
+    expect(state.roles.at(-1)).toEqual(libRole);
+    expect(results[0].skipped).toHaveLength(1);
+  });
+
+  it('換資料夾：把路徑交給 main，回來的結果同樣進 AppState', async () => {
+    const api = rolesApi();
+    const state = new AppState();
+    const results: RolesResult[] = [];
+
+    await new SetRolesDirCommand(api, state, 'D:\\新的', (r) => results.push(r)).execute();
+
+    expect(api.setRolesDir).toHaveBeenCalledWith('D:\\新的');
+    expect(results[0].dir).toBe('D:\\新的');
+    expect(state.roles).toHaveLength(ROLES.length + 1);
+  });
+
+  it('main 拒絕時只顯示原因，清單留著原來那一份', async () => {
+    const api = rolesApi({
+      setRolesDir: vi.fn().mockRejectedValue(new Error('角色資料夾不存在：D:\\沒有')),
+    });
+    const state = new AppState();
+    const errors: string[] = [];
+
+    await new SetRolesDirCommand(api, state, 'D:\\沒有', () => {}, (m) => errors.push(m)).execute();
+
+    expect(errors).toEqual(['角色資料夾不存在：D:\\沒有']);
+    expect(state.roles).toEqual([...ROLES]);
   });
 });

@@ -227,7 +227,11 @@
           </label>
           <label>
             角色
-            <select id="f-agent-role"></select>
+            <span class="role-field">
+              <span id="f-agent-role-name" class="role-field-name">無</span>
+              <button id="f-agent-role-pick" type="button">選擇…</button>
+              <button id="f-agent-role-clear" type="button">清除</button>
+            </span>
           </label>
           <label>
             任務
@@ -305,6 +309,37 @@
         <menu>
           <button id="cwd-ok" value="ok" type="submit" class="primary">確定</button>
           <button id="cwd-cancel" value="cancel" type="submit" formnovalidate>取消</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <!-- 角色選擇器：內建那一組在最上面，其餘照角色庫的分類分組。
+         標頭那一排是角色庫本身的設定 (資料夾、重新掃描)。 -->
+    <dialog id="role-picker">
+      <form method="dialog" novalidate>
+        <header class="role-picker-head">
+          <h2>選擇角色</h2>
+          <div class="role-lib-row">
+            <label class="role-lib-dir">
+              角色資料夾
+              <input id="roles-dir" type="text" placeholder="放 markdown 角色檔的資料夾" />
+            </label>
+            <button id="roles-browse" type="button">瀏覽…</button>
+            <button id="roles-rescan" type="button">重新掃描</button>
+          </div>
+          <p id="roles-status" class="cli-hint"></p>
+          <details id="roles-skipped" hidden>
+            <summary>略過的檔案</summary>
+            <ul id="roles-skipped-list"></ul>
+          </details>
+          <p id="roles-errors" class="errors"></p>
+          <input id="role-search" type="search" placeholder="搜尋角色（名稱、說明、分類）" />
+        </header>
+
+        <div id="role-picker-list" class="role-list"></div>
+
+        <menu>
+          <button id="role-picker-close" value="cancel" type="submit" formnovalidate>關閉</button>
         </menu>
       </form>
     </dialog>

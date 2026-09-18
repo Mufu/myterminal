@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { AppState } from '../src/renderer/app-state';
+import type { RoleInfo } from '../src/shared/roles';
+import { ROLES } from '../src/shared/roles';
 import type { SessionInfo } from '../src/shared/session';
 import type { SavedProfile } from '../src/shared/profile';
 import type { RunState } from '../src/shared/workflow';
@@ -209,5 +211,27 @@ describe('AppState 工作流', () => {
     state.setSessions([session('a')]);
     expect(state.runs).toEqual([run]);
     expect(state.activeSessionId).toBe('a');
+  });
+});
+
+describe('AppState 角色', () => {
+  it('開機先給內建那五個，roles:list 回來才接上角色庫', () => {
+    const state = new AppState();
+    expect(state.roles).toEqual([...ROLES]);
+
+    let notified = 0;
+    state.subscribe(() => (notified += 1));
+
+    const libRole: RoleInfo = {
+      id: 'lib:engineering/code-reviewer',
+      label: 'Code Reviewer',
+      systemPrompt: 'You are Code Reviewer.',
+      defaultPermission: 'readonly',
+      source: 'library',
+    };
+    state.setRoles([...ROLES, libRole]);
+
+    expect(state.roles.at(-1)).toEqual(libRole);
+    expect(notified).toBe(1);
   });
 });

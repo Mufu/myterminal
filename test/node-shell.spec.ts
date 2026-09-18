@@ -8,7 +8,8 @@ import {
 } from '../src/renderer/node-shell';
 import type { AgentNode } from '../src/renderer/node-shell';
 import type { AgentNodeConfig, RunState } from '../src/shared/workflow';
-import { findRole } from '../src/shared/roles';
+import type { RoleInfo } from '../src/shared/roles';
+import { ROLES, findRole } from '../src/shared/roles';
 
 /**
  * 畫布上的「手動操作」：要在哪個目錄開終端機、要把什麼提示交出去。
@@ -91,6 +92,23 @@ describe('renderNodePrompt', () => {
   it('有角色時前面加上角色的前置指示，中間空一行', () => {
     const agent = node({ prompt: '做事', role: 'coder' });
     expect(renderNodePrompt(agent, null)).toBe(`${findRole('coder')?.systemPrompt}\n\n做事`);
+  });
+
+  it('角色庫的角色從傳進來的清單找', () => {
+    const libRole: RoleInfo = {
+      id: 'lib:engineering/code-reviewer',
+      label: 'Code Reviewer',
+      systemPrompt: 'You are Code Reviewer.',
+      defaultPermission: 'readonly',
+      source: 'library',
+    };
+    const agent = node({ prompt: '做事', role: libRole.id });
+
+    expect(renderNodePrompt(agent, null, [...ROLES, libRole])).toBe(
+      'You are Code Reviewer.\n\n做事',
+    );
+    // 角色庫被搬走之後找不到，就只剩提示本身。
+    expect(renderNodePrompt(agent, null, ROLES)).toBe('做事');
   });
 });
 

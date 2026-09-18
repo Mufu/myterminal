@@ -3,6 +3,7 @@ import type { ElectronApplication, Page } from '@playwright/test';
 import { mkdirSync, realpathSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { findRole } from '../src/shared/roles';
+import { pickRole } from './helpers';
 
 const root = join(__dirname, '..');
 
@@ -58,7 +59,7 @@ test('節點的手動操作：開終端機、複製提示、開終端機並啟�
 
     await window.fill('#props-cwd', realWorkDir);
     await window.fill('#props-prompt', '請說 SHELL_OK');
-    await window.selectOption('#props-role', 'coder');
+    await pickRole(window, '#props-role-pick', '工程師', '工程師');
     // 工程師的預設權限是可修改檔案。
     await expect(window.locator('#props-permission')).toHaveValue('edit');
     // 預設在 PowerShell 裡開。

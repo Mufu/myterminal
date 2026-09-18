@@ -4,7 +4,7 @@ import type { AgentKind } from '../shared/agent';
 import { formatTokens } from '../shared/agent';
 import type { BillingMode, CliAuthStatus } from '../shared/cli-auth';
 import { usageLabel, usageTitle } from '../shared/cli-auth';
-import { findRole } from '../shared/roles';
+import { findRoleIn, roleTagText } from '../shared/roles';
 
 /** 狀態徽章上的字。*/
 export function runStatusLabel(status: RunStatus): string {
@@ -163,11 +163,12 @@ export class WorkflowListView {
       row.append(dot, label);
 
       // 有角色的節點在名字後面貼一個標籤，一眼看得出這一步是誰在做。
-      const role = node.role ? findRole(node.role) : undefined;
+      const role = node.role ? findRoleIn(this.state.roles, node.role) : undefined;
       if (role) {
         const tag = document.createElement('span');
         tag.className = 'role-tag';
-        tag.textContent = role.label;
+        tag.textContent = roleTagText(role);
+        tag.title = roleTagText(role);
         row.appendChild(tag);
       }
 

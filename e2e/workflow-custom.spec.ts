@@ -3,6 +3,7 @@ import type { ElectronApplication, Page } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { pickRole } from './helpers';
 
 const root = join(__dirname, '..');
 
@@ -373,7 +374,7 @@ test('F：Agent 任務選了角色，CLI 也吃得到', async () => {
     await expect(window.locator('#new-connection')).toBeVisible();
     await window.selectOption('#f-type', 'agent');
     await window.selectOption('#f-agent-kind', 'claude');
-    await window.selectOption('#f-agent-role', 'reviewer');
+    await pickRole(window, '#f-agent-role-pick', '審查', '審查者');
     // 審查者的預設是唯讀。
     await expect(window.locator('#f-agent-permission')).toHaveValue('readonly');
     await window.fill('#f-agent-prompt', '用一句話說明你現在扮演的角色');

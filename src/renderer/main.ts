@@ -10,6 +10,7 @@ import { CliStatusView } from './cli-status-view';
 import { NewConnectionDialog } from './new-connection-dialog';
 import { CliSettingsDialog } from './cli-settings-dialog';
 import { WorkflowRunDialog } from './workflow-run-dialog';
+import { RolePickerDialog } from './role-picker-dialog';
 import { InputPanel } from './input-panel';
 import { Toolbar } from './toolbar';
 import {
@@ -202,6 +203,9 @@ function syncTerminals(): void {
 
 const confirmRemove: ConfirmPort = (message) => window.confirm(message);
 
+// 角色選擇器：新連接對話框與畫布的屬性面板共用同一個。
+const rolePicker = new RolePickerDialog(state, api);
+
 const dialog = new NewConnectionDialog((profile, save) => {
   // 勾了儲存時 validateProfile 已經確保名稱不是空的，所以這裡的轉型是安全的。
   // 存不進去 (例如目錄唯讀) 要讓使用者知道，不能默默失敗。
@@ -211,7 +215,7 @@ const dialog = new NewConnectionDialog((profile, save) => {
       .catch((error: unknown) => alert(`儲存連線設定失敗：${errorText(error)}`));
   }
   void createSession(profile);
-});
+}, rolePicker, () => state.roles);
 
 const inputPanel = new InputPanel(
   {
@@ -318,6 +322,7 @@ const editorView = new WorkflowEditorView(
     cancel: (run) => void new CancelWorkflowCommand(api, confirmRemove, run).execute(),
   },
   state,
+  rolePicker,
 );
 
 /**
@@ -363,7 +368,7 @@ function openNodeCli(nodeId: string): void {
       cwd,
       kind: node.config.kind,
       permission: node.config.permission ?? 'readonly',
-      prompt: renderNodePrompt(node, editorRun()),
+      prompt: renderNodePrompt(node, editorRun(), state.roles),
       resumeId: nodeResumeId(node),
     }).execute(),
   );
@@ -379,7 +384,10 @@ function nodeResumeId(node: AgentNode): string | undefined {
 function copyNodePrompt(nodeId: string): void {
   const node = agentNode(nodeId);
   if (!node) return;
-  void new CopyNodePromptCommand(clipboard, renderNodePrompt(node, editorRun())).execute();
+  void new CopyNodePromptCommand(
+    clipboard,
+    renderNodePrompt(node, editorRun(), state.roles),
+  ).execute();
 }
 
 /** 畫布上的「接手」：節點的工作階段本身知道是哪一支 CLI、哪一段對話。*/
@@ -394,6 +402,7 @@ const saveWorkflow = new SaveWorkflowCommand(
   editorModel,
   (messages) => editorView.showErrors(messages),
   refreshWorkflows,
+  () => state.roles,
 );
 
 $<HTMLButtonElement>('btn-workflow-edit').addEventListener('click', () =>
@@ -474,4 +483,9 @@ void api.cliAuth().then((auth) => {
 });
 // 使用者自己選的登入方式：晶片上的字以它為準 (選了金鑰就是拿金鑰在跑)。
 void api.cliSettings().then((settings) => state.setCliSettings(settings));
+// 角色庫：開機掃一次，選擇器的標頭 (資料夾、掃出幾個) 也是同一份結果。
+void api.listRoles().then((result) => {
+  state.setRoles(result.roles);
+  rolePicker.showScan(result);
+});
 void refreshWorkflows();
